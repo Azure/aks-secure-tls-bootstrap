@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+option go_package = "github.com/Azure/aks-tls-bootstrap-client;aks_tls_bootstrap";
+
+package aks_tls_bootstrap;
+
+service AKSBootstrapTokenRequest {
+    // Step 1 of retrieving a bootstrap token; generates a nonce to be used by the
+    // client when requesting attested data.
+    rpc GetNonce(NonceRequest) returns (NonceResponse) {}
+
+    // Step 2 of retrieving a bootstrap token; validates the attested data and the
+    // nonce, then generates and returns the bootstrap token to the client.
+    rpc GetToken(TokenRequest) returns (TokenResponse) {}
+}
+
+// A nonce is generated for a given request.
+message NonceRequest {
+    string ResourceId = 1;
+}
+
+// This Response contains the nonce for the client to use in attested data.
+message NonceResponse {
+    string Nonce = 1;
+}
+
+// A token request has to match a valid generated nonce and auth data.
+message TokenRequest {
+    string ResourceId = 1;
+    string Nonce = 2;
+    string AttestedData = 3;
+}
+
+// The response token is used by kubelet to bootstrap itself.
+message TokenResponse {
+    string Token = 1;
+    string Expiration = 2;
+}
