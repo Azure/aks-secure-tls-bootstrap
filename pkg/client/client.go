@@ -79,9 +79,11 @@ func (c *tlsBootstrapClientImpl) GetBootstrapToken() (string, error) {
 
 	conn, err := grpc.Dial(server,
 		grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)),
-		grpc.WithPerRPCCredentials(oauth.NewOauthAccess(&oauth2.Token{
-			AccessToken: token,
-		})),
+		grpc.WithPerRPCCredentials(oauth.TokenSource{
+			TokenSource: oauth2.StaticTokenSource(&oauth2.Token{
+				AccessToken: token,
+			}),
+		}),
 	)
 	if err != nil {
 		return "", fmt.Errorf("failed to connect to %s: %w", execCredential.Spec.Cluster.Server, err)
