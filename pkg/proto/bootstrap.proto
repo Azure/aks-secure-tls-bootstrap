@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
 syntax = "proto3";
 
 option go_package = "github.com/Azure/aks-tls-bootstrap-client;aks_tls_bootstrap";
