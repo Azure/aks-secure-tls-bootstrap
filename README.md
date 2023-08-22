@@ -1,14 +1,14 @@
-# Project
+# aks-tls-bootstrap-client
 
-> This repo has been populated by an initial template to help get you started. Please
-> make sure to update the content to build a great experience for community-building.
+[![Test coverage](https://github.com/Azure/aks-tls-bootstrap-client/actions/workflows/check-coverage.yaml/badge.svg)](https://github.com/Azure/aks-tls-bootstrap-client/actions/workflows/check-coverage.yaml)
+[![Coverage Status](https://coveralls.io/repos/github/Azure/aks-tls-bootstrap-client/badge.svg?branch=main)](https://coveralls.io/github/Azure/aks-tls-bootstrap-client?branch=main)
 
-As the maintainer of this project, please make a few updates:
+[![golangci-lint](https://github.com/Azure/aks-tls-bootstrap-client/actions/workflows/golangci-lint.yaml/badge.svg)](https://github.com/Azure/aks-tls-bootstrap-client/actions/workflows/golangci-lint.yaml)
 
-- Improving this README.MD file to provide a great experience
-- Updating SUPPORT.MD with content about this project's support experience
-- Understanding the security reporting process in SECURITY.MD
-- Remove this section from the README
+This repo contains the following:
+
+- Implementation of the AKS secure TLS bootstrapping protocol client
+- The supporting protobuf definitions and datamodel
 
 ## Contributing
 
