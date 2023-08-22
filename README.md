@@ -1,6 +1,7 @@
 # aks-tls-bootstrap-client
 
 [![Test coverage](https://github.com/Azure/aks-tls-bootstrap-client/actions/workflows/check-coverage.yaml/badge.svg)](https://github.com/Azure/aks-tls-bootstrap-client/actions/workflows/check-coverage.yaml)
+[![Coverage Status](https://coveralls.io/repos/github/Azure/aks-tls-bootstrap-client/badge.svg?branch=main)](https://coveralls.io/github/Azure/aks-tls-bootstrap-client?branch=main)
 
 [![golangci-lint](https://github.com/Azure/aks-tls-bootstrap-client/actions/workflows/golangci-lint.yaml/badge.svg)](https://github.com/Azure/aks-tls-bootstrap-client/actions/workflows/golangci-lint.yaml)
 
