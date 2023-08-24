@@ -53,11 +53,11 @@ fmt-vet:
 
 .PHONY: test
 test: ## Test all applicable go packages.
-	go test $(shell go list ./pkg... | grep -v proto | grep -v vendor | grep -v mock | grep -v datamodel)
+	go test $(shell go list ./pkg... | grep -v proto | grep -v vendor | grep -v mock)
 
 .PHONY: test-coverage
 test-coverage:
-	go test $(shell go list ./pkg... | grep -v proto | grep -v vendor | grep -v mock | grep -v datamodel) -coverprofile coverage_raw.out -covermode count
+	go test $(shell go list ./pkg... | grep -v proto | grep -v vendor | grep -v mock) -coverprofile coverage_raw.out -covermode count
 
 ##@ Build
 
