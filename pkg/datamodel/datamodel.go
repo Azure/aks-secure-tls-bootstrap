@@ -4,6 +4,7 @@
 package datamodel
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
@@ -47,6 +48,16 @@ type AzureADTokenClaims struct {
 	Ver               string   `json:"ver"`
 	Wids              []string `json:"wids"`
 	jwt.RegisteredClaims
+}
+
+func (c *AzureADTokenClaims) Valid() error {
+	if c.AppID == "" {
+		return fmt.Errorf("appid claim must be included and non-empty")
+	}
+	if c.Tid == "" {
+		return fmt.Errorf("tid claim must be included and non-empty")
+	}
+	return c.RegisteredClaims.Valid()
 }
 
 type Request struct {
