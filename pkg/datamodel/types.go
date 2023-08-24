@@ -46,7 +46,7 @@ type AzureADTokenClaims struct {
 	Uti               string   `json:"uti"`
 	Ver               string   `json:"ver"`
 	Wids              []string `json:"wids"`
-	jwt.StandardClaims
+	jwt.RegisteredClaims
 }
 
 type Request struct {
