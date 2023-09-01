@@ -6,9 +6,9 @@ package client
 import (
 	"github.com/Azure/aks-tls-bootstrap-client/pkg/client/mocks"
 	"github.com/Azure/aks-tls-bootstrap-client/pkg/datamodel"
-	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"go.uber.org/mock/gomock"
 )
 
 var _ = Describe("Auth tests", func() {

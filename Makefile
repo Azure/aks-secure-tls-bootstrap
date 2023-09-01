@@ -61,6 +61,10 @@ test-coverage:
 
 ##@ Build
 
+.PHONY: generate
+generate: mockgen ## Run go generate against code.
+	go generate ./...
+
 .PHONY: protobuf
 protobuf:
 	protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative pkg/proto/bootstrap.proto
@@ -84,6 +88,9 @@ build-client-windows: ## Builds a windows binary for the specified architecture
 build: fmt vet # Build client binary
 	go build -o bin/tls-bootstrap-client cmd/client/main.go
 
+mockgen:
+	$(call go-install-tool,$(PROJECT_DIR)/bin/mockgen,go.uber.org/mock/mockgen@v0.2.0)
+
 ifndef ignore-not-found
   ignore-not-found = false
 endif
@@ -99,5 +106,14 @@ go mod init tmp ;\
 echo "Downloading $(2)" ;\
 GOBIN=$(PROJECT_DIR)/bin go get $(2) ;\
 rm -rf $$TMP_DIR ;\
+}
+endef
+
+# go-install-tool will 'go install' any package $2 and install it to $1.
+define go-install-tool
+@[ -f $(1) ] || { \
+	set -e ;\
+	echo "Downloading $(2)" ;\
+	GOBIN=$(PROJECT_DIR)/bin go install $(2) ;\
 }
 endef
