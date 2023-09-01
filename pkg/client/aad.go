@@ -15,7 +15,7 @@ import (
 )
 
 type AadClient interface {
-	GetAadToken(clientID, clientSecret, tenantID string, scopes []string) (string, error)
+	GetAadToken(ctx context.Context, clientID, clientSecret, tenantID string, scopes []string) (string, error)
 }
 
 func NewAadClient(logger *logrus.Logger) AadClient {
@@ -28,7 +28,7 @@ type aadClientImpl struct {
 	Logger *logrus.Logger
 }
 
-func (c *aadClientImpl) GetAadToken(clientID, clientSecret, tenantID string, scopes []string) (string, error) {
+func (c *aadClientImpl) GetAadToken(ctx context.Context, clientID, clientSecret, tenantID string, scopes []string) (string, error) {
 	if scopes == nil {
 		scopes = []string{}
 	}
@@ -50,7 +50,7 @@ func (c *aadClientImpl) GetAadToken(clientID, clientSecret, tenantID string, sco
 
 	c.Logger.WithField("scopes", strings.Join(scopes, ",")).Info("requesting new AAD token")
 
-	authResult, err := client.AcquireTokenByCredential(context.Background(), scopes)
+	authResult, err := client.AcquireTokenByCredential(ctx, scopes)
 	if err != nil {
 		return "", fmt.Errorf("failed to acquire token via service principal: %w", err)
 	}

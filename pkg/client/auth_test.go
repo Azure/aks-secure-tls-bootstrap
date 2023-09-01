@@ -4,6 +4,8 @@
 package client
 
 import (
+	"context"
+
 	"github.com/Azure/aks-tls-bootstrap-client/pkg/client/mocks"
 	"github.com/Azure/aks-tls-bootstrap-client/pkg/datamodel"
 	. "github.com/onsi/ginkgo"
@@ -40,14 +42,17 @@ var _ = Describe("Auth tests", func() {
 
 			When("azure json is missing clientId", func() {
 				It("should return an error", func() {
-					imdsClient.EXPECT().GetMSIToken(gomock.Any(), gomock.Any()).Times(0)
-					aadClient.EXPECT().GetAadToken(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+					imdsClient.EXPECT().GetMSIToken(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+					aadClient.EXPECT().GetAadToken(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					azureConfig := &datamodel.KubeletAzureJSON{
 						ClientSecret: "secret",
 						TenantID:     "tid",
 					}
 
-					spToken, err := tlsBootstrapClient.getAuthToken(emptyClientID, azureConfig)
+					ctx, cancel := context.WithCancel(context.Background())
+					defer cancel()
+
+					spToken, err := tlsBootstrapClient.getAuthToken(ctx, emptyClientID, azureConfig)
 					Expect(spToken).To(BeEmpty())
 					Expect(err).ToNot(BeNil())
 					Expect(err.Error()).To(ContainSubstring("cannot retrieve SP token from AAD: azure.json missing clientId"))
@@ -56,14 +61,17 @@ var _ = Describe("Auth tests", func() {
 
 			When("azure json is missing clientSecret", func() {
 				It("should return an error", func() {
-					imdsClient.EXPECT().GetMSIToken(gomock.Any(), gomock.Any()).Times(0)
-					aadClient.EXPECT().GetAadToken(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+					imdsClient.EXPECT().GetMSIToken(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+					aadClient.EXPECT().GetAadToken(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					azureConfig := &datamodel.KubeletAzureJSON{
 						ClientID: "cid",
 						TenantID: "tid",
 					}
 
-					spToken, err := tlsBootstrapClient.getAuthToken(emptyClientID, azureConfig)
+					ctx, cancel := context.WithCancel(context.Background())
+					defer cancel()
+
+					spToken, err := tlsBootstrapClient.getAuthToken(ctx, emptyClientID, azureConfig)
 					Expect(spToken).To(BeEmpty())
 					Expect(err).ToNot(BeNil())
 					Expect(err.Error()).To(ContainSubstring("cannot retrieve SP token from AAD: azure.json missing clientSecret"))
@@ -72,14 +80,17 @@ var _ = Describe("Auth tests", func() {
 
 			When("azure json is missing tenantId", func() {
 				It("should return an error", func() {
-					imdsClient.EXPECT().GetMSIToken(gomock.Any(), gomock.Any()).Times(0)
-					aadClient.EXPECT().GetAadToken(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+					imdsClient.EXPECT().GetMSIToken(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+					aadClient.EXPECT().GetAadToken(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					azureConfig := &datamodel.KubeletAzureJSON{
 						ClientID:     "cid",
 						ClientSecret: "secret",
 					}
 
-					spToken, err := tlsBootstrapClient.getAuthToken(emptyClientID, azureConfig)
+					ctx, cancel := context.WithCancel(context.Background())
+					defer cancel()
+
+					spToken, err := tlsBootstrapClient.getAuthToken(ctx, emptyClientID, azureConfig)
 					Expect(spToken).To(BeEmpty())
 					Expect(err).ToNot(BeNil())
 					Expect(err.Error()).To(ContainSubstring("cannot retrieve SP token from AAD: azure.json missing tenantId"))
@@ -89,12 +100,13 @@ var _ = Describe("Auth tests", func() {
 			When("azure json contains msi clientId and userAssignedIdentityId is non-empty", func() {
 				It("should acquire MSI token from IMDS using userAssignedIdentityId as clientId", func() {
 					userAssignedIdentityID := "uami"
-					imdsClient.EXPECT().GetMSIToken(baseImdsURL, userAssignedIdentityID).Return(
+					imdsClient.EXPECT().GetMSIToken(gomock.Any(), baseImdsURL, userAssignedIdentityID).Return(
 						&datamodel.TokenResponseJSON{
 							AccessToken: "mockMSIToken",
 						}, nil,
 					).Times(1)
 					aadClient.EXPECT().GetAadToken(
+						gomock.Any(),
 						gomock.Any(),
 						gomock.Any(),
 						gomock.Any(),
@@ -105,7 +117,10 @@ var _ = Describe("Auth tests", func() {
 						UserAssignedIdentityID: userAssignedIdentityID,
 					}
 
-					msiToken, err := tlsBootstrapClient.getAuthToken(emptyClientID, azureConfigMsi)
+					ctx, cancel := context.WithCancel(context.Background())
+					defer cancel()
+
+					msiToken, err := tlsBootstrapClient.getAuthToken(ctx, emptyClientID, azureConfigMsi)
 					Expect(err).To(BeNil())
 					Expect(msiToken).To(Equal("mockMSIToken"))
 				})
@@ -113,7 +128,7 @@ var _ = Describe("Auth tests", func() {
 
 			When("azure json contains msi clientId and userAssignedIdentityId is empty", func() {
 				It("should acquire MSI token from IMDS", func() {
-					imdsClient.EXPECT().GetMSIToken(baseImdsURL, emptyClientID).Return(
+					imdsClient.EXPECT().GetMSIToken(gomock.Any(), baseImdsURL, emptyClientID).Return(
 						&datamodel.TokenResponseJSON{
 							AccessToken: "mockMSIToken",
 						}, nil,
@@ -123,12 +138,16 @@ var _ = Describe("Auth tests", func() {
 						gomock.Any(),
 						gomock.Any(),
 						gomock.Any(),
+						gomock.Any(),
 					).Times(0)
 					azureConfigMsi := &datamodel.KubeletAzureJSON{
 						ClientID: "msi",
 					}
 
-					msiToken, err := tlsBootstrapClient.getAuthToken(emptyClientID, azureConfigMsi)
+					ctx, cancel := context.WithCancel(context.Background())
+					defer cancel()
+
+					msiToken, err := tlsBootstrapClient.getAuthToken(ctx, emptyClientID, azureConfigMsi)
 					Expect(err).To(BeNil())
 					Expect(msiToken).To(Equal("mockMSIToken"))
 				})
@@ -136,12 +155,14 @@ var _ = Describe("Auth tests", func() {
 
 			When("azure json contains non-MSI clientId", func() {
 				It("should use service principal and acquire token from AAD", func() {
-					aadClient.EXPECT().GetAadToken("no-msi", "secret", "tenantId", gomock.Any()).Return(
+					aadClient.EXPECT().GetAadToken(gomock.Any(), "no-msi", "secret", "tenantId", gomock.Any()).Return(
 						"spToken",
 						nil,
 					).Times(1)
 					imdsClient.EXPECT().GetMSIToken(
-						gomock.Any(), gomock.Any(),
+						gomock.Any(),
+						gomock.Any(),
+						gomock.Any(),
 					).Times(0)
 					azureConfigNoMsi := &datamodel.KubeletAzureJSON{
 						ClientID:     "no-msi",
@@ -149,7 +170,10 @@ var _ = Describe("Auth tests", func() {
 						TenantID:     "tenantId",
 					}
 
-					spToken, err := tlsBootstrapClient.getAuthToken(emptyClientID, azureConfigNoMsi)
+					ctx, cancel := context.WithCancel(context.Background())
+					defer cancel()
+
+					spToken, err := tlsBootstrapClient.getAuthToken(ctx, emptyClientID, azureConfigNoMsi)
 					Expect(err).To(BeNil())
 					Expect(spToken).To(Equal("spToken"))
 				})
@@ -160,7 +184,7 @@ var _ = Describe("Auth tests", func() {
 			var nonEmptyClientID = "clientId"
 
 			It("should acquire MSI token from IMDS", func() {
-				imdsClient.EXPECT().GetMSIToken(baseImdsURL, nonEmptyClientID).Return(
+				imdsClient.EXPECT().GetMSIToken(gomock.Any(), baseImdsURL, nonEmptyClientID).Return(
 					&datamodel.TokenResponseJSON{
 						AccessToken: "mockMSIToken",
 					}, nil,
@@ -170,9 +194,13 @@ var _ = Describe("Auth tests", func() {
 					gomock.Any(),
 					gomock.Any(),
 					gomock.Any(),
+					gomock.Any(),
 				).Times(0)
 
-				token, err := tlsBootstrapClient.getAuthToken(nonEmptyClientID, nil)
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
+				token, err := tlsBootstrapClient.getAuthToken(ctx, nonEmptyClientID, nil)
 				Expect(err).To(BeNil())
 				Expect(token).To(Equal("mockMSIToken"))
 			})

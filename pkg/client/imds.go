@@ -17,9 +17,9 @@ import (
 )
 
 type ImdsClient interface {
-	GetMSIToken(imdsURL, clientID string) (*datamodel.TokenResponseJSON, error)
-	GetInstanceData(imdsURL string) (*datamodel.VmssInstanceData, error)
-	GetAttestedData(imdsURL, nonce string) (*datamodel.VmssAttestedData, error)
+	GetMSIToken(ctx context.Context, imdsURL, clientID string) (*datamodel.TokenResponseJSON, error)
+	GetInstanceData(ctx context.Context, imdsURL string) (*datamodel.VmssInstanceData, error)
+	GetAttestedData(ctx context.Context, imdsURL, nonce string) (*datamodel.VmssAttestedData, error)
 }
 
 func NewImdsClient(logger *logrus.Logger) ImdsClient {
@@ -32,7 +32,7 @@ type imdsClientImpl struct {
 	logger *logrus.Logger
 }
 
-func (c *imdsClientImpl) GetMSIToken(imdsURL, clientID string) (*datamodel.TokenResponseJSON, error) {
+func (c *imdsClientImpl) GetMSIToken(ctx context.Context, imdsURL, clientID string) (*datamodel.TokenResponseJSON, error) {
 	// TODO(cameissner): modify so this works on all clouds later
 	url := fmt.Sprintf("%s/metadata/identity/oauth2/token", imdsURL)
 	queryParameters := map[string]string{
@@ -45,7 +45,7 @@ func (c *imdsClientImpl) GetMSIToken(imdsURL, clientID string) (*datamodel.Token
 
 	data := &datamodel.TokenResponseJSON{}
 
-	if err := getImdsData(c.logger, url, queryParameters, data); err != nil {
+	if err := getImdsData(ctx, c.logger, url, queryParameters, data); err != nil {
 		return nil, fmt.Errorf("failed to retrieve IMDS MSI token: %w", err)
 	}
 	if data.Error != "" {
@@ -56,7 +56,7 @@ func (c *imdsClientImpl) GetMSIToken(imdsURL, clientID string) (*datamodel.Token
 	return data, nil
 }
 
-func (c *imdsClientImpl) GetInstanceData(imdsURL string) (*datamodel.VmssInstanceData, error) {
+func (c *imdsClientImpl) GetInstanceData(ctx context.Context, imdsURL string) (*datamodel.VmssInstanceData, error) {
 	url := fmt.Sprintf("%s/metadata/instance", imdsURL)
 	queryParameters := map[string]string{
 		"api-version": "2021-05-01",
@@ -64,14 +64,14 @@ func (c *imdsClientImpl) GetInstanceData(imdsURL string) (*datamodel.VmssInstanc
 	}
 	data := &datamodel.VmssInstanceData{}
 
-	if err := getImdsData(c.logger, url, queryParameters, data); err != nil {
+	if err := getImdsData(ctx, c.logger, url, queryParameters, data); err != nil {
 		return nil, fmt.Errorf("failed to retrieve IMDS instance data: %w", err)
 	}
 
 	return data, nil
 }
 
-func (c *imdsClientImpl) GetAttestedData(imdsURL, nonce string) (*datamodel.VmssAttestedData, error) {
+func (c *imdsClientImpl) GetAttestedData(ctx context.Context, imdsURL, nonce string) (*datamodel.VmssAttestedData, error) {
 	url := fmt.Sprintf("%s/metadata/attested/document", imdsURL)
 	queryParameters := map[string]string{
 		"api-version": "2021-05-01",
@@ -80,17 +80,17 @@ func (c *imdsClientImpl) GetAttestedData(imdsURL, nonce string) (*datamodel.Vmss
 	}
 
 	data := &datamodel.VmssAttestedData{}
-	if err := getImdsData(c.logger, url, queryParameters, data); err != nil {
+	if err := getImdsData(ctx, c.logger, url, queryParameters, data); err != nil {
 		return nil, fmt.Errorf("failed to retrieve IMDS attested data: %w", err)
 	}
 
 	return data, nil
 }
 
-func getImdsData(logger *logrus.Logger, url string, queryParameters map[string]string, responseObject interface{}) error {
+func getImdsData(ctx context.Context, logger *logrus.Logger, url string, queryParameters map[string]string, responseObject interface{}) error {
 	client := http.Client{Transport: &http.Transport{Proxy: nil}}
 
-	request, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return fmt.Errorf("failed to initialize HTTP request: %w", err)
 	}
@@ -109,7 +109,10 @@ func getImdsData(logger *logrus.Logger, url string, queryParameters map[string]s
 	}
 
 	defer response.Body.Close()
-	responseBody, _ := io.ReadAll(response.Body)
+	responseBody, err := io.ReadAll(response.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read IMDS response body: %w", err)
+	}
 
 	logger.WithField("responseBody", string(responseBody)).Debug("received IMDS reply")
 

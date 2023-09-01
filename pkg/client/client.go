@@ -22,8 +22,9 @@ import (
 	"google.golang.org/grpc/credentials/oauth"
 )
 
+// TLSBootstrapClient retrieves tokens for performing node TLS bootstrapping.
 type TLSBootstrapClient interface {
-	GetBootstrapToken() (string, error)
+	GetBootstrapToken(ctx context.Context) (string, error)
 }
 
 func NewTLSBootstrapClient(logger *logrus.Logger, clientID, nextProto string) TLSBootstrapClient {
@@ -47,7 +48,7 @@ type tlsBootstrapClientImpl struct {
 	nextProto  string
 }
 
-func (c *tlsBootstrapClientImpl) GetBootstrapToken() (string, error) {
+func (c *tlsBootstrapClientImpl) GetBootstrapToken(ctx context.Context) (string, error) {
 	c.logger.Info("retrieving auth token")
 
 	execCredential, err := loadExecCredential(c.logger)
@@ -70,7 +71,7 @@ func (c *tlsBootstrapClientImpl) GetBootstrapToken() (string, error) {
 		return "", fmt.Errorf("failed to parse azure config from azure.json: %w", err)
 	}
 
-	token, err := c.getAuthToken(c.clientID, azureConfig)
+	token, err := c.getAuthToken(ctx, c.clientID, azureConfig)
 	if err != nil {
 		return "", err
 	}
@@ -80,7 +81,8 @@ func (c *tlsBootstrapClientImpl) GetBootstrapToken() (string, error) {
 		return "", err
 	}
 
-	conn, err := grpc.Dial(server,
+	conn, err := grpc.DialContext(
+		ctx, server,
 		grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)),
 		grpc.WithPerRPCCredentials(oauth.TokenSource{
 			TokenSource: oauth2.StaticTokenSource(&oauth2.Token{
@@ -96,7 +98,7 @@ func (c *tlsBootstrapClientImpl) GetBootstrapToken() (string, error) {
 	pbClient := pb.NewAKSBootstrapTokenRequestClient(conn)
 
 	c.logger.Info("retrieving IMDS instance data")
-	instanceData, err := c.imdsClient.GetInstanceData(baseImdsURL)
+	instanceData, err := c.imdsClient.GetInstanceData(ctx, baseImdsURL)
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve instance metadata from IMDS: %w", err)
 	}
@@ -105,14 +107,14 @@ func (c *tlsBootstrapClientImpl) GetBootstrapToken() (string, error) {
 	nonceRequest := pb.NonceRequest{
 		ResourceId: instanceData.Compute.ResourceID,
 	}
-	nonce, err := pbClient.GetNonce(context.Background(), &nonceRequest)
+	nonce, err := pbClient.GetNonce(ctx, &nonceRequest)
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve a nonce: %w", err)
 	}
 	c.logger.Infof("nonce reply is %s", nonce.Nonce)
 
 	c.logger.Info("retrieving IMDS attested data")
-	attestedData, err := c.imdsClient.GetAttestedData(baseImdsURL, nonce.Nonce)
+	attestedData, err := c.imdsClient.GetAttestedData(ctx, baseImdsURL, nonce.Nonce)
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve attested data from IMDS: %w", err)
 	}
@@ -123,7 +125,7 @@ func (c *tlsBootstrapClientImpl) GetBootstrapToken() (string, error) {
 		Nonce:        nonce.Nonce,
 		AttestedData: attestedData.Signature,
 	}
-	tokenReply, err := pbClient.GetToken(context.Background(), &tokenRequest)
+	tokenReply, err := pbClient.GetToken(ctx, &tokenRequest)
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve a token: %w", err)
 	}

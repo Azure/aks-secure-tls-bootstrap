@@ -4,6 +4,7 @@
 package client
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -38,7 +39,10 @@ var _ = Describe("TLS Bootstrap Client IMDS tests", func() {
 			})
 			defer imds.Close()
 
-			err := getImdsData(testLogger, imds.URL, map[string]string{}, &struct{}{})
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			err := getImdsData(ctx, testLogger, imds.URL, map[string]string{}, &struct{}{})
 			Expect(err).To(BeNil())
 		})
 
@@ -49,7 +53,10 @@ var _ = Describe("TLS Bootstrap Client IMDS tests", func() {
 				})
 				defer imds.Close()
 
-				err := getImdsData(testLogger, imds.URL, map[string]string{}, &struct{}{})
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
+				err := getImdsData(ctx, testLogger, imds.URL, map[string]string{}, &struct{}{})
 				Expect(err).To(BeNil())
 			})
 		})
@@ -69,7 +76,10 @@ var _ = Describe("TLS Bootstrap Client IMDS tests", func() {
 				})
 				defer imds.Close()
 
-				err := getImdsData(testLogger, imds.URL, params, &struct{}{})
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
+				err := getImdsData(ctx, testLogger, imds.URL, params, &struct{}{})
 				Expect(err).To(BeNil())
 			})
 		})
@@ -87,7 +97,10 @@ var _ = Describe("TLS Bootstrap Client IMDS tests", func() {
 				})
 				defer imds.Close()
 
-				tokenResp, err := imdsClient.GetMSIToken(imds.URL, "")
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
+				tokenResp, err := imdsClient.GetMSIToken(ctx, imds.URL, "")
 				Expect(err).To(BeNil())
 				Expect(tokenResp).NotTo(BeNil())
 				Expect(tokenResp.AccessToken).To(Equal("accesstoken"))
@@ -106,8 +119,11 @@ var _ = Describe("TLS Bootstrap Client IMDS tests", func() {
 				})
 				defer imds.Close()
 
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
 				clientID := "clientId"
-				tokenResp, err := imdsClient.GetMSIToken(imds.URL, clientID)
+				tokenResp, err := imdsClient.GetMSIToken(ctx, imds.URL, clientID)
 				Expect(err).To(BeNil())
 				Expect(tokenResp).NotTo(BeNil())
 				Expect(tokenResp.AccessToken).To(Equal("accesstoken"))
@@ -126,7 +142,10 @@ var _ = Describe("TLS Bootstrap Client IMDS tests", func() {
 			})
 			defer imds.Close()
 
-			instanceData, err := imdsClient.GetInstanceData(imds.URL)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			instanceData, err := imdsClient.GetInstanceData(ctx, imds.URL)
 			Expect(err).To(BeNil())
 			Expect(instanceData).ToNot(BeNil())
 			Expect(instanceData.Compute.ResourceID).To(Equal("resourceId"))
@@ -144,8 +163,11 @@ var _ = Describe("TLS Bootstrap Client IMDS tests", func() {
 			})
 			defer imds.Close()
 
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
 			nonce := "nonce"
-			attestedData, err := imdsClient.GetAttestedData(imds.URL, nonce)
+			attestedData, err := imdsClient.GetAttestedData(ctx, imds.URL, nonce)
 			Expect(err).To(BeNil())
 			Expect(attestedData).ToNot(BeNil())
 			Expect(attestedData.Signature).To(Equal("signature"))
