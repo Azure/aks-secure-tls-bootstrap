@@ -4,9 +4,13 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/Azure/aks-tls-bootstrap-client/pkg/client"
 	"github.com/sirupsen/logrus"
@@ -54,7 +58,10 @@ func main() {
 
 	bootstrapClient := client.NewTLSBootstrapClient(logger, *clientID, *nextProto)
 
-	token, err := bootstrapClient.GetBootstrapToken()
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+
+	token, err := bootstrapClient.GetBootstrapToken(ctx)
 	if err != nil {
 		logger.Fatalf("Failed to retrieve bootstrap token: %s", err)
 	}
