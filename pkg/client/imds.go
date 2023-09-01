@@ -3,7 +3,7 @@
 
 package client
 
-//go:generate mockgen -destination=./mocks/mock_imds.go -package=mocks github.com/Azure/aks-tls-bootstrap-client/pkg/client ImdsClient
+//go:generate ../../bin/mockgen -copyright_file=../../hack/copyright_header.txt -destination=./mocks/mock_imds.go -package=mocks github.com/Azure/aks-tls-bootstrap-client/pkg/client ImdsClient
 
 import (
 	"context"

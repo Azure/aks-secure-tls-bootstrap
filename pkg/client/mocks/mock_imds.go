@@ -9,7 +9,7 @@ import (
 	reflect "reflect"
 
 	datamodel "github.com/Azure/aks-tls-bootstrap-client/pkg/datamodel"
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockImdsClient is a mock of ImdsClient interface.
