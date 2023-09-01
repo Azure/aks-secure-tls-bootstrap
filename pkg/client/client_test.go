@@ -3,6 +3,7 @@
 package client
 
 import (
+	"context"
 	"crypto/x509"
 	"os"
 	"strings"
@@ -86,7 +87,10 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 	Context("Test GetBootstrapToken", func() {
 		It("should return an error when KUBERNETES_EXEC_INFO is missing", func() {
 			os.Setenv("KUBERNETES_EXEC_INFO", "")
-			token, err := bootstrapClient.GetBootstrapToken()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			token, err := bootstrapClient.GetBootstrapToken(ctx)
 			Expect(token).To(BeEmpty())
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(ContainSubstring("KUBERNETES_EXEC_INFO variable not found"))

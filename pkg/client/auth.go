@@ -4,6 +4,7 @@
 package client
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -11,7 +12,7 @@ import (
 	"github.com/Azure/aks-tls-bootstrap-client/pkg/datamodel"
 )
 
-func (c *tlsBootstrapClientImpl) getAuthToken(clientID string, azureConfig *datamodel.KubeletAzureJSON) (string, error) {
+func (c *tlsBootstrapClientImpl) getAuthToken(ctx context.Context, clientID string, azureConfig *datamodel.KubeletAzureJSON) (string, error) {
 	if clientID == "" {
 		if azureConfig == nil {
 			return "", fmt.Errorf("clientId is missing and supplied azureConfig is nil")
@@ -24,7 +25,7 @@ func (c *tlsBootstrapClientImpl) getAuthToken(clientID string, azureConfig *data
 
 	if clientID != "" || azureConfig.ClientID == managedServiceIdentity {
 		c.logger.Info("retrieving MSI access token from IMDS")
-		msiToken, err := c.imdsClient.GetMSIToken(baseImdsURL, clientID)
+		msiToken, err := c.imdsClient.GetMSIToken(ctx, baseImdsURL, clientID)
 		if err != nil {
 			return "", err
 		}
@@ -45,6 +46,7 @@ func (c *tlsBootstrapClientImpl) getAuthToken(clientID string, azureConfig *data
 
 	c.logger.Info("retrieving SP access token from AAD")
 	spToken, err := c.aadClient.GetAadToken(
+		ctx,
 		azureConfig.ClientID,
 		azureConfig.ClientSecret,
 		azureConfig.TenantID,
