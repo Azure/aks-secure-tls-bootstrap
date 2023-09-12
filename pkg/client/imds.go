@@ -14,6 +14,8 @@ import (
 
 	"github.com/Azure/aks-tls-bootstrap-client/pkg/datamodel"
 	"github.com/sirupsen/logrus"
+
+	"github.com/avast/retry-go/v4"
 )
 
 type ImdsClient interface {
@@ -88,35 +90,49 @@ func (c *imdsClientImpl) GetAttestedData(ctx context.Context, imdsURL, nonce str
 }
 
 func getImdsData(ctx context.Context, logger *logrus.Logger, url string, queryParameters map[string]string, responseObject interface{}) error {
-	client := http.Client{Transport: &http.Transport{Proxy: nil}}
-
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return fmt.Errorf("failed to initialize HTTP request: %w", err)
+	client := http.Client{
+		Transport: &http.Transport{
+			Proxy: nil,
+		},
 	}
 
-	request.Header.Add("Metadata", "True")
+	responseBody, err := retry.DoWithData(func() ([]byte, error) {
+		request, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		if err != nil {
+			return nil, retry.Unrecoverable(err)
+		}
+		request.Header.Add(metadataHeaderKey, "True")
 
-	query := request.URL.Query()
-	for key := range queryParameters {
-		query.Add(key, queryParameters[key])
-	}
-	request.URL.RawQuery = query.Encode()
+		query := request.URL.Query()
+		for key := range queryParameters {
+			query.Add(key, queryParameters[key])
+		}
+		request.URL.RawQuery = query.Encode()
 
-	response, err := client.Do(request)
+		response, err := client.Do(request)
+		if err != nil {
+			return nil, err
+		}
+
+		defer response.Body.Close()
+		responseBody, err := io.ReadAll(response.Body)
+		if err != nil {
+			return nil, err
+		}
+
+		return responseBody, nil
+	},
+		retry.Context(ctx),
+		retry.Attempts(imdsRequestMaxRetries),
+		retry.MaxDelay(imdsRequestMaxDelay),
+		retry.DelayType(retry.BackOffDelay))
 	if err != nil {
-		return fmt.Errorf("failed to retrieve IMDS data: %w", err)
-	}
-
-	defer response.Body.Close()
-	responseBody, err := io.ReadAll(response.Body)
-	if err != nil {
-		return fmt.Errorf("failed to read IMDS response body: %w", err)
+		return fmt.Errorf("unable to retrieve data from IMDS: %w", err)
 	}
 
 	logger.WithField("responseBody", string(responseBody)).Debug("received IMDS reply")
 
-	if err = json.Unmarshal(responseBody, responseObject); err != nil {
+	if err := json.Unmarshal(responseBody, responseObject); err != nil {
 		return fmt.Errorf("failed to unmarshal IMDS data: %w", err)
 	}
 
