@@ -67,7 +67,7 @@ generate: mockgen ## Run go generate against code.
 
 .PHONY: protobuf
 protobuf:
-	protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative pkg/proto/bootstrap.proto
+	protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative pkg/protos/bootstrap.proto
 
 .PHONY: build-client-all
 build-client-all: fmt vet ## Builds the client binary for all platforms
