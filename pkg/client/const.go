@@ -20,13 +20,18 @@ const (
 	microsoftLoginAuthorityTemplate = "https://login.microsoftonline.com/%s"
 	// The default scope used to request AAD tokens from IMDS.
 	defaultAKSAADServerScope = "6dae42f8-4368-4678-94ff-3960e28e3630/.default"
-	getAadTokenMaxDelay      = 10 * time.Second
-	getAadTokenMaxRetries    = 10
+	// Max delay for retrying requests to AAD.
+	getAadTokenMaxDelay = 10 * time.Second
+	// Max number of retries for requests to AAD.
+	getAadTokenMaxRetries = 10
 
 	// IMDS-related consts
 	// The URL used to connect to IMDS.
-	baseImdsURL           = "http://169.254.169.254"
-	metadataHeaderKey     = "Metadata"
-	imdsRequestMaxDelay   = 10 * time.Second
+	baseImdsURL = "http://169.254.169.254"
+	// Used to specify "Metadata" header in IMDS requests.
+	metadataHeaderKey = "Metadata"
+	// Max delay for retrying requests to IMDS.
+	imdsRequestMaxDelay = 10 * time.Second
+	// Max number of retries for requests to IMDS.
 	imdsRequestMaxRetries = 10
 )
