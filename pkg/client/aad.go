@@ -57,10 +57,11 @@ func (c *aadClientImpl) GetAadToken(ctx context.Context, clientID, clientSecret,
 			return confidential.AuthResult{}, err
 		}
 		return authResult, nil
-	}, retry.Context(ctx),
+	},
+		retry.Context(ctx),
 		retry.Attempts(getAadTokenMaxRetries),
 		retry.MaxDelay(getAadTokenMaxDelay),
-		retry.DelayType(retry.RandomDelay))
+		retry.DelayType(retry.BackOffDelay))
 	if err != nil {
 		return "", fmt.Errorf("failed to acquire token via service principal from AAD: %w", err)
 	}
