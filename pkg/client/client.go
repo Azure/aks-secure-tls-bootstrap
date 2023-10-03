@@ -14,7 +14,7 @@ import (
 	"os"
 
 	"github.com/Azure/aks-tls-bootstrap-client/pkg/datamodel"
-	pb "github.com/Azure/aks-tls-bootstrap-client/pkg/proto"
+	pb "github.com/Azure/aks-tls-bootstrap-client/pkg/protos"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 	"google.golang.org/grpc"
