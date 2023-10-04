@@ -37,7 +37,7 @@ func (c *imdsClientImpl) GetMSIToken(ctx context.Context, imdsURL, clientID stri
 	url := fmt.Sprintf("%s/metadata/identity/oauth2/token", imdsURL)
 	queryParameters := map[string]string{
 		"api-version": "2018-02-01",
-		"resource":    "https://management.azure.com/",
+		"resource":    defaultAKSAADServerAppID,
 	}
 	if clientID != "" {
 		queryParameters["client_id"] = clientID
