@@ -52,7 +52,7 @@ func (c *imdsClientImpl) GetMSIToken(ctx context.Context, imdsURL, clientID stri
 		return nil, fmt.Errorf("failed to retrieve IMDS MSI token (%s): %s", data.Error, data.ErrorDescription)
 	}
 
-	c.logger.WithField("accessToken", data.AccessToken).Debugf("retrieved access token")
+	c.logger.WithField("jwt", data.AccessToken).Debugf("retrieved JWT from IMDS")
 	return data, nil
 }
 

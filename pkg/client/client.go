@@ -48,39 +48,50 @@ type tlsBootstrapClientImpl struct {
 	nextProto  string
 }
 
-func (c *tlsBootstrapClientImpl) GetBootstrapToken(ctx context.Context) (string, error) {
-	c.logger.Info("retrieving auth token")
-
-	execCredential, err := loadExecCredential(c.logger)
+func (c *tlsBootstrapClientImpl) setupClientConnection(ctx context.Context) (*grpc.ClientConn, error) {
+	c.logger.Debug("loading exec credential...")
+	execCredential, err := loadExecCredential()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
+	c.logger.Info("exec credential successfully loaded")
 
+	c.logger.Debug("decoding cluster CA data...")
 	pemCAs, err := base64.StdEncoding.DecodeString(execCredential.Spec.Cluster.CertificateAuthorityData)
 	if err != nil {
-		return "", fmt.Errorf("failed to decode base64 cluster certificates: %w", err)
+		return nil, fmt.Errorf("failed to decode base64 cluster certificates: %w", err)
 	}
+	c.logger.Info("decoded cluster CA data")
 
+	c.logger.Debug("generating TLS config for GRPC client connection...")
 	tlsConfig, err := getTLSConfig(pemCAs, c.nextProto, execCredential.Spec.Cluster.InsecureSkipTLSVerify)
 	if err != nil {
-		return "", fmt.Errorf("failed to get TLS config: %w", err)
+		return nil, fmt.Errorf("failed to get TLS config: %w", err)
 	}
+	c.logger.Info("generated TLS config for GRPC client connection")
 
+	c.logger.Debug("loading azure.json...")
 	azureConfig, err := loadAzureJSON()
 	if err != nil {
-		return "", fmt.Errorf("failed to parse azure config from azure.json: %w", err)
+		return nil, fmt.Errorf("failed to parse azure config from azure.json: %w", err)
 	}
+	c.logger.Info("loaded azure.json")
 
+	c.logger.Debug("generating JWT token for auth...")
 	token, err := c.getAuthToken(ctx, c.clientID, azureConfig)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
+	c.logger.Info("generated JWT token for auth")
 
+	c.logger.Debug("extracting server URL from exec credential...")
 	server, err := getServerURL(execCredential)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
+	c.logger.Info("extracted server URL from exec credential")
 
+	c.logger.Debug("dialing TLS bootstrap server and creating GRPC connection...")
 	conn, err := grpc.DialContext(
 		ctx, server,
 		grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)),
@@ -90,71 +101,95 @@ func (c *tlsBootstrapClientImpl) GetBootstrapToken(ctx context.Context) (string,
 			}),
 		}),
 	)
+	c.logger.Info("dialed TLS bootstrap server and created GRPC connection")
+
+	return conn, nil
+}
+
+func (c *tlsBootstrapClientImpl) GetBootstrapToken(ctx context.Context) (string, error) {
+	conn, err := c.setupClientConnection(ctx)
 	if err != nil {
-		return "", fmt.Errorf("failed to connect to %s: %w", execCredential.Spec.Cluster.Server, err)
+		return "", fmt.Errorf("unable to setup GRPC client connection to TLS bootstrap server: %w", err)
 	}
-	defer conn.Close()
 
 	pbClient := pb.NewAKSBootstrapTokenRequestClient(conn)
 
-	c.logger.Info("retrieving IMDS instance data")
+	c.logger.Debug("retrieving IMDS instance data...")
 	instanceData, err := c.imdsClient.GetInstanceData(ctx, baseImdsURL)
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve instance metadata from IMDS: %w", err)
 	}
+	c.logger.WithField("vmResourceId", instanceData.Compute.ResourceID).Info("retrieved IMDS instance data")
 
-	c.logger.Infof("retrieving nonce from TLS bootstrap token server at %s", server)
-	nonceRequest := pb.NonceRequest{
+	c.logger.Debug("retrieving nonce from TLS bootstrap token server...")
+	nonceResponse, err := pbClient.GetNonce(ctx, &pb.NonceRequest{
 		ResourceId: instanceData.Compute.ResourceID,
-	}
-	nonce, err := pbClient.GetNonce(ctx, &nonceRequest)
+	})
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve a nonce: %w", err)
 	}
-	c.logger.Infof("nonce reply is %s", nonce.Nonce)
+	c.logger.Info("received new nonce from TLS bootstrap server")
+	nonce := nonceResponse.GetNonce()
 
-	c.logger.Info("retrieving IMDS attested data")
-	attestedData, err := c.imdsClient.GetAttestedData(ctx, baseImdsURL, nonce.Nonce)
+	c.logger.Debug("retrieving IMDS attested data...")
+	attestedData, err := c.imdsClient.GetAttestedData(ctx, baseImdsURL, nonce)
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve attested data from IMDS: %w", err)
 	}
+	c.logger.Info("retrieved IMDS attested data")
 
-	c.logger.Info("retrieving bootstrap token from TLS bootstrap token server")
-	tokenRequest := pb.TokenRequest{
+	c.logger.Debug("retrieving bootstrap token from TLS bootstrap server...")
+	tokenResponse, err := pbClient.GetToken(ctx, &pb.TokenRequest{
 		ResourceId:   instanceData.Compute.ResourceID,
-		Nonce:        nonce.Nonce,
+		Nonce:        nonce,
 		AttestedData: attestedData.Signature,
-	}
-	tokenReply, err := pbClient.GetToken(ctx, &tokenRequest)
+	})
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve a token: %w", err)
 	}
-	c.logger.Info("received token reply")
+	c.logger.Info("received new bootstrap token from TLS bootstrap server")
 
-	execCredential.APIVersion = "client.authentication.k8s.io/v1"
-	execCredential.Kind = "ExecCredential"
-	execCredential.Status.Token = tokenReply.Token
-	execCredential.Status.ExpirationTimestamp = tokenReply.Expiration
+	c.logger.Debug("generating new exec credential with bootstrap token...")
+	execCredentialWithToken, err := getExecCredentialWithToken(tokenResponse.GetToken(), tokenResponse.GetExpiration())
+	if err != nil {
+		return "", fmt.Errorf("unable to generate new exec credential with bootstrap token: %w", err)
+	}
+	c.logger.Info("generated new exec credential with bootstrap token")
 
-	execCredentialBytes, err := json.Marshal(execCredential)
+	execCredentialBytes, err := json.Marshal(execCredentialWithToken)
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal execCredential")
 	}
+
 	return string(execCredentialBytes), nil
 }
 
-func loadExecCredential(logger *logrus.Logger) (*datamodel.ExecCredential, error) {
-	logger.WithField(kubernetesExecInfoVarName, os.Getenv(kubernetesExecInfoVarName)).Debugf("parsing %s variable", kubernetesExecInfoVarName)
-	kubernetesExecInfoVar := os.Getenv(kubernetesExecInfoVarName)
-	if kubernetesExecInfoVar == "" {
-		return nil, fmt.Errorf("%s variable not found", kubernetesExecInfoVarName)
+func getExecCredentialWithToken(token, expirationTimestamp string) (*datamodel.ExecCredential, error) {
+	if token == "" {
+		return nil, fmt.Errorf("token string is empty, cannot generate exec credential")
 	}
+	if expirationTimestamp == "" {
+		return nil, fmt.Errorf("token expiration timestamp is empty, cannot generate exec credential")
+	}
+	return &datamodel.ExecCredential{
+		APIVersion: "client.authentication.k8s.io/v1",
+		Kind:       "ExecCredential",
+		Status: datamodel.ExecCredentialStatus{
+			Token:               token,
+			ExpirationTimestamp: expirationTimestamp,
+		},
+	}, nil
+}
 
+func loadExecCredential() (*datamodel.ExecCredential, error) {
+	execInfo := os.Getenv(kubernetesExecInfoVarName)
+	if execInfo == "" {
+		return nil, fmt.Errorf("%s must be set to retrieve bootstrap token", kubernetesExecInfoVarName)
+	}
 	execCredential := &datamodel.ExecCredential{}
-	if err := json.Unmarshal([]byte(kubernetesExecInfoVar), execCredential); err != nil {
+	if err := json.Unmarshal([]byte(execInfo), execCredential); err != nil {
 		return nil, err
 	}
-
 	return execCredential, nil
 }
 

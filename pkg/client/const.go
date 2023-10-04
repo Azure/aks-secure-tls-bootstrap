@@ -18,4 +18,7 @@ const (
 	managedServiceIdentity = "msi"
 	// The template used to specify the AAD login authority in public cloud environments.
 	microsoftLoginAuthorityTemplate = "https://login.microsoftonline.com/%s"
+
+	imdsMSITokenAPIVersion = "2018-02-01"
+	imdsManagementResource = "https://management.azure.com/"
 )
