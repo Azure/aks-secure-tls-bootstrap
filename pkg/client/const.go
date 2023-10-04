@@ -20,8 +20,6 @@ const (
 	defaultAKSAADServerAppID = "6dae42f8-4368-4678-94ff-3960e28e3630"
 	// The template used to specify the AAD login authority in public cloud environments.
 	microsoftLoginAuthorityTemplate = "https://login.microsoftonline.com/%s"
-	// The default scope used to request AAD tokens from IMDS.
-	defaultAKSAADServerScope = "6dae42f8-4368-4678-94ff-3960e28e3630/.default"
 	// Max delay for retrying requests to AAD.
 	getAadTokenMaxDelay = 10 * time.Second
 	// Max number of retries for requests to AAD.
