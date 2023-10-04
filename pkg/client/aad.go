@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/confidential"
+	"github.com/avast/retry-go/v4"
 	"github.com/sirupsen/logrus"
 )
 
@@ -38,7 +39,7 @@ func (c *aadClientImpl) GetAadToken(ctx context.Context, clientID, clientSecret,
 
 	credential, err := confidential.NewCredFromSecret(clientSecret)
 	if err != nil {
-		return "", fmt.Errorf("failed to create secret from azure.json: %w", err)
+		return "", fmt.Errorf("failed to create secret credential from azure.json: %w", err)
 	}
 
 	// TODO(cameissner): modify so this works on all clouds later
@@ -50,9 +51,19 @@ func (c *aadClientImpl) GetAadToken(ctx context.Context, clientID, clientSecret,
 
 	c.Logger.WithField("scopes", strings.Join(scopes, ",")).Info("requesting new AAD token")
 
-	authResult, err := client.AcquireTokenByCredential(ctx, scopes)
+	authResult, err := retry.DoWithData(func() (confidential.AuthResult, error) {
+		authResult, err := client.AcquireTokenByCredential(ctx, scopes)
+		if err != nil {
+			return confidential.AuthResult{}, err
+		}
+		return authResult, nil
+	},
+		retry.Context(ctx),
+		retry.Attempts(getAadTokenMaxRetries),
+		retry.MaxDelay(getAadTokenMaxDelay),
+		retry.DelayType(retry.BackOffDelay))
 	if err != nil {
-		return "", fmt.Errorf("failed to acquire token via service principal: %w", err)
+		return "", fmt.Errorf("failed to acquire token via service principal from AAD: %w", err)
 	}
 
 	return authResult.AccessToken, nil
