@@ -33,7 +33,7 @@ func (c *aadClientImpl) GetAadToken(ctx context.Context, clientID, clientSecret,
 		scopes = []string{}
 	}
 	if len(scopes) < 1 {
-		scopes = append(scopes, defaultAKSAADServerScope)
+		scopes = append(scopes, fmt.Sprintf("%s/.default", defaultAKSAADServerScope))
 	}
 
 	credential, err := confidential.NewCredFromSecret(clientSecret)
