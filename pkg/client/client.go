@@ -101,6 +101,9 @@ func (c *tlsBootstrapClientImpl) setupClientConnection(ctx context.Context) (*gr
 			}),
 		}),
 	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to dial client connection with context: %w", err)
+	}
 	c.logger.Info("dialed TLS bootstrap server and created GRPC connection")
 
 	return conn, nil
