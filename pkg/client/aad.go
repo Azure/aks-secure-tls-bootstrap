@@ -16,7 +16,7 @@ import (
 )
 
 type AadClient interface {
-	GetAadToken(ctx context.Context, clientID, clientSecret, tenantID string) (string, error)
+	GetAadToken(ctx context.Context, clientID, clientSecret, tenantID, resource string) (string, error)
 }
 
 func NewAadClient(logger *logrus.Logger) AadClient {
@@ -29,9 +29,9 @@ type aadClientImpl struct {
 	Logger *logrus.Logger
 }
 
-func (c *aadClientImpl) GetAadToken(ctx context.Context, clientID, clientSecret, tenantID string) (string, error) {
+func (c *aadClientImpl) GetAadToken(ctx context.Context, clientID, clientSecret, tenantID, resource string) (string, error) {
 	scopes := []string{
-		fmt.Sprintf("%s/.default", defaultAKSAADServerAppID),
+		fmt.Sprintf("%s/.default", resource),
 	}
 
 	credential, err := confidential.NewCredFromSecret(clientSecret)

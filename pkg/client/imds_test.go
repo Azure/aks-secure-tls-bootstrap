@@ -33,6 +33,7 @@ func mockImdsWithAssertions(response string, assertions func(r *http.Request)) *
 var _ = Describe("TLS Bootstrap Client IMDS tests", func() {
 	var (
 		imdsClient = NewImdsClient(testLogger)
+		resource   = "resource"
 	)
 
 	Context("getImdsData tests", func() {
@@ -95,7 +96,7 @@ var _ = Describe("TLS Bootstrap Client IMDS tests", func() {
 					Expect(r.URL.Path).To(Equal("/metadata/identity/oauth2/token"))
 					queryParameters := r.URL.Query()
 					Expect(queryParameters.Get("api-version")).To(Equal("2018-02-01"))
-					Expect(queryParameters.Get("resource")).To(Equal(defaultAKSAADServerAppID))
+					Expect(queryParameters.Get("resource")).To(Equal("resource"))
 					Expect(queryParameters.Has("client_id")).To(BeFalse())
 				})
 				defer imds.Close()
@@ -103,7 +104,7 @@ var _ = Describe("TLS Bootstrap Client IMDS tests", func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 
-				tokenResp, err := imdsClient.GetMSIToken(ctx, imds.URL, "")
+				tokenResp, err := imdsClient.GetMSIToken(ctx, imds.URL, "", resource)
 				Expect(err).To(BeNil())
 				Expect(tokenResp).NotTo(BeNil())
 				Expect(tokenResp.AccessToken).To(Equal("accesstoken"))
@@ -116,7 +117,7 @@ var _ = Describe("TLS Bootstrap Client IMDS tests", func() {
 					Expect(r.URL.Path).To(Equal("/metadata/identity/oauth2/token"))
 					queryParameters := r.URL.Query()
 					Expect(queryParameters.Get("api-version")).To(Equal("2018-02-01"))
-					Expect(queryParameters.Get("resource")).To(Equal(defaultAKSAADServerAppID))
+					Expect(queryParameters.Get("resource")).To(Equal("resource"))
 					Expect(queryParameters.Get("client_id")).To(Equal("clientId"))
 				})
 				defer imds.Close()
@@ -125,7 +126,7 @@ var _ = Describe("TLS Bootstrap Client IMDS tests", func() {
 				defer cancel()
 
 				clientID := "clientId"
-				tokenResp, err := imdsClient.GetMSIToken(ctx, imds.URL, clientID)
+				tokenResp, err := imdsClient.GetMSIToken(ctx, imds.URL, clientID, resource)
 				Expect(err).To(BeNil())
 				Expect(tokenResp).NotTo(BeNil())
 				Expect(tokenResp.AccessToken).To(Equal("accesstoken"))
@@ -138,7 +139,7 @@ var _ = Describe("TLS Bootstrap Client IMDS tests", func() {
 					Expect(r.URL.Path).To(Equal("/metadata/identity/oauth2/token"))
 					queryParameters := r.URL.Query()
 					Expect(queryParameters.Get("api-version")).To(Equal("2018-02-01"))
-					Expect(queryParameters.Get("resource")).To(Equal(defaultAKSAADServerAppID))
+					Expect(queryParameters.Get("resource")).To(Equal("resource"))
 					Expect(queryParameters.Has("client_id")).To(BeFalse())
 				})
 				defer imds.Close()
@@ -146,7 +147,7 @@ var _ = Describe("TLS Bootstrap Client IMDS tests", func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 
-				tokenResp, err := imdsClient.GetMSIToken(ctx, imds.URL, "")
+				tokenResp, err := imdsClient.GetMSIToken(ctx, imds.URL, "", resource)
 				Expect(tokenResp).To(BeNil())
 				Expect(err).ToNot(BeNil())
 				Expect(err.Error()).To(ContainSubstring("failed to retrieve MSI token: tokenError: error generating new JWT"))
@@ -159,7 +160,7 @@ var _ = Describe("TLS Bootstrap Client IMDS tests", func() {
 					Expect(r.URL.Path).To(Equal("/metadata/identity/oauth2/token"))
 					queryParameters := r.URL.Query()
 					Expect(queryParameters.Get("api-version")).To(Equal("2018-02-01"))
-					Expect(queryParameters.Get("resource")).To(Equal(defaultAKSAADServerAppID))
+					Expect(queryParameters.Get("resource")).To(Equal("resource"))
 					Expect(queryParameters.Has("client_id")).To(BeFalse())
 				})
 				defer imds.Close()
@@ -167,7 +168,7 @@ var _ = Describe("TLS Bootstrap Client IMDS tests", func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 
-				tokenResp, err := imdsClient.GetMSIToken(ctx, imds.URL, "")
+				tokenResp, err := imdsClient.GetMSIToken(ctx, imds.URL, "", resource)
 				Expect(tokenResp).To(BeNil())
 				Expect(err).ToNot(BeNil())
 				Expect(err.Error()).To(ContainSubstring("failed to unmarshal IMDS data"))

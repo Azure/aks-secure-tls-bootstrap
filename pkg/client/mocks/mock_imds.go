@@ -69,16 +69,16 @@ func (mr *MockImdsClientMockRecorder) GetInstanceData(arg0, arg1 interface{}) *g
 }
 
 // GetMSIToken mocks base method.
-func (m *MockImdsClient) GetMSIToken(arg0 context.Context, arg1, arg2 string) (*datamodel.AADTokenResponse, error) {
+func (m *MockImdsClient) GetMSIToken(arg0 context.Context, arg1, arg2, arg3 string) (*datamodel.AADTokenResponse, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetMSIToken", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "GetMSIToken", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(*datamodel.AADTokenResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetMSIToken indicates an expected call of GetMSIToken.
-func (mr *MockImdsClientMockRecorder) GetMSIToken(arg0, arg1, arg2 interface{}) *gomock.Call {
+func (mr *MockImdsClientMockRecorder) GetMSIToken(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMSIToken", reflect.TypeOf((*MockImdsClient)(nil).GetMSIToken), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMSIToken", reflect.TypeOf((*MockImdsClient)(nil).GetMSIToken), arg0, arg1, arg2, arg3)
 }
