@@ -17,7 +17,7 @@ var _ = Describe("Log tests", func() {
 				logger := GetLogger(format, debug)
 				Expect(logger).ToNot(BeNil())
 				Expect(logger.Formatter).To(BeAssignableToTypeOf(&logrus.JSONFormatter{}))
-				Expect(logger.Level).To(Equal(logrus.DebugLevel))
+				Expect(logger.Level).ToNot(Equal(logrus.DebugLevel))
 			})
 		})
 
@@ -38,7 +38,7 @@ var _ = Describe("Log tests", func() {
 			It("should return a new logger using the debug level", func() {
 				var (
 					format = "text"
-					debug  = false
+					debug  = true
 				)
 				logger := GetLogger(format, debug)
 				Expect(logger).ToNot(BeNil())

@@ -11,11 +11,12 @@ import (
 	"strings"
 
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/confidential"
+	"github.com/avast/retry-go/v4"
 	"github.com/sirupsen/logrus"
 )
 
 type AadClient interface {
-	GetAadToken(ctx context.Context, clientID, clientSecret, tenantID string, scopes []string) (string, error)
+	GetAadToken(ctx context.Context, clientID, clientSecret, tenantID string) (string, error)
 }
 
 func NewAadClient(logger *logrus.Logger) AadClient {
@@ -28,17 +29,14 @@ type aadClientImpl struct {
 	Logger *logrus.Logger
 }
 
-func (c *aadClientImpl) GetAadToken(ctx context.Context, clientID, clientSecret, tenantID string, scopes []string) (string, error) {
-	if scopes == nil {
-		scopes = []string{}
-	}
-	if len(scopes) < 1 {
-		scopes = append(scopes, defaultAKSAADServerScope)
+func (c *aadClientImpl) GetAadToken(ctx context.Context, clientID, clientSecret, tenantID string) (string, error) {
+	scopes := []string{
+		fmt.Sprintf("%s/.default", defaultAKSAADServerAppID),
 	}
 
 	credential, err := confidential.NewCredFromSecret(clientSecret)
 	if err != nil {
-		return "", fmt.Errorf("failed to create secret from azure.json: %w", err)
+		return "", fmt.Errorf("failed to create secret credential from azure.json: %w", err)
 	}
 
 	// TODO(cameissner): modify so this works on all clouds later
@@ -50,9 +48,19 @@ func (c *aadClientImpl) GetAadToken(ctx context.Context, clientID, clientSecret,
 
 	c.Logger.WithField("scopes", strings.Join(scopes, ",")).Info("requesting new AAD token")
 
-	authResult, err := client.AcquireTokenByCredential(ctx, scopes)
+	authResult, err := retry.DoWithData(func() (confidential.AuthResult, error) {
+		authResult, err := client.AcquireTokenByCredential(ctx, scopes)
+		if err != nil {
+			return confidential.AuthResult{}, err
+		}
+		return authResult, nil
+	},
+		retry.Context(ctx),
+		retry.Attempts(getAadTokenMaxRetries),
+		retry.MaxDelay(getAadTokenMaxDelay),
+		retry.DelayType(retry.BackOffDelay))
 	if err != nil {
-		return "", fmt.Errorf("failed to acquire token via service principal: %w", err)
+		return "", fmt.Errorf("failed to acquire token via service principal from AAD: %w", err)
 	}
 
 	return authResult.AccessToken, nil

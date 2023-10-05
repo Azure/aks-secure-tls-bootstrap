@@ -93,7 +93,7 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 			token, err := bootstrapClient.GetBootstrapToken(ctx)
 			Expect(token).To(BeEmpty())
 			Expect(err).ToNot(BeNil())
-			Expect(err.Error()).To(ContainSubstring("KUBERNETES_EXEC_INFO variable not found"))
+			Expect(err.Error()).To(ContainSubstring("KUBERNETES_EXEC_INFO must be set to retrieve bootstrap token"))
 		})
 	})
 
