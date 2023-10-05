@@ -27,7 +27,7 @@ type TLSBootstrapClient interface {
 	GetBootstrapToken(ctx context.Context) (string, error)
 }
 
-func NewTLSBootstrapClient(logger *logrus.Logger, clientID, nextProto string) TLSBootstrapClient {
+func NewTLSBootstrapClient(logger *logrus.Logger, clientID, nextProto, resource string) TLSBootstrapClient {
 	imdsClient := NewImdsClient(logger)
 	aadClient := NewAadClient(logger)
 
@@ -37,6 +37,7 @@ func NewTLSBootstrapClient(logger *logrus.Logger, clientID, nextProto string) TL
 		aadClient:  aadClient,
 		clientID:   clientID,
 		nextProto:  nextProto,
+		resource:   resource,
 	}
 }
 
@@ -46,6 +47,7 @@ type tlsBootstrapClientImpl struct {
 	aadClient  AadClient
 	clientID   string
 	nextProto  string
+	resource   string
 }
 
 func (c *tlsBootstrapClientImpl) setupClientConnection(ctx context.Context) (*grpc.ClientConn, error) {
@@ -78,7 +80,7 @@ func (c *tlsBootstrapClientImpl) setupClientConnection(ctx context.Context) (*gr
 	c.logger.Info("loaded azure.json")
 
 	c.logger.Debug("generating JWT token for auth...")
-	token, err := c.getAuthToken(ctx, c.clientID, azureConfig)
+	token, err := c.getAuthToken(ctx, c.clientID, c.resource, azureConfig)
 	if err != nil {
 		return nil, err
 	}

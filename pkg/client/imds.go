@@ -19,7 +19,7 @@ import (
 )
 
 type ImdsClient interface {
-	GetMSIToken(ctx context.Context, imdsURL, clientID string) (*datamodel.AADTokenResponse, error)
+	GetMSIToken(ctx context.Context, imdsURL, clientID, resource string) (*datamodel.AADTokenResponse, error)
 	GetInstanceData(ctx context.Context, imdsURL string) (*datamodel.VMSSInstanceData, error)
 	GetAttestedData(ctx context.Context, imdsURL, nonce string) (*datamodel.VMSSAttestedData, error)
 }
@@ -34,12 +34,12 @@ type imdsClientImpl struct {
 	logger *logrus.Logger
 }
 
-func (c *imdsClientImpl) GetMSIToken(ctx context.Context, imdsURL, clientID string) (*datamodel.AADTokenResponse, error) {
+func (c *imdsClientImpl) GetMSIToken(ctx context.Context, imdsURL, clientID, resource string) (*datamodel.AADTokenResponse, error) {
 	// TODO(cameissner): modify so this works on all clouds later
 	url := fmt.Sprintf("%s/metadata/identity/oauth2/token", imdsURL)
 	queryParameters := map[string]string{
 		apiVersionHeaderKey: imdsMSITokenAPIVersion,
-		resourceHeaderKey:   defaultAKSAADServerAppID,
+		resourceHeaderKey:   resource,
 	}
 	if clientID != "" {
 		queryParameters[clientIDHeaderKey] = clientID

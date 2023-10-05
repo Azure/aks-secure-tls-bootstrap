@@ -37,16 +37,19 @@ var _ = Describe("Auth tests", func() {
 	})
 
 	Context("Test getAuthToken", func() {
-		When("userSpecifiedClientID is not supplied", func() {
-			var emptyClientID = ""
+		var (
+			emptyClientID = ""
+			resource      = "resource"
+		)
 
+		When("userSpecifiedClientID is not supplied", func() {
 			When("azure config is nil", func() {
 				It("should return an error", func() {
 					var azureConfig *datamodel.AzureConfig
 					ctx, cancel := context.WithCancel(context.Background())
 					defer cancel()
 
-					token, err := tlsBootstrapClient.getAuthToken(ctx, emptyClientID, azureConfig)
+					token, err := tlsBootstrapClient.getAuthToken(ctx, emptyClientID, resource, azureConfig)
 					Expect(token).To(BeEmpty())
 					Expect(err).ToNot(BeNil())
 					Expect(err.Error()).To(ContainSubstring("unable to get auth token: azure config is nil"))
@@ -55,8 +58,14 @@ var _ = Describe("Auth tests", func() {
 
 			When("azure config is missing clientId", func() {
 				It("should return an error", func() {
-					imdsClient.EXPECT().GetMSIToken(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+					imdsClient.EXPECT().GetMSIToken(
+						gomock.Any(),
+						gomock.Any(),
+						gomock.Any(),
+						gomock.Any(),
+					).Times(0)
 					aadClient.EXPECT().GetAadToken(
+						gomock.Any(),
 						gomock.Any(),
 						gomock.Any(),
 						gomock.Any(),
@@ -70,7 +79,7 @@ var _ = Describe("Auth tests", func() {
 					ctx, cancel := context.WithCancel(context.Background())
 					defer cancel()
 
-					spToken, err := tlsBootstrapClient.getAuthToken(ctx, emptyClientID, azureConfig)
+					spToken, err := tlsBootstrapClient.getAuthToken(ctx, emptyClientID, resource, azureConfig)
 					Expect(spToken).To(BeEmpty())
 					Expect(err).ToNot(BeNil())
 					Expect(err.Error()).To(ContainSubstring("unable to infer node identity type: client ID in azure.json is empty"))
@@ -79,8 +88,14 @@ var _ = Describe("Auth tests", func() {
 
 			When("azure config has clientId but is missing clientSecret", func() {
 				It("should return an error", func() {
-					imdsClient.EXPECT().GetMSIToken(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+					imdsClient.EXPECT().GetMSIToken(
+						gomock.Any(),
+						gomock.Any(),
+						gomock.Any(),
+						gomock.Any(),
+					).Times(0)
 					aadClient.EXPECT().GetAadToken(
+						gomock.Any(),
 						gomock.Any(),
 						gomock.Any(),
 						gomock.Any(),
@@ -94,7 +109,7 @@ var _ = Describe("Auth tests", func() {
 					ctx, cancel := context.WithCancel(context.Background())
 					defer cancel()
 
-					spToken, err := tlsBootstrapClient.getAuthToken(ctx, emptyClientID, azureConfig)
+					spToken, err := tlsBootstrapClient.getAuthToken(ctx, emptyClientID, resource, azureConfig)
 					Expect(spToken).To(BeEmpty())
 					Expect(err).ToNot(BeNil())
 					Expect(err.Error()).To(ContainSubstring("cannot retrieve SP token from AAD: azure.json missing clientSecret"))
@@ -103,8 +118,14 @@ var _ = Describe("Auth tests", func() {
 
 			When("azure config has clientId and clientSecret but is missing tenantId", func() {
 				It("should return an error", func() {
-					imdsClient.EXPECT().GetMSIToken(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+					imdsClient.EXPECT().GetMSIToken(
+						gomock.Any(),
+						gomock.Any(),
+						gomock.Any(),
+						gomock.Any(),
+					).Times(0)
 					aadClient.EXPECT().GetAadToken(
+						gomock.Any(),
 						gomock.Any(),
 						gomock.Any(),
 						gomock.Any(),
@@ -118,7 +139,7 @@ var _ = Describe("Auth tests", func() {
 					ctx, cancel := context.WithCancel(context.Background())
 					defer cancel()
 
-					spToken, err := tlsBootstrapClient.getAuthToken(ctx, emptyClientID, azureConfig)
+					spToken, err := tlsBootstrapClient.getAuthToken(ctx, emptyClientID, resource, azureConfig)
 					Expect(spToken).To(BeEmpty())
 					Expect(err).ToNot(BeNil())
 					Expect(err.Error()).To(ContainSubstring("cannot retrieve SP token from AAD: azure.json missing tenantId"))
@@ -128,12 +149,13 @@ var _ = Describe("Auth tests", func() {
 			When("azure config contains msi clientId and userAssignedIdentityId is non-empty", func() {
 				It("should acquire MSI token from IMDS using userAssignedIdentityId as clientId", func() {
 					userAssignedIdentityID := "uami"
-					imdsClient.EXPECT().GetMSIToken(gomock.Any(), baseImdsURL, userAssignedIdentityID).Return(
+					imdsClient.EXPECT().GetMSIToken(gomock.Any(), baseImdsURL, userAssignedIdentityID, resource).Return(
 						&datamodel.AADTokenResponse{
 							AccessToken: "mockMSIToken",
 						}, nil,
 					).Times(1)
 					aadClient.EXPECT().GetAadToken(
+						gomock.Any(),
 						gomock.Any(),
 						gomock.Any(),
 						gomock.Any(),
@@ -147,7 +169,7 @@ var _ = Describe("Auth tests", func() {
 					ctx, cancel := context.WithCancel(context.Background())
 					defer cancel()
 
-					msiToken, err := tlsBootstrapClient.getAuthToken(ctx, emptyClientID, azureConfigMsi)
+					msiToken, err := tlsBootstrapClient.getAuthToken(ctx, emptyClientID, resource, azureConfigMsi)
 					Expect(err).To(BeNil())
 					Expect(msiToken).To(Equal("mockMSIToken"))
 				})
@@ -155,12 +177,13 @@ var _ = Describe("Auth tests", func() {
 
 			When("azure config contains msi clientId and userAssignedIdentityId is empty", func() {
 				It("should acquire MSI token from IMDS without specifying clientId", func() {
-					imdsClient.EXPECT().GetMSIToken(gomock.Any(), baseImdsURL, emptyClientID).Return(
+					imdsClient.EXPECT().GetMSIToken(gomock.Any(), baseImdsURL, emptyClientID, resource).Return(
 						&datamodel.AADTokenResponse{
 							AccessToken: "mockMSIToken",
 						}, nil,
 					).Times(1)
 					aadClient.EXPECT().GetAadToken(
+						gomock.Any(),
 						gomock.Any(),
 						gomock.Any(),
 						gomock.Any(),
@@ -173,7 +196,7 @@ var _ = Describe("Auth tests", func() {
 					ctx, cancel := context.WithCancel(context.Background())
 					defer cancel()
 
-					msiToken, err := tlsBootstrapClient.getAuthToken(ctx, emptyClientID, azureConfigMsi)
+					msiToken, err := tlsBootstrapClient.getAuthToken(ctx, emptyClientID, resource, azureConfigMsi)
 					Expect(err).To(BeNil())
 					Expect(msiToken).To(Equal("mockMSIToken"))
 				})
@@ -181,11 +204,12 @@ var _ = Describe("Auth tests", func() {
 
 			When("azure config contains non-MSI clientId", func() {
 				It("should use service principal and acquire token from AAD", func() {
-					aadClient.EXPECT().GetAadToken(gomock.Any(), "clientId", "clientSecret", "tenantId").Return(
+					aadClient.EXPECT().GetAadToken(gomock.Any(), "clientId", "clientSecret", "tenantId", resource).Return(
 						"spToken",
 						nil,
 					).Times(1)
 					imdsClient.EXPECT().GetMSIToken(
+						gomock.Any(),
 						gomock.Any(),
 						gomock.Any(),
 						gomock.Any(),
@@ -199,7 +223,7 @@ var _ = Describe("Auth tests", func() {
 					ctx, cancel := context.WithCancel(context.Background())
 					defer cancel()
 
-					spToken, err := tlsBootstrapClient.getAuthToken(ctx, emptyClientID, azureConfigNoMsi)
+					spToken, err := tlsBootstrapClient.getAuthToken(ctx, emptyClientID, resource, azureConfigNoMsi)
 					Expect(err).To(BeNil())
 					Expect(spToken).To(Equal("spToken"))
 				})
@@ -210,7 +234,7 @@ var _ = Describe("Auth tests", func() {
 			var nonEmptyClientID = "clientId"
 
 			It("should acquire MSI token from IMDS", func() {
-				imdsClient.EXPECT().GetMSIToken(gomock.Any(), baseImdsURL, nonEmptyClientID).Return(
+				imdsClient.EXPECT().GetMSIToken(gomock.Any(), baseImdsURL, nonEmptyClientID, resource).Return(
 					&datamodel.AADTokenResponse{
 						AccessToken: "mockMSIToken",
 					}, nil,
@@ -220,12 +244,13 @@ var _ = Describe("Auth tests", func() {
 					gomock.Any(),
 					gomock.Any(),
 					gomock.Any(),
+					gomock.Any(),
 				).Times(0)
 
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 
-				token, err := tlsBootstrapClient.getAuthToken(ctx, nonEmptyClientID, nil)
+				token, err := tlsBootstrapClient.getAuthToken(ctx, nonEmptyClientID, resource, nil)
 				Expect(err).To(BeNil())
 				Expect(token).To(Equal("mockMSIToken"))
 			})

@@ -28,8 +28,6 @@ const (
 	nonceHeaderKey = "nonce"
 
 	// AAD-related consts
-	// Used as the audience in JWT tokens requested from AAD.
-	defaultAKSAADServerAppID = "6dae42f8-4368-4678-94ff-3960e28e3630"
 	// The template used to specify the AAD login authority in public cloud environments.
 	microsoftLoginAuthorityTemplate = "https://login.microsoftonline.com/%s"
 	// Max delay for retrying requests to AAD.
