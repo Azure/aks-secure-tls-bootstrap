@@ -83,12 +83,14 @@ type ExecCredential struct {
 		} `json:"cluster,omitempty"`
 		Interactive bool `json:"interactive,omitempty"`
 	} `json:"spec,omitempty"`
-	Status struct {
-		ClientCertificateData string `json:"clientCertificateData,omitempty"`
-		ClientKeyData         string `json:"clientKeyData,omitempty"`
-		ExpirationTimestamp   string `json:"expirationTimestamp,omitempty"`
-		Token                 string `json:"token,omitempty"`
-	} `json:"status,omitempty"`
+	Status ExecCredentialStatus `json:"status,omitempty"`
+}
+
+type ExecCredentialStatus struct {
+	ClientCertificateData string `json:"clientCertificateData,omitempty"`
+	ClientKeyData         string `json:"clientKeyData,omitempty"`
+	ExpirationTimestamp   string `json:"expirationTimestamp,omitempty"`
+	Token                 string `json:"token,omitempty"`
 }
 
 // Compute represents the compute-related fields we need from VMSS-related instance data.

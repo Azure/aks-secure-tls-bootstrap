@@ -37,13 +37,31 @@ var _ = Describe("Auth tests", func() {
 	})
 
 	Context("Test getAuthToken", func() {
-		When("clientId is not supplied", func() {
+		When("userSpecifiedClientID is not supplied", func() {
 			var emptyClientID = ""
 
-			When("azure json is missing clientId", func() {
+			When("azure config is nil", func() {
+				It("should return an error", func() {
+					var azureConfig *datamodel.AzureConfig
+					ctx, cancel := context.WithCancel(context.Background())
+					defer cancel()
+
+					token, err := tlsBootstrapClient.getAuthToken(ctx, emptyClientID, azureConfig)
+					Expect(token).To(BeEmpty())
+					Expect(err).ToNot(BeNil())
+					Expect(err.Error()).To(ContainSubstring("unable to get auth token: azure config is nil"))
+				})
+			})
+
+			When("azure config is missing clientId", func() {
 				It("should return an error", func() {
 					imdsClient.EXPECT().GetMSIToken(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
-					aadClient.EXPECT().GetAadToken(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+					aadClient.EXPECT().GetAadToken(
+						gomock.Any(),
+						gomock.Any(),
+						gomock.Any(),
+						gomock.Any(),
+					).Times(0)
 					azureConfig := &datamodel.AzureConfig{
 						ClientSecret: "secret",
 						TenantID:     "tid",
@@ -55,14 +73,19 @@ var _ = Describe("Auth tests", func() {
 					spToken, err := tlsBootstrapClient.getAuthToken(ctx, emptyClientID, azureConfig)
 					Expect(spToken).To(BeEmpty())
 					Expect(err).ToNot(BeNil())
-					Expect(err.Error()).To(ContainSubstring("cannot retrieve SP token from AAD: azure.json missing clientId"))
+					Expect(err.Error()).To(ContainSubstring("unable to infer node identity type: client ID in azure.json is empty"))
 				})
 			})
 
-			When("azure json is missing clientSecret", func() {
+			When("azure config has clientId but is missing clientSecret", func() {
 				It("should return an error", func() {
 					imdsClient.EXPECT().GetMSIToken(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
-					aadClient.EXPECT().GetAadToken(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+					aadClient.EXPECT().GetAadToken(
+						gomock.Any(),
+						gomock.Any(),
+						gomock.Any(),
+						gomock.Any(),
+					).Times(0)
 					azureConfig := &datamodel.AzureConfig{
 						ClientID: "cid",
 						TenantID: "tid",
@@ -78,10 +101,15 @@ var _ = Describe("Auth tests", func() {
 				})
 			})
 
-			When("azure json is missing tenantId", func() {
+			When("azure config has clientId and clientSecret but is missing tenantId", func() {
 				It("should return an error", func() {
 					imdsClient.EXPECT().GetMSIToken(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
-					aadClient.EXPECT().GetAadToken(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+					aadClient.EXPECT().GetAadToken(
+						gomock.Any(),
+						gomock.Any(),
+						gomock.Any(),
+						gomock.Any(),
+					).Times(0)
 					azureConfig := &datamodel.AzureConfig{
 						ClientID:     "cid",
 						ClientSecret: "secret",
@@ -97,7 +125,7 @@ var _ = Describe("Auth tests", func() {
 				})
 			})
 
-			When("azure json contains msi clientId and userAssignedIdentityId is non-empty", func() {
+			When("azure config contains msi clientId and userAssignedIdentityId is non-empty", func() {
 				It("should acquire MSI token from IMDS using userAssignedIdentityId as clientId", func() {
 					userAssignedIdentityID := "uami"
 					imdsClient.EXPECT().GetMSIToken(gomock.Any(), baseImdsURL, userAssignedIdentityID).Return(
@@ -106,7 +134,6 @@ var _ = Describe("Auth tests", func() {
 						}, nil,
 					).Times(1)
 					aadClient.EXPECT().GetAadToken(
-						gomock.Any(),
 						gomock.Any(),
 						gomock.Any(),
 						gomock.Any(),
@@ -126,15 +153,14 @@ var _ = Describe("Auth tests", func() {
 				})
 			})
 
-			When("azure json contains msi clientId and userAssignedIdentityId is empty", func() {
-				It("should acquire MSI token from IMDS", func() {
+			When("azure config contains msi clientId and userAssignedIdentityId is empty", func() {
+				It("should acquire MSI token from IMDS without specifying clientId", func() {
 					imdsClient.EXPECT().GetMSIToken(gomock.Any(), baseImdsURL, emptyClientID).Return(
 						&datamodel.AADTokenResponse{
 							AccessToken: "mockMSIToken",
 						}, nil,
 					).Times(1)
 					aadClient.EXPECT().GetAadToken(
-						gomock.Any(),
 						gomock.Any(),
 						gomock.Any(),
 						gomock.Any(),
@@ -153,9 +179,9 @@ var _ = Describe("Auth tests", func() {
 				})
 			})
 
-			When("azure json contains non-MSI clientId", func() {
+			When("azure config contains non-MSI clientId", func() {
 				It("should use service principal and acquire token from AAD", func() {
-					aadClient.EXPECT().GetAadToken(gomock.Any(), "no-msi", "secret", "tenantId", gomock.Any()).Return(
+					aadClient.EXPECT().GetAadToken(gomock.Any(), "clientId", "clientSecret", "tenantId").Return(
 						"spToken",
 						nil,
 					).Times(1)
@@ -165,8 +191,8 @@ var _ = Describe("Auth tests", func() {
 						gomock.Any(),
 					).Times(0)
 					azureConfigNoMsi := &datamodel.AzureConfig{
-						ClientID:     "no-msi",
-						ClientSecret: "secret",
+						ClientID:     "clientId",
+						ClientSecret: "clientSecret",
 						TenantID:     "tenantId",
 					}
 
@@ -180,7 +206,7 @@ var _ = Describe("Auth tests", func() {
 			})
 		})
 
-		When("clientId is supplied", func() {
+		When("userSpecifiedClientID is supplied", func() {
 			var nonEmptyClientID = "clientId"
 
 			It("should acquire MSI token from IMDS", func() {
@@ -190,7 +216,6 @@ var _ = Describe("Auth tests", func() {
 					}, nil,
 				).Times(1)
 				aadClient.EXPECT().GetAadToken(
-					gomock.Any(),
 					gomock.Any(),
 					gomock.Any(),
 					gomock.Any(),

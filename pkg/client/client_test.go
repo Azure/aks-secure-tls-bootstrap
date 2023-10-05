@@ -93,14 +93,14 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 			token, err := bootstrapClient.GetBootstrapToken(ctx)
 			Expect(token).To(BeEmpty())
 			Expect(err).ToNot(BeNil())
-			Expect(err.Error()).To(ContainSubstring("KUBERNETES_EXEC_INFO variable not found"))
+			Expect(err.Error()).To(ContainSubstring("KUBERNETES_EXEC_INFO must be set to retrieve bootstrap token"))
 		})
 	})
 
 	Context("Test loadExecCredential", func() {
 		When("ExecCredential JSON is properly formed", func() {
 			It("should correctly parse and load the exec credential", func() {
-				execCredential, err := loadExecCredential(testLogger)
+				execCredential, err := loadExecCredential()
 				Expect(err).To(BeNil())
 				Expect(execCredential).ToNot(BeNil())
 				Expect(execCredential.APIVersion).To(Equal("client.authentication.k8s.io/v1"))
@@ -118,7 +118,7 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 		})
 
 		When("ExecCredential JSON is malformed", func() {
-			execCredential, err := loadExecCredential(testLogger)
+			execCredential, err := loadExecCredential()
 			Expect(err).ToNot(BeNil())
 			Expect(execCredential).To(BeNil())
 		})

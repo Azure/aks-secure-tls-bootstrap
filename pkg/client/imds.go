@@ -38,11 +38,11 @@ func (c *imdsClientImpl) GetMSIToken(ctx context.Context, imdsURL, clientID stri
 	// TODO(cameissner): modify so this works on all clouds later
 	url := fmt.Sprintf("%s/metadata/identity/oauth2/token", imdsURL)
 	queryParameters := map[string]string{
-		"api-version": "2018-02-01",
-		"resource":    defaultAKSAADServerAppID,
+		apiVersionHeaderKey: imdsMSITokenAPIVersion,
+		resourceHeaderKey:   defaultAKSAADServerAppID,
 	}
 	if clientID != "" {
-		queryParameters["client_id"] = clientID
+		queryParameters[clientIDHeaderKey] = clientID
 	}
 
 	tokenResponse := &datamodel.AADTokenResponse{}
@@ -60,8 +60,8 @@ func (c *imdsClientImpl) GetMSIToken(ctx context.Context, imdsURL, clientID stri
 func (c *imdsClientImpl) GetInstanceData(ctx context.Context, imdsURL string) (*datamodel.VMSSInstanceData, error) {
 	url := fmt.Sprintf("%s/metadata/instance", imdsURL)
 	queryParameters := map[string]string{
-		"api-version": "2021-05-01",
-		"format":      "json",
+		apiVersionHeaderKey: imdsInstanceDataAPIVersion,
+		formatHeaderKey:     formatJSON,
 	}
 	data := &datamodel.VMSSInstanceData{}
 
@@ -75,9 +75,9 @@ func (c *imdsClientImpl) GetInstanceData(ctx context.Context, imdsURL string) (*
 func (c *imdsClientImpl) GetAttestedData(ctx context.Context, imdsURL, nonce string) (*datamodel.VMSSAttestedData, error) {
 	url := fmt.Sprintf("%s/metadata/attested/document", imdsURL)
 	queryParameters := map[string]string{
-		"api-version": "2021-05-01",
-		"format":      "json",
-		"nonce":       nonce,
+		apiVersionHeaderKey: imdsAttestedDataAPIVersion,
+		formatHeaderKey:     formatJSON,
+		nonceHeaderKey:      nonce,
 	}
 
 	data := &datamodel.VMSSAttestedData{}
