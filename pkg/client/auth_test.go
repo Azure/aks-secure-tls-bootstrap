@@ -44,7 +44,7 @@ var _ = Describe("Auth tests", func() {
 				It("should return an error", func() {
 					imdsClient.EXPECT().GetMSIToken(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					aadClient.EXPECT().GetAadToken(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
-					azureConfig := &datamodel.KubeletAzureJSON{
+					azureConfig := &datamodel.AzureConfig{
 						ClientSecret: "secret",
 						TenantID:     "tid",
 					}
@@ -63,7 +63,7 @@ var _ = Describe("Auth tests", func() {
 				It("should return an error", func() {
 					imdsClient.EXPECT().GetMSIToken(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					aadClient.EXPECT().GetAadToken(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
-					azureConfig := &datamodel.KubeletAzureJSON{
+					azureConfig := &datamodel.AzureConfig{
 						ClientID: "cid",
 						TenantID: "tid",
 					}
@@ -82,7 +82,7 @@ var _ = Describe("Auth tests", func() {
 				It("should return an error", func() {
 					imdsClient.EXPECT().GetMSIToken(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 					aadClient.EXPECT().GetAadToken(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
-					azureConfig := &datamodel.KubeletAzureJSON{
+					azureConfig := &datamodel.AzureConfig{
 						ClientID:     "cid",
 						ClientSecret: "secret",
 					}
@@ -101,7 +101,7 @@ var _ = Describe("Auth tests", func() {
 				It("should acquire MSI token from IMDS using userAssignedIdentityId as clientId", func() {
 					userAssignedIdentityID := "uami"
 					imdsClient.EXPECT().GetMSIToken(gomock.Any(), baseImdsURL, userAssignedIdentityID).Return(
-						&datamodel.TokenResponseJSON{
+						&datamodel.AADTokenResponse{
 							AccessToken: "mockMSIToken",
 						}, nil,
 					).Times(1)
@@ -112,7 +112,7 @@ var _ = Describe("Auth tests", func() {
 						gomock.Any(),
 						gomock.Any(),
 					).Times(0)
-					azureConfigMsi := &datamodel.KubeletAzureJSON{
+					azureConfigMsi := &datamodel.AzureConfig{
 						ClientID:               "msi",
 						UserAssignedIdentityID: userAssignedIdentityID,
 					}
@@ -129,7 +129,7 @@ var _ = Describe("Auth tests", func() {
 			When("azure json contains msi clientId and userAssignedIdentityId is empty", func() {
 				It("should acquire MSI token from IMDS", func() {
 					imdsClient.EXPECT().GetMSIToken(gomock.Any(), baseImdsURL, emptyClientID).Return(
-						&datamodel.TokenResponseJSON{
+						&datamodel.AADTokenResponse{
 							AccessToken: "mockMSIToken",
 						}, nil,
 					).Times(1)
@@ -140,7 +140,7 @@ var _ = Describe("Auth tests", func() {
 						gomock.Any(),
 						gomock.Any(),
 					).Times(0)
-					azureConfigMsi := &datamodel.KubeletAzureJSON{
+					azureConfigMsi := &datamodel.AzureConfig{
 						ClientID: "msi",
 					}
 
@@ -164,7 +164,7 @@ var _ = Describe("Auth tests", func() {
 						gomock.Any(),
 						gomock.Any(),
 					).Times(0)
-					azureConfigNoMsi := &datamodel.KubeletAzureJSON{
+					azureConfigNoMsi := &datamodel.AzureConfig{
 						ClientID:     "no-msi",
 						ClientSecret: "secret",
 						TenantID:     "tenantId",
@@ -185,7 +185,7 @@ var _ = Describe("Auth tests", func() {
 
 			It("should acquire MSI token from IMDS", func() {
 				imdsClient.EXPECT().GetMSIToken(gomock.Any(), baseImdsURL, nonEmptyClientID).Return(
-					&datamodel.TokenResponseJSON{
+					&datamodel.AADTokenResponse{
 						AccessToken: "mockMSIToken",
 					}, nil,
 				).Times(1)

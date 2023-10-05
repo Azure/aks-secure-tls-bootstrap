@@ -12,7 +12,7 @@ import (
 	"github.com/Azure/aks-tls-bootstrap-client/pkg/datamodel"
 )
 
-func (c *tlsBootstrapClientImpl) getAuthToken(ctx context.Context, clientID string, azureConfig *datamodel.KubeletAzureJSON) (string, error) {
+func (c *tlsBootstrapClientImpl) getAuthToken(ctx context.Context, clientID string, azureConfig *datamodel.AzureConfig) (string, error) {
 	if clientID == "" {
 		if azureConfig == nil {
 			return "", fmt.Errorf("clientId is missing and supplied azureConfig is nil")
@@ -58,20 +58,20 @@ func (c *tlsBootstrapClientImpl) getAuthToken(ctx context.Context, clientID stri
 	return spToken, nil
 }
 
-func loadAzureJSON() (*datamodel.KubeletAzureJSON, error) {
+func loadAzureJSON() (*datamodel.AzureConfig, error) {
 	if isWindows() {
 		return loadAzureJSONFromPath(defaultWindowsAzureJSONPath)
 	}
 	return loadAzureJSONFromPath(defaultLinuxAzureJSONPath)
 }
 
-func loadAzureJSONFromPath(path string) (*datamodel.KubeletAzureJSON, error) {
+func loadAzureJSONFromPath(path string) (*datamodel.AzureConfig, error) {
 	azureJSON, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse %s", path)
 	}
 
-	azureConfig := &datamodel.KubeletAzureJSON{}
+	azureConfig := &datamodel.AzureConfig{}
 	if err = json.Unmarshal(azureJSON, azureConfig); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal %s", path)
 	}

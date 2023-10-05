@@ -15,7 +15,7 @@ var _ = Describe("datamodel tests", func() {
 	Context("AzureADTokenClaims validation tests", func() {
 		When("appid is empty", func() {
 			It("should invalidate the claims", func() {
-				claims := &AzureADTokenClaims{
+				claims := &AADTokenClaims{
 					Tid: "tid",
 					RegisteredClaims: jwt.RegisteredClaims{
 						ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
@@ -29,7 +29,7 @@ var _ = Describe("datamodel tests", func() {
 
 		When("tid is empty", func() {
 			It("shoudl invalidate the claims", func() {
-				claims := &AzureADTokenClaims{
+				claims := &AADTokenClaims{
 					AppID: "appid",
 					RegisteredClaims: jwt.RegisteredClaims{
 						ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
@@ -43,7 +43,7 @@ var _ = Describe("datamodel tests", func() {
 
 		When("claims are expired", func() {
 			It("should invalidate the claims", func() {
-				claims := &AzureADTokenClaims{
+				claims := &AADTokenClaims{
 					AppID: "appid",
 					Tid:   "tid",
 					RegisteredClaims: jwt.RegisteredClaims{
@@ -58,7 +58,7 @@ var _ = Describe("datamodel tests", func() {
 
 		When("claims are valid", func() {
 			It("should successfully validate the claims", func() {
-				claims := &AzureADTokenClaims{
+				claims := &AADTokenClaims{
 					AppID: "appid",
 					Tid:   "tid",
 					RegisteredClaims: jwt.RegisteredClaims{

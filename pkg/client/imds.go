@@ -19,9 +19,9 @@ import (
 )
 
 type ImdsClient interface {
-	GetMSIToken(ctx context.Context, imdsURL, clientID string) (*datamodel.TokenResponseJSON, error)
-	GetInstanceData(ctx context.Context, imdsURL string) (*datamodel.VmssInstanceData, error)
-	GetAttestedData(ctx context.Context, imdsURL, nonce string) (*datamodel.VmssAttestedData, error)
+	GetMSIToken(ctx context.Context, imdsURL, clientID string) (*datamodel.AADTokenResponse, error)
+	GetInstanceData(ctx context.Context, imdsURL string) (*datamodel.VMSSInstanceData, error)
+	GetAttestedData(ctx context.Context, imdsURL, nonce string) (*datamodel.VMSSAttestedData, error)
 }
 
 func NewImdsClient(logger *logrus.Logger) ImdsClient {
@@ -34,7 +34,7 @@ type imdsClientImpl struct {
 	logger *logrus.Logger
 }
 
-func (c *imdsClientImpl) GetMSIToken(ctx context.Context, imdsURL, clientID string) (*datamodel.TokenResponseJSON, error) {
+func (c *imdsClientImpl) GetMSIToken(ctx context.Context, imdsURL, clientID string) (*datamodel.AADTokenResponse, error) {
 	// TODO(cameissner): modify so this works on all clouds later
 	url := fmt.Sprintf("%s/metadata/identity/oauth2/token", imdsURL)
 	queryParameters := map[string]string{
@@ -45,26 +45,25 @@ func (c *imdsClientImpl) GetMSIToken(ctx context.Context, imdsURL, clientID stri
 		queryParameters["client_id"] = clientID
 	}
 
-	data := &datamodel.TokenResponseJSON{}
-
-	if err := getImdsData(ctx, c.logger, url, queryParameters, data); err != nil {
-		return nil, fmt.Errorf("failed to retrieve IMDS MSI token: %w", err)
+	tokenResponse := &datamodel.AADTokenResponse{}
+	if err := getImdsData(ctx, c.logger, url, queryParameters, tokenResponse); err != nil {
+		return nil, fmt.Errorf("failed to retrieve MSI token: %w", err)
 	}
-	if data.Error != "" {
-		return nil, fmt.Errorf("failed to retrieve IMDS MSI token (%s): %s", data.Error, data.ErrorDescription)
+	if tokenResponse.Error != "" {
+		return nil, fmt.Errorf("failed to retrieve MSI token: %s: %s", tokenResponse.Error, tokenResponse.ErrorDescription)
 	}
 
-	c.logger.WithField("accessToken", data.AccessToken).Debugf("retrieved access token")
-	return data, nil
+	c.logger.WithField("accessToken", tokenResponse.AccessToken).Debugf("retrieved access token")
+	return tokenResponse, nil
 }
 
-func (c *imdsClientImpl) GetInstanceData(ctx context.Context, imdsURL string) (*datamodel.VmssInstanceData, error) {
+func (c *imdsClientImpl) GetInstanceData(ctx context.Context, imdsURL string) (*datamodel.VMSSInstanceData, error) {
 	url := fmt.Sprintf("%s/metadata/instance", imdsURL)
 	queryParameters := map[string]string{
 		"api-version": "2021-05-01",
 		"format":      "json",
 	}
-	data := &datamodel.VmssInstanceData{}
+	data := &datamodel.VMSSInstanceData{}
 
 	if err := getImdsData(ctx, c.logger, url, queryParameters, data); err != nil {
 		return nil, fmt.Errorf("failed to retrieve IMDS instance data: %w", err)
@@ -73,7 +72,7 @@ func (c *imdsClientImpl) GetInstanceData(ctx context.Context, imdsURL string) (*
 	return data, nil
 }
 
-func (c *imdsClientImpl) GetAttestedData(ctx context.Context, imdsURL, nonce string) (*datamodel.VmssAttestedData, error) {
+func (c *imdsClientImpl) GetAttestedData(ctx context.Context, imdsURL, nonce string) (*datamodel.VMSSAttestedData, error) {
 	url := fmt.Sprintf("%s/metadata/attested/document", imdsURL)
 	queryParameters := map[string]string{
 		"api-version": "2021-05-01",
@@ -81,7 +80,7 @@ func (c *imdsClientImpl) GetAttestedData(ctx context.Context, imdsURL, nonce str
 		"nonce":       nonce,
 	}
 
-	data := &datamodel.VmssAttestedData{}
+	data := &datamodel.VMSSAttestedData{}
 	if err := getImdsData(ctx, c.logger, url, queryParameters, data); err != nil {
 		return nil, fmt.Errorf("failed to retrieve IMDS attested data: %w", err)
 	}

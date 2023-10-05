@@ -10,47 +10,22 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 )
 
-type AzureADTokenClaims struct {
-	ClaimNames struct {
-		Groups string `json:"groups"`
-	} `json:"_claim_names"`
-	ClaimSources struct {
-		Src1 struct {
-			Endpoint string `json:"endpoint"`
-		} `json:"src1"`
-	} `json:"_claim_sources"`
-	Acr               string   `json:"acr"`
-	Aio               string   `json:"aio"`
-	Amr               []string `json:"amr"`
-	AppID             string   `json:"appid"`
-	AppIDAcr          string   `json:"appidacr"`
-	Azp               string   `json:"azp"`
-	Azpacr            string   `json:"azpacr"`
-	DeviceID          string   `json:"deviceid"`
-	FamilyName        string   `json:"family_name"`
-	GivenName         string   `json:"given_name"`
-	Groups            []string `json:"groups"`
-	HasGroups         bool     `json:"hasgroups"`
-	Idp               string   `json:"idp"`
-	IPAddr            string   `json:"ipaddr"`
-	Name              string   `json:"name"`
-	Oid               string   `json:"oid"`
-	OnpremSID         string   `json:"onprem_sid"`
-	PreferredUsername string   `json:"preferred_username"`
-	Puid              string   `json:"puid"`
-	Rh                string   `json:"rh"`
-	Roles             []string `json:"roles"`
-	Scp               string   `json:"scp"`
-	Tid               string   `json:"tid"`
-	UniqueName        string   `json:"unique_name"`
-	Upn               string   `json:"upn"`
-	Uti               string   `json:"uti"`
-	Ver               string   `json:"ver"`
-	Wids              []string `json:"wids"`
+// AADTokenClaims embeds the jwt.RegisteredClaims object, containg
+// common registered JWT claims such as 'exp', 'aud', 'iat', etc. It also
+// contains the AAD-specific claims that we use in order to perform authz
+type AADTokenClaims struct {
+	AppID string `json:"appid"`
+	Tid   string `json:"tid"`
 	jwt.RegisteredClaims
 }
 
-func (c *AzureADTokenClaims) Valid() error {
+// Valid is required to implement the jwt.Claims interface.
+// Valid will perform basic validation of AAD-related claims, as well
+// as call the Valid method on the embedded RegisteredClaims struct which contains
+// common registered claims that mostly every JWT is expected to have in its payload
+// (such as 'aud', 'exp', 'iat', etc.). AADTokenClaims must implement the jwt.Claims
+// interface so we can delegate base-level claim validation to the jwt package on the server side.
+func (c *AADTokenClaims) Valid() error {
 	if c.AppID == "" {
 		return fmt.Errorf("appid claim must be included and non-empty")
 	}
@@ -60,50 +35,40 @@ func (c *AzureADTokenClaims) Valid() error {
 	return c.RegisteredClaims.Valid()
 }
 
-type Request struct {
-	Nonce      string
-	Expiration time.Time
-	ResourceID string
-	VMID       string
-	VMName     string
-}
-
-type AttestedData struct {
-	LicenseType string `json:"licenseType,omitempty"`
-	Nonce       string `json:",omitempty"`
-	Plan        struct {
-		Name      string `json:"name,omitempty"`
-		Product   string `json:"product,omitempty"`
-		Publisher string `json:"publisher,omitempty"`
-	} `json:",omitempty"`
-	SubscriptionID string `json:"subscriptionId"`
-	Sku            string `json:"sku,omitempty"`
-	Timestamp      struct {
-		CreatedOn string `json:"createdOn"`
-		ExpiresOn string `json:"expiresOn"`
-	} `json:"timestamp"`
-	VMID string `json:"vmId"`
-}
-
-type KubeletAzureJSON struct {
-	ClientID               string `json:"aadClientId"`
-	ClientSecret           string `json:"aadClientSecret"`
-	TenantID               string `json:"tenantId"`
-	UserAssignedIdentityID string `json:"userAssignedIdentityID"`
-}
-
-type TokenResponseJSON struct {
+// AADTokenResponse is used to unmarshal responses received from
+// IMDS when retrieving MSI tokens for authentication.
+type AADTokenResponse struct {
 	AccessToken      string `json:"access_token"`
-	RefreshToken     string `json:"refresh_token"`
-	ExpiresIn        string `json:"expires_in"`
-	ExpiresOn        string `json:"expires_on"`
-	NotBefore        string `json:"not_before"`
-	Resource         string `json:"resource"`
-	TokenType        string `json:"token_type"`
 	Error            string `json:"error"`
 	ErrorDescription string `json:"error_description"`
 }
 
+// BootstrapTokenRequest represents a request to generate a new
+// unique TLS bootstrap token on the server-side.
+type BootstrapTokenRequest struct {
+	Nonce      string
+	Expiration time.Time
+	ResourceID string
+}
+
+// AttestedData represents the set of fields we need when decoding
+// and unmarshaliong attested data blobs received from IMDS.
+type AttestedData struct {
+	Nonce string `json:",omitempty"`
+	VMID  string `json:"vmId,omitempty"`
+}
+
+// AzureConfig represents the fields we need from the azure.json
+// file present on all AKS nodes.
+type AzureConfig struct {
+	ClientID               string `json:"aadClientId,omitempty"`
+	ClientSecret           string `json:"aadClientSecret,omitempty"`
+	TenantID               string `json:"tenantId,omitempty"`
+	UserAssignedIdentityID string `json:"userAssignedIdentityID,omitempty"`
+}
+
+// ExecCredential represents cluster-related data supplied to the client plugin
+// by kubelet when invoked for generating bootstrap tokens.
 type ExecCredential struct {
 	APIVersion string `json:"apiVersion"`
 	Kind       string `json:"kind"`
@@ -126,143 +91,20 @@ type ExecCredential struct {
 	} `json:"status,omitempty"`
 }
 
-type VmssInstanceData struct {
-	Compute struct {
-		AzEnvironment    string `json:"azEnvironment"`
-		CustomData       string `json:"customData"`
-		EvictionPolicy   string `json:"evictionPolicy"`
-		ExtendedLocation struct {
-			Name string `json:"name"`
-			Type string `json:"type"`
-		} `json:"extendedLocation"`
-		IsHostCompatibilityLayerVM string `json:"isHostCompatibilityLayerVm"`
-		LicenseType                string `json:"licenseType"`
-		Location                   string `json:"location"`
-		Name                       string `json:"name"`
-		Offer                      string `json:"offer"`
-		OsProfile                  struct {
-			AdminUsername                 string `json:"adminUsername"`
-			ComputerName                  string `json:"computerName"`
-			DisablePasswordAuthentication string `json:"disablePasswordAuthentication"`
-		} `json:"osProfile"`
-		OsType           string `json:"osType"`
-		PlacementGroupID string `json:"placementGroupId"`
-		Plan             struct {
-			Name      string `json:"name"`
-			Product   string `json:"product"`
-			Publisher string `json:"publisher"`
-		} `json:"plan"`
-		PlatformFaultDomain  string        `json:"platformFaultDomain"`
-		PlatformUpdateDomain string        `json:"platformUpdateDomain"`
-		Priority             string        `json:"priority"`
-		Provider             string        `json:"provider"`
-		PublicKeys           []interface{} `json:"publicKeys"`
-		Publisher            string        `json:"publisher"`
-		ResourceGroupName    string        `json:"resourceGroupName"`
-		ResourceID           string        `json:"resourceId"`
-		SecurityProfile      struct {
-			SecureBootEnabled string `json:"secureBootEnabled"`
-			VirtualTpmEnabled string `json:"virtualTpmEnabled"`
-		} `json:"securityProfile"`
-		Sku            string `json:"sku"`
-		StorageProfile struct {
-			DataDisks []struct {
-				BytesPerSecondThrottle string `json:"bytesPerSecondThrottle"`
-				Caching                string `json:"caching"`
-				CreateOption           string `json:"createOption"`
-				DiskCapacityBytes      string `json:"diskCapacityBytes"`
-				DiskSizeGB             string `json:"diskSizeGB"`
-				Image                  struct {
-					URI string `json:"uri"`
-				} `json:"image"`
-				IsSharedDisk string `json:"isSharedDisk"`
-				IsUltraDisk  string `json:"isUltraDisk"`
-				Lun          string `json:"lun"`
-				ManagedDisk  struct {
-					ID                 string `json:"id"`
-					StorageAccountType string `json:"storageAccountType"`
-				} `json:"managedDisk"`
-				Name                 string `json:"name"`
-				OpsPerSecondThrottle string `json:"opsPerSecondThrottle"`
-				Vhd                  struct {
-					URI string `json:"uri"`
-				} `json:"vhd"`
-				WriteAcceleratorEnabled string `json:"writeAcceleratorEnabled"`
-			} `json:"dataDisks"`
-			ImageReference struct {
-				ID        string `json:"id"`
-				Offer     string `json:"offer"`
-				Publisher string `json:"publisher"`
-				Sku       string `json:"sku"`
-				Version   string `json:"version"`
-			} `json:"imageReference"`
-			OsDisk struct {
-				Caching          string `json:"caching"`
-				CreateOption     string `json:"createOption"`
-				DiffDiskSettings struct {
-					Option string `json:"option"`
-				} `json:"diffDiskSettings"`
-				DiskSizeGB         string `json:"diskSizeGB"`
-				EncryptionSettings struct {
-					Enabled string `json:"enabled"`
-				} `json:"encryptionSettings"`
-				Image struct {
-					URI string `json:"uri"`
-				} `json:"image"`
-				ManagedDisk struct {
-					ID                 string `json:"id"`
-					StorageAccountType string `json:"storageAccountType"`
-				} `json:"managedDisk"`
-				Name   string `json:"name"`
-				OsType string `json:"osType"`
-				Vhd    struct {
-					URI string `json:"uri"`
-				} `json:"vhd"`
-				WriteAcceleratorEnabled string `json:"writeAcceleratorEnabled"`
-			} `json:"osDisk"`
-			ResourceDisk struct {
-				Size string `json:"size"`
-			} `json:"resourceDisk"`
-		} `json:"storageProfile"`
-		SubscriptionID string `json:"subscriptionId"`
-		Tags           string `json:"tags"`
-		TagsList       []struct {
-			Name  string `json:"name"`
-			Value string `json:"value"`
-		} `json:"tagsList"`
-		UserData               string `json:"userData"`
-		Version                string `json:"version"`
-		VirtualMachineScaleSet struct {
-			ID string `json:"id"`
-		} `json:"virtualMachineScaleSet"`
-		VMID           string `json:"vmId"`
-		VMScaleSetName string `json:"vmScaleSetName"`
-		VMSize         string `json:"vmSize"`
-		Zone           string `json:"zone"`
-	} `json:"compute"`
-	Network struct {
-		Interface []struct {
-			Ipv4 struct {
-				IPAddress []struct {
-					PrivateIPAddress string `json:"privateIpAddress"`
-					PublicIPAddress  string `json:"publicIpAddress"`
-				} `json:"ipAddress"`
-				Subnet []struct {
-					Address string `json:"address"`
-					Prefix  string `json:"prefix"`
-				} `json:"subnet"`
-			} `json:"ipv4"`
-			Ipv6 struct {
-				IPAddress []struct {
-					PrivateIPAddress string `json:"privateIpAddress"`
-				} `json:"ipAddress"`
-			} `json:"ipv6"`
-			MacAddress string `json:"macAddress"`
-		} `json:"interface"`
-	} `json:"network"`
+// Compute represents the compute-related fields we need from VMSS-related instance data.
+type Compute struct {
+	ResourceID string `json:"resourceId,omitempty"`
 }
 
-type VmssAttestedData struct {
-	Encoding  string `json:"encoding"`
-	Signature string `json:"signature"`
+// VMSSInstanceData represents the top-level fields we need from VMSS-related
+// instance data retrieved from IMDS.
+type VMSSInstanceData struct {
+	Compute Compute `json:"compute,omitempty"`
+}
+
+// VMSSAttestedData represents the fields we need the attested data
+// response retrieved from IMDS.
+type VMSSAttestedData struct {
+	Encoding  string `json:"encoding,omitempty"`
+	Signature string `json:"signature,omitempty"`
 }
