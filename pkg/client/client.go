@@ -111,6 +111,7 @@ func (c *tlsBootstrapClientImpl) GetBootstrapToken(ctx context.Context) (string,
 	if err != nil {
 		return "", fmt.Errorf("unable to setup GRPC client connection to TLS bootstrap server: %w", err)
 	}
+	defer conn.Close()
 
 	pbClient := pb.NewAKSBootstrapTokenRequestClient(conn)
 
@@ -186,11 +187,11 @@ func loadExecCredential() (*datamodel.ExecCredential, error) {
 	if execInfo == "" {
 		return nil, fmt.Errorf("%s must be set to retrieve bootstrap token", kubernetesExecInfoVarName)
 	}
-	execCredential := &datamodel.ExecCredential{}
-	if err := json.Unmarshal([]byte(execInfo), execCredential); err != nil {
+	var execCredential datamodel.ExecCredential
+	if err := json.Unmarshal([]byte(execInfo), &execCredential); err != nil {
 		return nil, err
 	}
-	return execCredential, nil
+	return &execCredential, nil
 }
 
 func getServerURL(execCredential *datamodel.ExecCredential) (string, error) {
