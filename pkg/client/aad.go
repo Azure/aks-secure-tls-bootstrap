@@ -3,7 +3,7 @@
 
 package client
 
-//go:generate ../../bin/mockgen -copyright_file=../../hack/copyright_header.txt -destination=./mocks/mock_aad.go -package=mocks github.com/Azure/aks-tls-bootstrap-client/pkg/client AadClient
+//go:generate ../../bin/mockgen -copyright_file=../../hack/copyright_header.txt -destination=./mocks/mock_aad.go -package=mocks github.com/Azure/aks-tls-bootstrap-client/pkg/client AadClient,GetTokenInterface
 
 import (
 	"context"
@@ -29,6 +29,14 @@ type aadClientImpl struct {
 	Logger *logrus.Logger
 }
 
+type GetTokenInterface interface {
+	GetTokenWithClient(ctx context.Context, scopes []string, client confidential.Client) (string, error)
+}
+type getTokenWithClientImpl struct{}
+
+// global controller that can be overwritten to mock
+var getTokenImplGlobalController = GetTokenInterface(getTokenWithClientImpl{})
+
 func (c *aadClientImpl) GetAadToken(ctx context.Context, clientID, clientSecret, tenantID, resource string) (string, error) {
 	scopes := []string{
 		fmt.Sprintf("%s/.default", resource),
@@ -48,6 +56,10 @@ func (c *aadClientImpl) GetAadToken(ctx context.Context, clientID, clientSecret,
 
 	c.Logger.WithField("scopes", strings.Join(scopes, ",")).Info("requesting new AAD token")
 
+	return getTokenImplGlobalController.GetTokenWithClient(ctx, scopes, client)
+}
+
+func (getTokenWithClientImpl) GetTokenWithClient(ctx context.Context, scopes []string, client confidential.Client) (string, error) {
 	authResult, err := retry.DoWithData(func() (confidential.AuthResult, error) {
 		authResult, err := client.AcquireTokenByCredential(ctx, scopes)
 		if err != nil {
@@ -62,6 +74,5 @@ func (c *aadClientImpl) GetAadToken(ctx context.Context, clientID, clientSecret,
 	if err != nil {
 		return "", fmt.Errorf("failed to acquire token via service principal from AAD: %w", err)
 	}
-
 	return authResult.AccessToken, nil
 }
