@@ -42,7 +42,7 @@ var _ = Describe("Auth tests", func() {
 			resource      = "resource"
 		)
 
-		When("userSpecifiedClientID is not supplied", func() {
+		When("customClientID is not supplied", func() {
 			When("azure config is nil", func() {
 				It("should return an error", func() {
 					var azureConfig *datamodel.AzureConfig
@@ -230,7 +230,7 @@ var _ = Describe("Auth tests", func() {
 			})
 		})
 
-		When("userSpecifiedClientID is supplied", func() {
+		When("customClientID is supplied", func() {
 			var nonEmptyClientID = "clientId"
 
 			It("should acquire MSI token from IMDS", func() {

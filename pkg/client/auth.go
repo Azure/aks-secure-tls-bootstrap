@@ -17,10 +17,10 @@ import (
 // a user-assigned managed identity and thus fetch the corresponding MSI token from IMDS. Otherwise, the information specified
 // in the azure config read from azure.json to infer the identity type and either request the token from AAD directly, or from IMDS.
 // All tokens for MSIs will be fetched from IMDS, while all SPN tokens will be fetched from AAD directly.
-func (c *tlsBootstrapClientImpl) getAuthToken(ctx context.Context, userSpecifiedClientID, resource string, azureConfig *datamodel.AzureConfig) (string, error) {
-	if userSpecifiedClientID != "" {
+func (c *tlsBootstrapClientImpl) getAuthToken(ctx context.Context, customClientID, resource string, azureConfig *datamodel.AzureConfig) (string, error) {
+	if customClientID != "" {
 		c.logger.Info("retrieving MSI access token from IMDS using user-specified client ID for UAMI...")
-		tokenResponse, err := c.imdsClient.GetMSIToken(ctx, baseImdsURL, userSpecifiedClientID, resource)
+		tokenResponse, err := c.imdsClient.GetMSIToken(ctx, baseImdsURL, customClientID, resource)
 		if err != nil {
 			return "", fmt.Errorf("unable to get MSI token for UAMI using user-specified client ID")
 		}
