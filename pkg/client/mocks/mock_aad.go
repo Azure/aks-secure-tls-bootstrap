@@ -11,7 +11,7 @@ import (
 	context "context"
 	reflect "reflect"
 
-	confidential "github.com/AzureAD/microsoft-authentication-library-for-go/apps/confidential"
+	dependencies "github.com/Azure/aks-tls-bootstrap-client/pkg/dependencies"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -77,7 +77,7 @@ func (m *MockGetTokenInterface) EXPECT() *MockGetTokenInterfaceMockRecorder {
 }
 
 // GetTokenWithClient mocks base method.
-func (m *MockGetTokenInterface) GetTokenWithClient(arg0 context.Context, arg1 []string, arg2 confidential.Client) (string, error) {
+func (m *MockGetTokenInterface) GetTokenWithClient(arg0 context.Context, arg1 []string, arg2 dependencies.AcquireTokenClient) (string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetTokenWithClient", arg0, arg1, arg2)
 	ret0, _ := ret[0].(string)

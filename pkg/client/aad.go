@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/Azure/aks-tls-bootstrap-client/pkg/dependencies"
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/confidential"
 	"github.com/avast/retry-go/v4"
 	"github.com/sirupsen/logrus"
@@ -29,8 +30,9 @@ type aadClientImpl struct {
 	Logger *logrus.Logger
 }
 
+// dependency injection for testing GetTokenWithClient
 type GetTokenInterface interface {
-	GetTokenWithClient(ctx context.Context, scopes []string, client confidential.Client) (string, error)
+	GetTokenWithClient(ctx context.Context, scopes []string, client dependencies.AcquireTokenClient) (string, error)
 }
 type getTokenWithClientImpl struct{}
 
@@ -49,7 +51,9 @@ func (c *aadClientImpl) GetAadToken(ctx context.Context, clientID, clientSecret,
 
 	// TODO(cameissner): modify so this works on all clouds later
 	authority := fmt.Sprintf(microsoftLoginAuthorityTemplate, tenantID)
-	client, err := confidential.New(authority, clientID, credential)
+	//client, err := confidential.New(authority, clientID, credential)
+	client, err := dependencies.NewTokenClient(authority, clientID, credential)
+
 	if err != nil {
 		return "", fmt.Errorf("failed to create client from azure.json sp/secret: %w", err)
 	}
@@ -59,7 +63,7 @@ func (c *aadClientImpl) GetAadToken(ctx context.Context, clientID, clientSecret,
 	return getTokenImplGlobalController.GetTokenWithClient(ctx, scopes, client)
 }
 
-func (getTokenWithClientImpl) GetTokenWithClient(ctx context.Context, scopes []string, client confidential.Client) (string, error) {
+func (getTokenWithClientImpl) GetTokenWithClient(ctx context.Context, scopes []string, client dependencies.AcquireTokenClient) (string, error) {
 	authResult, err := retry.DoWithData(func() (confidential.AuthResult, error) {
 		authResult, err := client.AcquireTokenByCredential(ctx, scopes)
 		if err != nil {
