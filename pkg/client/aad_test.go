@@ -12,14 +12,17 @@ import (
 
 var _ = Describe("Aad tests", func() {
 	var (
-		mockCtrl           *gomock.Controller
-		tokenInterfaceMock *mocks.MockGetTokenInterface
-		AadClient          = NewAadClient(testLogger)
+		mockCtrl              *gomock.Controller
+		tokenInterfaceMock    *mocks.MockGetTokenInterface
+		aquireTokenClientMock *mocks.MockAcquireTokenClient
+		AadClient             = NewAadClient(testLogger)
+		TokenController       = NewTokenWithClientInterface()
 	)
 
 	BeforeEach(func() {
 		mockCtrl = gomock.NewController(GinkgoT())
 		tokenInterfaceMock = mocks.NewMockGetTokenInterface(mockCtrl)
+		aquireTokenClientMock = mocks.NewMockAcquireTokenClient(mockCtrl)
 	})
 
 	AfterEach(func() {
@@ -33,25 +36,49 @@ var _ = Describe("Aad tests", func() {
 	})
 
 	Context("Test GetAadToken", func() {
-		It("should return AadToken", func() {
-			dummyAuth := base.AuthResult{AccessToken: "dummyAuth"}
-			tokenInterfaceMock.EXPECT().
-				GetTokenWithClient(gomock.Any(), gomock.Any(), gomock.Any()).
-				Return(dummyAuth.AccessToken, nil).
-				Times(1)
+		When("When GetTokenWithClient is mocked", func() {
+			It("should return the mocked token", func() {
+				dummyAuth := base.AuthResult{AccessToken: "dummyAuth"}
+				tokenInterfaceMock.EXPECT().
+					GetTokenWithConfidentialClient(gomock.Any(), gomock.Any()).
+					Return(dummyAuth.AccessToken, nil).
+					Times(1)
 
-			originalImpl := getTokenImplGlobalController
-			getTokenImplGlobalController = tokenInterfaceMock
-			defer func() {
-				getTokenImplGlobalController = originalImpl // Restore the original implementation.
-			}()
+				originalImpl := getTokenWithConfidentialClientImplFunc
+				getTokenWithConfidentialClientImplFunc = tokenInterfaceMock
+				defer func() {
+					getTokenWithConfidentialClientImplFunc = originalImpl // Restore the original implementation.
+				}()
 
-			_, cancel := context.WithCancel(context.Background())
-			defer cancel()
+				_, cancel := context.WithCancel(context.Background())
+				defer cancel()
 
-			token, err := AadClient.GetAadToken(context.Background(), gomock.Any().String(), gomock.Any().String(), gomock.Any().String(), gomock.Any().String())
-			Expect(token).To(Equal(dummyAuth.AccessToken))
-			Expect(err).To(BeNil())
+				token, err := AadClient.GetAadToken(context.Background(), gomock.Any().String(), gomock.Any().String(), gomock.Any().String(), gomock.Any().String())
+				Expect(token).To(Equal(dummyAuth.AccessToken))
+				Expect(err).To(BeNil())
+			})
+		})
+	})
+
+	Context("Test GetAadToken", func() {
+		When("AcquireTokenByCredential is mocked", func() {
+			It("Shoudl return the mocked authToken", func() {
+				dummyAuth := base.AuthResult{AccessToken: "dummyAuth"}
+				aquireTokenClientMock.EXPECT().AcquireTokenByCredential(gomock.Any(), gomock.Any()).Return(dummyAuth, nil).Times(1)
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
+				originalImpl := aquireTokenClient
+				aquireTokenClient = aquireTokenClientMock
+				defer func() {
+					aquireTokenClient = originalImpl // Restore the original implementation.
+				}()
+
+				scopes := []string{"apple", "banana", "cherry"}
+				accessToken, err := TokenController.GetTokenWithConfidentialClient(ctx, scopes)
+				Expect(accessToken).To(Equal(dummyAuth.AccessToken))
+				Expect(err).To(BeNil())
+			})
 		})
 	})
 })

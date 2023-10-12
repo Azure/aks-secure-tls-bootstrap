@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Azure/aks-tls-bootstrap-client/pkg/dependencies"
+	"github.com/Azure/aks-tls-bootstrap-client/pkg/client/dependencies"
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/confidential"
 	"github.com/avast/retry-go/v4"
 	"github.com/sirupsen/logrus"
@@ -32,12 +32,17 @@ type aadClientImpl struct {
 
 // dependency injection for testing GetTokenWithClient
 type GetTokenInterface interface {
-	GetTokenWithClient(ctx context.Context, scopes []string, client dependencies.AcquireTokenClient) (string, error)
+	GetTokenWithConfidentialClient(ctx context.Context, scopes []string) (string, error)
 }
-type getTokenWithClientImpl struct{}
+type getTokenWithConfidentialClientImpl struct{}
+
+func NewTokenWithClientInterface() GetTokenInterface {
+	return &getTokenWithConfidentialClientImpl{}
+}
 
 // global controller that can be overwritten to mock
-var getTokenImplGlobalController = GetTokenInterface(getTokenWithClientImpl{})
+var getTokenWithConfidentialClientImplFunc = GetTokenInterface(getTokenWithConfidentialClientImpl{})
+var aquireTokenClient dependencies.AcquireTokenClient
 
 func (c *aadClientImpl) GetAadToken(ctx context.Context, clientID, clientSecret, tenantID, resource string) (string, error) {
 	scopes := []string{
@@ -52,24 +57,23 @@ func (c *aadClientImpl) GetAadToken(ctx context.Context, clientID, clientSecret,
 	// TODO(cameissner): modify so this works on all clouds later
 	authority := fmt.Sprintf(microsoftLoginAuthorityTemplate, tenantID)
 	//client, err := confidential.New(authority, clientID, credential)
-	client, err := dependencies.NewTokenClient(authority, clientID, credential)
-
+	aquireTokenClient, err = dependencies.NewTokenClient(authority, clientID, credential)
 	if err != nil {
 		return "", fmt.Errorf("failed to create client from azure.json sp/secret: %w", err)
 	}
 
 	c.Logger.WithField("scopes", strings.Join(scopes, ",")).Info("requesting new AAD token")
 
-	return getTokenImplGlobalController.GetTokenWithClient(ctx, scopes, client)
+	return getTokenWithConfidentialClientImplFunc.GetTokenWithConfidentialClient(ctx, scopes)
 }
 
-func (getTokenWithClientImpl) GetTokenWithClient(ctx context.Context, scopes []string, client dependencies.AcquireTokenClient) (string, error) {
+func (getTokenWithConfidentialClientImpl) GetTokenWithConfidentialClient(ctx context.Context, scopes []string) (string, error) {
 	authResult, err := retry.DoWithData(func() (confidential.AuthResult, error) {
-		authResult, err := client.AcquireTokenByCredential(ctx, scopes)
+		authResult, err := aquireTokenClient.AcquireTokenByCredential(ctx, scopes)
 		if err != nil {
 			return confidential.AuthResult{}, err
 		}
-		return authResult, nil
+		return authResult, err
 	},
 		retry.Context(ctx),
 		retry.Attempts(getAadTokenMaxRetries),
@@ -78,5 +82,5 @@ func (getTokenWithClientImpl) GetTokenWithClient(ctx context.Context, scopes []s
 	if err != nil {
 		return "", fmt.Errorf("failed to acquire token via service principal from AAD: %w", err)
 	}
-	return authResult.AccessToken, nil
+	return authResult.AccessToken, err
 }

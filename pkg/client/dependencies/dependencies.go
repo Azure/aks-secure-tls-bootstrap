@@ -6,6 +6,8 @@ import (
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/confidential"
 )
 
+//go:generate ../../../bin/mockgen -copyright_file=../../../hack/copyright_header.txt -destination=../mocks/mock_dependencies.go -package=mocks github.com/Azure/aks-tls-bootstrap-client/pkg/client/dependencies AcquireTokenClient
+
 //-------------------------------------
 // dependency injection for testing AcquireTokenByCredential
 

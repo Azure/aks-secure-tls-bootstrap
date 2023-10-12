@@ -11,7 +11,6 @@ import (
 	context "context"
 	reflect "reflect"
 
-	dependencies "github.com/Azure/aks-tls-bootstrap-client/pkg/dependencies"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -76,17 +75,17 @@ func (m *MockGetTokenInterface) EXPECT() *MockGetTokenInterfaceMockRecorder {
 	return m.recorder
 }
 
-// GetTokenWithClient mocks base method.
-func (m *MockGetTokenInterface) GetTokenWithClient(arg0 context.Context, arg1 []string, arg2 dependencies.AcquireTokenClient) (string, error) {
+// GetTokenWithConfidentialClient mocks base method.
+func (m *MockGetTokenInterface) GetTokenWithConfidentialClient(arg0 context.Context, arg1 []string) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetTokenWithClient", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "GetTokenWithConfidentialClient", arg0, arg1)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetTokenWithClient indicates an expected call of GetTokenWithClient.
-func (mr *MockGetTokenInterfaceMockRecorder) GetTokenWithClient(arg0, arg1, arg2 interface{}) *gomock.Call {
+// GetTokenWithConfidentialClient indicates an expected call of GetTokenWithConfidentialClient.
+func (mr *MockGetTokenInterfaceMockRecorder) GetTokenWithConfidentialClient(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTokenWithClient", reflect.TypeOf((*MockGetTokenInterface)(nil).GetTokenWithClient), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTokenWithConfidentialClient", reflect.TypeOf((*MockGetTokenInterface)(nil).GetTokenWithConfidentialClient), arg0, arg1)
 }
