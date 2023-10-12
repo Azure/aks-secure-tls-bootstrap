@@ -3,7 +3,7 @@
 
 package client
 
-//go:generate ../../bin/mockgen -copyright_file=../../hack/copyright_header.txt -destination=./mocks/mock_aad.go -package=mocks github.com/Azure/aks-tls-bootstrap-client/pkg/client AadClient
+//go:generate ../../bin/mockgen -copyright_file=../../hack/copyright_header.txt -destination=./mocks/mock_aad.go -package=mocks github.com/Azure/aks-tls-bootstrap-client/pkg/client AadClient,tokenAcquirer
 
 import (
 	"context"
@@ -14,6 +14,9 @@ import (
 	"github.com/avast/retry-go/v4"
 	"github.com/sirupsen/logrus"
 )
+
+// can instantiate this with a mock in unit tests
+var newTokenAcquirer = newConfidentialTokenAcquirer
 
 type AadClient interface {
 	GetAadToken(ctx context.Context, clientID, clientSecret, tenantID, resource string) (string, error)
@@ -33,27 +36,20 @@ func (c *aadClientImpl) GetAadToken(ctx context.Context, clientID, clientSecret,
 	scopes := []string{
 		fmt.Sprintf("%s/.default", resource),
 	}
-
-	credential, err := confidential.NewCredFromSecret(clientSecret)
-	if err != nil {
-		return "", fmt.Errorf("failed to create secret credential from azure.json: %w", err)
-	}
-
-	// TODO(cameissner): modify so this works on all clouds later
-	authority := fmt.Sprintf(microsoftLoginAuthorityTemplate, tenantID)
-	client, err := confidential.New(authority, clientID, credential)
-	if err != nil {
-		return "", fmt.Errorf("failed to create client from azure.json sp/secret: %w", err)
-	}
-
 	c.Logger.WithField("scopes", strings.Join(scopes, ",")).Info("requesting new AAD token")
 
+	authority := fmt.Sprintf(microsoftLoginAuthorityTemplate, tenantID)
+	tokenAcquirer, err := newTokenAcquirer(authority, clientID, clientSecret)
+	if err != nil {
+		return "", fmt.Errorf("unable to construct new AAD token acquirer: %w", err)
+	}
+
 	authResult, err := retry.DoWithData(func() (confidential.AuthResult, error) {
-		authResult, err := client.AcquireTokenByCredential(ctx, scopes)
+		res, err := tokenAcquirer.Acquire(ctx, scopes)
 		if err != nil {
 			return confidential.AuthResult{}, err
 		}
-		return authResult, nil
+		return res, nil
 	},
 		retry.Context(ctx),
 		retry.Attempts(getAadTokenMaxRetries),
@@ -64,4 +60,28 @@ func (c *aadClientImpl) GetAadToken(ctx context.Context, clientID, clientSecret,
 	}
 
 	return authResult.AccessToken, nil
+}
+
+type TokenAcquirer interface {
+	Acquire(ctx context.Context, scopes []string) (confidential.AuthResult, error)
+}
+
+type confidentialTokenAcquirer struct {
+	confidential.Client
+}
+
+func newConfidentialTokenAcquirer(authority, clientID, clientSecret string) (TokenAcquirer, error) {
+	credential, err := confidential.NewCredFromSecret(clientSecret)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create secret credential from azure.json: %w", err)
+	}
+	client, err := confidential.New(authority, clientID, credential)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client from azure.json sp/secret: %w", err)
+	}
+	return &confidentialTokenAcquirer{client}, nil
+}
+
+func (a *confidentialTokenAcquirer) Acquire(ctx context.Context, scopes []string) (confidential.AuthResult, error) {
+	return a.AcquireTokenByCredential(ctx, scopes)
 }
