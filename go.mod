@@ -5,7 +5,6 @@ go 1.20
 require (
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.1.0
 	github.com/avast/retry-go/v4 v4.5.0
-	github.com/golang-jwt/jwt/v4 v4.5.0
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.27.10
 	github.com/sirupsen/logrus v1.9.3
