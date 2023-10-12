@@ -22,7 +22,11 @@ type AcquireTokenClientImpl struct {
 }
 
 func NewTokenClient(authority, clientID string, credential confidential.Credential) (AcquireTokenClient, error) {
-	c, err := confidential.New(authority, clientID, credential)
+        client, err := confidential.New(authority, clientID, credential)
+        if err != nil {
+          return nil, fmt.Errorf("failed to construct new confidential client: %w", err)
+        }
+	return &AcquireTokenClientImpl{client: &client}, nil
 	return &AcquireTokenClientImpl{client: &c}, err
 }
 
