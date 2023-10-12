@@ -3,59 +3,12 @@
 
 package datamodel
 
-import (
-	"fmt"
-	"time"
-
-	"github.com/golang-jwt/jwt/v4"
-)
-
-// AADTokenClaims embeds the jwt.RegisteredClaims object, containg
-// common registered JWT claims such as 'exp', 'aud', 'iat', etc. It also
-// contains the AAD-specific claims that we use in order to perform authz
-type AADTokenClaims struct {
-	AppID string `json:"appid"`
-	Tid   string `json:"tid"`
-	jwt.RegisteredClaims
-}
-
-// Valid is required to implement the jwt.Claims interface.
-// Valid will perform basic validation of AAD-related claims, as well
-// as call the Valid method on the embedded RegisteredClaims struct which contains
-// common registered claims that mostly every JWT is expected to have in its payload
-// (such as 'aud', 'exp', 'iat', etc.). AADTokenClaims must implement the jwt.Claims
-// interface so we can delegate base-level claim validation to the jwt package on the server side.
-func (c *AADTokenClaims) Valid() error {
-	if c.AppID == "" {
-		return fmt.Errorf("appid claim must be included and non-empty")
-	}
-	if c.Tid == "" {
-		return fmt.Errorf("tid claim must be included and non-empty")
-	}
-	return c.RegisteredClaims.Valid()
-}
-
 // AADTokenResponse is used to unmarshal responses received from
 // IMDS when retrieving MSI tokens for authentication.
 type AADTokenResponse struct {
 	AccessToken      string `json:"access_token"`
 	Error            string `json:"error"`
 	ErrorDescription string `json:"error_description"`
-}
-
-// BootstrapTokenRequest represents a request to generate a new
-// unique TLS bootstrap token on the server-side.
-type BootstrapTokenRequest struct {
-	Nonce      string
-	Expiration time.Time
-	ResourceID string
-}
-
-// AttestedData represents the set of fields we need when decoding
-// and unmarshaliong attested data blobs received from IMDS.
-type AttestedData struct {
-	Nonce string `json:",omitempty"`
-	VMID  string `json:"vmId,omitempty"`
 }
 
 // AzureConfig represents the fields we need from the azure.json
