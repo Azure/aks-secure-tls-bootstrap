@@ -56,12 +56,11 @@ func (c *aadClientImpl) GetAadToken(ctx context.Context, clientID, clientSecret,
 
 	// TODO(cameissner): modify so this works on all clouds later
 	authority := fmt.Sprintf(microsoftLoginAuthorityTemplate, tenantID)
-	//client, err := confidential.New(authority, clientID, credential)
+
 	aquireTokenClient, err = dependencies.NewTokenClient(authority, clientID, credential)
 	if err != nil {
 		return "", fmt.Errorf("failed to create client from azure.json sp/secret: %w", err)
 	}
-
 	c.Logger.WithField("scopes", strings.Join(scopes, ",")).Info("requesting new AAD token")
 
 	return getTokenWithConfidentialClientImplFunc.GetTokenWithConfidentialClient(ctx, scopes)
