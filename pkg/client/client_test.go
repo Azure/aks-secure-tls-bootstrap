@@ -181,6 +181,20 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 			})
 		})
 
+		When("setupClientConnection is mocked to succeed but getInstanceData is not mocked", func() {
+			It("should panic on getInstanceData", func() {
+				os.Setenv("KUBERNETES_EXEC_INFO", "")
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
+				mockSetupClientConnectionFuncs(mockExecCredential)
+
+				Expect(func() {
+					bootstrapClient.GetBootstrapToken(ctx)
+				}).To(Panic())
+			})
+		})
+
 		When("GetNonce and GetAttestedData are mocked to succeed", func() {
 			It("should fail to get a token", func() {
 				os.Setenv("KUBERNETES_EXEC_INFO", "")
@@ -205,7 +219,27 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 			})
 		})
 
-		When("GetNonce and GetAttestedData are mocked to succeed", func() {
+		When("GetNonce is mocked but GetAttestedData is not mocked", func() {
+			It("should fail to get a token", func() {
+				os.Setenv("KUBERNETES_EXEC_INFO", "")
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
+				mockSetupClientConnectionFuncs(mockExecCredential)
+				newGetInstanceData = func(ctx context.Context, c *tlsBootstrapClientImpl, imdsURL string) (*datamodel.VMSSInstanceData, error) {
+					return &datamodel.VMSSInstanceData{}, nil
+				}
+				newPbClientGetNonce = func(ctx context.Context, pbClient pb.AKSBootstrapTokenRequestClient, nonceRequest *pb.NonceRequest) (*pb.NonceResponse, error) {
+					return &pb.NonceResponse{}, nil
+				}
+
+				Expect(func() {
+					bootstrapClient.GetBootstrapToken(ctx)
+				}).To(Panic())
+			})
+		})
+
+		When("PbClientGetToken is mocked to succeed", func() {
 			It("should fail to generate new exec credential", func() {
 				os.Setenv("KUBERNETES_EXEC_INFO", "")
 				ctx, cancel := context.WithCancel(context.Background())
