@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/Azure/aks-tls-bootstrap-client/pkg/datamodel"
+	pb "github.com/Azure/aks-tls-bootstrap-client/pkg/protos"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -67,10 +68,38 @@ wEqb8vx9lRpm8Tuo3Pw3MZ8upt8aHTn/BB61YkDsNdAZAWGKgv77doGsWwqWtb+m
 h/ZvW8MtN313Ykv4
 -----END CERTIFICATE-----`
 
+func mockSetupClientConnectionFuncs(mockExecCredential *datamodel.ExecCredential) {
+	newLoadExecCredential = func() (*datamodel.ExecCredential, error) {
+		return mockExecCredential, nil
+	}
+	newGetTlsConfig = func(pemCAs []byte, c *tlsBootstrapClientImpl, execCredential *datamodel.ExecCredential) (*tls.Config, error) {
+		return &tls.Config{}, nil
+	}
+	newLoadAzureJson = func() (*datamodel.AzureConfig, error) {
+		return &datamodel.AzureConfig{}, nil
+	}
+	newGetAuthToken = func(ctx context.Context, c *tlsBootstrapClientImpl, customClientID, resource string, azureConfig *datamodel.AzureConfig) (string, error) {
+		return "", nil
+	}
+}
+
 var _ = Describe("TLS Bootstrap client tests", func() {
 	var (
 		bootstrapClient    TLSBootstrapClient
 		mockExecCredential *datamodel.ExecCredential
+
+		// setupClientConnection mocks
+		oldnewLoadExecCredential func() (*datamodel.ExecCredential, error)
+		oldGetTlsConfig          func(pemCAs []byte, c *tlsBootstrapClientImpl, execCredential *datamodel.ExecCredential) (*tls.Config, error)
+		oldLoadAzureJson         func() (*datamodel.AzureConfig, error)
+		oldGetAuthToken          func(ctx context.Context, c *tlsBootstrapClientImpl, customClientID, resource string, azureConfig *datamodel.AzureConfig) (string, error)
+
+		// GetBootstrapToken mocks
+		oldGetInstanceData            func(ctx context.Context, c *tlsBootstrapClientImpl, imdsURL string) (*datamodel.VMSSInstanceData, error)
+		oldPbClientGetNonce           func(ctx context.Context, pbClient pb.AKSBootstrapTokenRequestClient, nonceRequest *pb.NonceRequest) (*pb.NonceResponse, error)
+		oldGetAttestedData            func(ctx context.Context, c *tlsBootstrapClientImpl, nonce string) (*datamodel.VMSSAttestedData, error)
+		oldPbClientGetToken           func(ctx context.Context, pbClient pb.AKSBootstrapTokenRequestClient, tokenRequest *pb.TokenRequest) (*pb.TokenResponse, error)
+		oldGetExecCredentialWithToken func(token string, expirationTimestamp string) (*datamodel.ExecCredential, error)
 	)
 
 	BeforeEach(func() {
@@ -92,10 +121,34 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 			} "json:\"cluster,omitempty\""
 			Interactive bool "json:\"interactive,omitempty\""
 		}{}}
+
+		// save all function implementations so that they can be resotred on cleanup
+		oldnewLoadExecCredential = newLoadExecCredential
+		oldGetTlsConfig = newGetTlsConfig
+		oldLoadAzureJson = newLoadAzureJson
+		oldGetAuthToken = newGetAuthToken
+
+		oldGetInstanceData = newGetInstanceData
+		oldPbClientGetNonce = newPbClientGetNonce
+		oldGetAttestedData = newGetAttestedData
+		oldPbClientGetToken = newPbClientGetToken
+		oldGetExecCredentialWithToken = newGetExecCredentialWithToken
 	})
 
 	AfterEach(func() {
 		os.Setenv("KUBERNETES_EXEC_INFO", "")
+
+		// restore all mocked functions
+		newLoadExecCredential = oldnewLoadExecCredential
+		newGetTlsConfig = oldGetTlsConfig
+		newLoadAzureJson = oldLoadAzureJson
+		newGetAuthToken = oldGetAuthToken
+
+		newGetInstanceData = oldGetInstanceData
+		newPbClientGetNonce = oldPbClientGetNonce
+		newGetAttestedData = oldGetAttestedData
+		newPbClientGetToken = oldPbClientGetToken
+		newGetExecCredentialWithToken = oldGetExecCredentialWithToken
 	})
 
 	Context("Test GetBootstrapToken", func() {
@@ -108,6 +161,104 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 			Expect(token).To(BeEmpty())
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(ContainSubstring("KUBERNETES_EXEC_INFO must be set to retrieve bootstrap token"))
+		})
+
+		When("setupClientConnection and getInstanceData are mocked to succeed", func() {
+			It("should fail to recieve nonce", func() {
+				os.Setenv("KUBERNETES_EXEC_INFO", "")
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
+				mockSetupClientConnectionFuncs(mockExecCredential)
+				newGetInstanceData = func(ctx context.Context, c *tlsBootstrapClientImpl, imdsURL string) (*datamodel.VMSSInstanceData, error) {
+					return &datamodel.VMSSInstanceData{}, nil
+				}
+
+				token, err := bootstrapClient.GetBootstrapToken(ctx)
+				Expect(token).To(BeEmpty())
+				Expect(err).ToNot(BeNil())
+				Expect(err.Error()).To(ContainSubstring("failed to retrieve a nonce"))
+			})
+		})
+
+		When("GetNonce and GetAttestedData are mocked to succeed", func() {
+			It("should fail to get a token", func() {
+				os.Setenv("KUBERNETES_EXEC_INFO", "")
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
+				mockSetupClientConnectionFuncs(mockExecCredential)
+				newGetInstanceData = func(ctx context.Context, c *tlsBootstrapClientImpl, imdsURL string) (*datamodel.VMSSInstanceData, error) {
+					return &datamodel.VMSSInstanceData{}, nil
+				}
+				newPbClientGetNonce = func(ctx context.Context, pbClient pb.AKSBootstrapTokenRequestClient, nonceRequest *pb.NonceRequest) (*pb.NonceResponse, error) {
+					return &pb.NonceResponse{}, nil
+				}
+				newGetAttestedData = func(ctx context.Context, c *tlsBootstrapClientImpl, nonce string) (*datamodel.VMSSAttestedData, error) {
+					return &datamodel.VMSSAttestedData{}, nil
+				}
+
+				token, err := bootstrapClient.GetBootstrapToken(ctx)
+				Expect(token).To(BeEmpty())
+				Expect(err).ToNot(BeNil())
+				Expect(err.Error()).To(ContainSubstring("failed to retrieve a token"))
+			})
+		})
+
+		When("GetNonce and GetAttestedData are mocked to succeed", func() {
+			It("should fail to generate new exec credential", func() {
+				os.Setenv("KUBERNETES_EXEC_INFO", "")
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
+				mockSetupClientConnectionFuncs(mockExecCredential)
+				newGetInstanceData = func(ctx context.Context, c *tlsBootstrapClientImpl, imdsURL string) (*datamodel.VMSSInstanceData, error) {
+					return &datamodel.VMSSInstanceData{}, nil
+				}
+				newPbClientGetNonce = func(ctx context.Context, pbClient pb.AKSBootstrapTokenRequestClient, nonceRequest *pb.NonceRequest) (*pb.NonceResponse, error) {
+					return &pb.NonceResponse{}, nil
+				}
+				newGetAttestedData = func(ctx context.Context, c *tlsBootstrapClientImpl, nonce string) (*datamodel.VMSSAttestedData, error) {
+					return &datamodel.VMSSAttestedData{}, nil
+				}
+				newPbClientGetToken = func(ctx context.Context, pbClient pb.AKSBootstrapTokenRequestClient, tokenRequest *pb.TokenRequest) (*pb.TokenResponse, error) {
+					return &pb.TokenResponse{}, nil
+				}
+
+				token, err := bootstrapClient.GetBootstrapToken(ctx)
+				Expect(token).To(BeEmpty())
+				Expect(err).ToNot(BeNil())
+				Expect(err.Error()).To(ContainSubstring("generate new exec credential"))
+			})
+		})
+
+		When("getExecCredentialWithToken is mocked to succeed", func() {
+			It("should return a bootstrap token", func() {
+				os.Setenv("KUBERNETES_EXEC_INFO", "")
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
+				mockSetupClientConnectionFuncs(mockExecCredential)
+				newGetInstanceData = func(ctx context.Context, c *tlsBootstrapClientImpl, imdsURL string) (*datamodel.VMSSInstanceData, error) {
+					return &datamodel.VMSSInstanceData{}, nil
+				}
+				newPbClientGetNonce = func(ctx context.Context, pbClient pb.AKSBootstrapTokenRequestClient, nonceRequest *pb.NonceRequest) (*pb.NonceResponse, error) {
+					return &pb.NonceResponse{}, nil
+				}
+				newGetAttestedData = func(ctx context.Context, c *tlsBootstrapClientImpl, nonce string) (*datamodel.VMSSAttestedData, error) {
+					return &datamodel.VMSSAttestedData{}, nil
+				}
+				newPbClientGetToken = func(ctx context.Context, pbClient pb.AKSBootstrapTokenRequestClient, tokenRequest *pb.TokenRequest) (*pb.TokenResponse, error) {
+					return &pb.TokenResponse{}, nil
+				}
+				newGetExecCredentialWithToken = func(token string, expirationTimestamp string) (*datamodel.ExecCredential, error) {
+					return &datamodel.ExecCredential{}, nil
+				}
+
+				token, err := bootstrapClient.GetBootstrapToken(ctx)
+				Expect(token).ToNot(BeEmpty())
+				Expect(err).To(BeNil())
+			})
 		})
 	})
 
@@ -299,6 +450,15 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 				Expect(conn).ToNot(BeNil())
 				Expect(err).To(BeNil())
 			})
+		})
+	})
+
+	Context("Test getExecCredentialWithToken", func() {
+		It("Shiuld return a new exec credential", func() {
+			cred, err := getExecCredentialWithToken("dummyToken", "dummyTimestamp")
+			Expect(err).To(BeNil())
+			Expect(cred.Status.Token).To(Equal("dummyToken"))
+			Expect(cred.Status.ExpirationTimestamp).To(Equal("dummyTimestamp"))
 		})
 	})
 })
