@@ -25,6 +25,7 @@ import (
 // TLSBootstrapClient retrieves tokens for performing node TLS bootstrapping.
 type TLSBootstrapClient interface {
 	GetBootstrapToken(ctx context.Context) (string, error)
+	setupClientConnection(ctx context.Context) (*grpc.ClientConn, error)
 }
 
 func NewTLSBootstrapClient(logger *logrus.Logger, opts SecureTLSBootstrapClientOpts) TLSBootstrapClient {
@@ -50,9 +51,25 @@ type tlsBootstrapClientImpl struct {
 	resource       string
 }
 
+var newLoadExecCredential = func() (*datamodel.ExecCredential, error) {
+	return loadExecCredential()
+}
+
+var newGetTlsConfig = func(pemCAs []byte, c *tlsBootstrapClientImpl, execCredential *datamodel.ExecCredential) (*tls.Config, error) {
+	return getTLSConfig(pemCAs, c.nextProto, execCredential.Spec.Cluster.InsecureSkipTLSVerify)
+}
+
+var newLoadAzureJson = func() (*datamodel.AzureConfig, error) {
+	return loadAzureJSON()
+}
+
+var newGetAuthToken = func(ctx context.Context, c *tlsBootstrapClientImpl, customClientID, resource string, azureConfig *datamodel.AzureConfig) (string, error) {
+	return c.getAuthToken(ctx, customClientID, resource, azureConfig)
+}
+
 func (c *tlsBootstrapClientImpl) setupClientConnection(ctx context.Context) (*grpc.ClientConn, error) {
 	c.logger.Debug("loading exec credential...")
-	execCredential, err := loadExecCredential()
+	execCredential, err := newLoadExecCredential()
 	if err != nil {
 		return nil, err
 	}
@@ -66,21 +83,22 @@ func (c *tlsBootstrapClientImpl) setupClientConnection(ctx context.Context) (*gr
 	c.logger.Info("decoded cluster CA data")
 
 	c.logger.Debug("generating TLS config for GRPC client connection...")
-	tlsConfig, err := getTLSConfig(pemCAs, c.nextProto, execCredential.Spec.Cluster.InsecureSkipTLSVerify)
+	tlsConfig, err := newGetTlsConfig(pemCAs, c, execCredential)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get TLS config: %w", err)
 	}
 	c.logger.Info("generated TLS config for GRPC client connection")
 
 	c.logger.Debug("loading azure.json...")
-	azureConfig, err := loadAzureJSON()
+	azureConfig, err := newLoadAzureJson()
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse azure config from azure.json: %w", err)
 	}
 	c.logger.Info("loaded azure.json")
 
 	c.logger.Debug("generating JWT token for auth...")
-	token, err := c.getAuthToken(ctx, c.customClientID, c.resource, azureConfig)
+
+	token, err := newGetAuthToken(ctx, c, c.customClientID, c.resource, azureConfig)
 	if err != nil {
 		return nil, err
 	}

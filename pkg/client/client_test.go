@@ -4,6 +4,7 @@ package client
 
 import (
 	"context"
+	"crypto/tls"
 	"crypto/x509"
 	"os"
 	"strings"
@@ -68,7 +69,8 @@ h/ZvW8MtN313Ykv4
 
 var _ = Describe("TLS Bootstrap client tests", func() {
 	var (
-		bootstrapClient TLSBootstrapClient
+		bootstrapClient    TLSBootstrapClient
+		mockExecCredential *datamodel.ExecCredential
 	)
 
 	BeforeEach(func() {
@@ -78,6 +80,18 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 		testExecInfoJSON = strings.ReplaceAll(testExecInfoJSON, "\n", "")
 		testExecInfoJSON = strings.ReplaceAll(testExecInfoJSON, "\t", "")
 		os.Setenv("KUBERNETES_EXEC_INFO", testExecInfoJSON)
+
+		mockExecCredential = &datamodel.ExecCredential{Spec: struct {
+			Cluster struct {
+				CertificateAuthorityData string      "json:\"certificate-authority-data,omitempty\""
+				Config                   interface{} "json:\"config,omitempty\""
+				InsecureSkipTLSVerify    bool        "json:\"insecure-skip-tls-verify,omitempty\""
+				ProxyURL                 string      "json:\"proxy-url,omitempty\""
+				Server                   string      "json:\"server,omitempty\""
+				TLSServerName            string      "json:\"tls-server-name,omitempty\""
+			} "json:\"cluster,omitempty\""
+			Interactive bool "json:\"interactive,omitempty\""
+		}{}}
 	})
 
 	AfterEach(func() {
@@ -189,6 +203,101 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 				pool := x509.NewCertPool()
 				Expect(pool.AppendCertsFromPEM([]byte(exampleCACert))).To(BeTrue())
 				Expect(config.RootCAs.Equal(pool)).To(BeTrue())
+			})
+		})
+	})
+
+	Context("Test setupClientConnection", func() {
+		When("loadExecCredential is mocked to fail", func() {
+			It("should fail on DecodeString", func() {
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
+				mockExecCredential.Spec.Cluster.CertificateAuthorityData = "incorrectbase64"
+				newLoadExecCredential = func() (*datamodel.ExecCredential, error) {
+					return mockExecCredential, nil
+				}
+
+				conn, err := bootstrapClient.setupClientConnection(ctx)
+				Expect(conn).To(BeNil())
+				Expect(err).ToNot(BeNil())
+				Expect(err.Error()).To(ContainSubstring("failed to decode"))
+			})
+		})
+
+		When("loadExecCredential is mocked to succeed", func() {
+			It("should fail on getTLSConfig", func() {
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
+				newLoadExecCredential = func() (*datamodel.ExecCredential, error) {
+					return mockExecCredential, nil
+				}
+				conn, err := bootstrapClient.setupClientConnection(ctx)
+				Expect(conn).To(BeNil())
+				Expect(err).ToNot(BeNil())
+				Expect(err.Error()).To(ContainSubstring("failed to get TLS config"))
+			})
+		})
+
+		When("getTlsConfig is mocked to succeed", func() {
+			It("should fail on loadAzureJson", func() {
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
+				newLoadExecCredential = func() (*datamodel.ExecCredential, error) {
+					return mockExecCredential, nil
+				}
+				newGetTlsConfig = func(pemCAs []byte, c *tlsBootstrapClientImpl, execCredential *datamodel.ExecCredential) (*tls.Config, error) {
+					return &tls.Config{}, nil
+				}
+				conn, err := bootstrapClient.setupClientConnection(ctx)
+				Expect(conn).To(BeNil())
+				Expect(err).ToNot(BeNil())
+				Expect(err.Error()).To(ContainSubstring("failed to parse azure"))
+			})
+		})
+
+		When("loadAzureJSON is mocked to succeed", func() {
+			It("should fail on getAuthToken", func() {
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
+				newLoadExecCredential = func() (*datamodel.ExecCredential, error) {
+					return mockExecCredential, nil
+				}
+				newGetTlsConfig = func(pemCAs []byte, c *tlsBootstrapClientImpl, execCredential *datamodel.ExecCredential) (*tls.Config, error) {
+					return &tls.Config{}, nil
+				}
+				newLoadAzureJson = func() (*datamodel.AzureConfig, error) {
+					return &datamodel.AzureConfig{}, nil
+				}
+				conn, err := bootstrapClient.setupClientConnection(ctx)
+				Expect(conn).To(BeNil())
+				Expect(err).ToNot(BeNil())
+			})
+		})
+
+		When("getAuthToken is mocked to succeed", func() {
+			It("setupClientConnection should succeed", func() {
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
+				newLoadExecCredential = func() (*datamodel.ExecCredential, error) {
+					return mockExecCredential, nil
+				}
+				newGetTlsConfig = func(pemCAs []byte, c *tlsBootstrapClientImpl, execCredential *datamodel.ExecCredential) (*tls.Config, error) {
+					return &tls.Config{}, nil
+				}
+				newLoadAzureJson = func() (*datamodel.AzureConfig, error) {
+					return &datamodel.AzureConfig{}, nil
+				}
+				newGetAuthToken = func(ctx context.Context, c *tlsBootstrapClientImpl, customClientID, resource string, azureConfig *datamodel.AzureConfig) (string, error) {
+					return "", nil
+				}
+				conn, err := bootstrapClient.setupClientConnection(ctx)
+				Expect(conn).ToNot(BeNil())
+				Expect(err).To(BeNil())
 			})
 		})
 	})
