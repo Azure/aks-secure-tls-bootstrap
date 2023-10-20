@@ -188,10 +188,13 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 				defer cancel()
 
 				mockSetupClientConnectionFuncs(mockExecCredential)
-
+				var token string
+				var err error
 				Expect(func() {
-					bootstrapClient.GetBootstrapToken(ctx)
+					token, err = bootstrapClient.GetBootstrapToken(ctx)
 				}).To(Panic())
+				Expect(token).To(BeEmpty())
+				Expect(err).To(BeNil())
 			})
 		})
 
@@ -233,9 +236,13 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 					return &pb.NonceResponse{}, nil
 				}
 
+				var token string
+				var err error
 				Expect(func() {
-					bootstrapClient.GetBootstrapToken(ctx)
+					token, err = bootstrapClient.GetBootstrapToken(ctx)
 				}).To(Panic())
+				Expect(token).To(BeEmpty())
+				Expect(err).To(BeNil())
 			})
 		})
 
