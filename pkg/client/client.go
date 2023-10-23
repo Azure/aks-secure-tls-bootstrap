@@ -63,10 +63,6 @@ var newLoadAzureJson = func() (*datamodel.AzureConfig, error) {
 	return loadAzureJSON()
 }
 
-var newGetAuthToken = func(ctx context.Context, c *tlsBootstrapClientImpl, customClientID, resource string, azureConfig *datamodel.AzureConfig) (string, error) {
-	return c.getAuthToken(ctx, customClientID, resource, azureConfig)
-}
-
 func (c *tlsBootstrapClientImpl) setupClientConnection(ctx context.Context) (*grpc.ClientConn, error) {
 	c.logger.Debug("loading exec credential...")
 	execCredential, err := newLoadExecCredential()
@@ -98,7 +94,7 @@ func (c *tlsBootstrapClientImpl) setupClientConnection(ctx context.Context) (*gr
 
 	c.logger.Debug("generating JWT token for auth...")
 
-	token, err := newGetAuthToken(ctx, c, c.customClientID, c.resource, azureConfig)
+	token, err := c.getAuthToken(ctx, c.customClientID, c.resource, azureConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -129,20 +125,12 @@ func (c *tlsBootstrapClientImpl) setupClientConnection(ctx context.Context) (*gr
 	return conn, nil
 }
 
-var newGetInstanceData = func(ctx context.Context, c *tlsBootstrapClientImpl, imdsURL string) (*datamodel.VMSSInstanceData, error) {
-	return c.imdsClient.GetInstanceData(ctx, baseImdsURL)
-}
-
 var newPbClientGetNonce = func(ctx context.Context, pbClient pb.AKSBootstrapTokenRequestClient, nonceRequest *pb.NonceRequest) (*pb.NonceResponse, error) {
 	return pbClient.GetNonce(ctx, nonceRequest)
 }
 
 var newPbClientGetToken = func(ctx context.Context, pbClient pb.AKSBootstrapTokenRequestClient, tokenRequest *pb.TokenRequest) (*pb.TokenResponse, error) {
 	return pbClient.GetToken(ctx, tokenRequest)
-}
-
-var newGetAttestedData = func(ctx context.Context, c *tlsBootstrapClientImpl, nonce string) (*datamodel.VMSSAttestedData, error) {
-	return c.imdsClient.GetAttestedData(ctx, baseImdsURL, nonce)
 }
 
 var newGetExecCredentialWithToken = func(token string, expirationTimestamp string) (*datamodel.ExecCredential, error) {
@@ -159,7 +147,7 @@ func (c *tlsBootstrapClientImpl) GetBootstrapToken(ctx context.Context) (string,
 	pbClient := pb.NewAKSBootstrapTokenRequestClient(conn)
 
 	c.logger.Debug("retrieving IMDS instance data...")
-	instanceData, err := newGetInstanceData(ctx, c, baseImdsURL)
+	instanceData, err := c.imdsClient.GetInstanceData(ctx, baseImdsURL)
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve instance metadata from IMDS: %w", err)
 	}
@@ -174,7 +162,8 @@ func (c *tlsBootstrapClientImpl) GetBootstrapToken(ctx context.Context) (string,
 	nonce := nonceResponse.GetNonce()
 
 	c.logger.Debug("retrieving IMDS attested data...")
-	attestedData, err := newGetAttestedData(ctx, c, nonce)
+	// attestedData, err := newGetAttestedData(ctx, c, nonce)
+	attestedData, err := c.imdsClient.GetAttestedData(ctx, baseImdsURL, nonce)
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve attested data from IMDS: %w", err)
 	}
