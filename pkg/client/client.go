@@ -31,10 +31,12 @@ type TLSBootstrapClient interface {
 func NewTLSBootstrapClient(logger *logrus.Logger, opts SecureTLSBootstrapClientOpts) TLSBootstrapClient {
 	imdsClient := NewImdsClient(logger)
 	aadClient := NewAadClient(logger)
+	pbcClient := pb.NewAKSBootstrapTokenRequestClient()
 
 	return &tlsBootstrapClientImpl{
 		logger:         logger,
 		imdsClient:     imdsClient,
+		pbcClient:      pbcClient,
 		aadClient:      aadClient,
 		customClientID: opts.CustomClientID,
 		nextProto:      opts.NextProto,
@@ -46,6 +48,7 @@ type tlsBootstrapClientImpl struct {
 	logger         *logrus.Logger
 	imdsClient     ImdsClient
 	aadClient      AadClient
+	pbcClient      pb.AKSBootstrapTokenRequestClient
 	customClientID string
 	nextProto      string
 	resource       string
@@ -125,14 +128,6 @@ func (c *tlsBootstrapClientImpl) setupClientConnection(ctx context.Context) (*gr
 	return conn, nil
 }
 
-var newPbClientGetNonce = func(ctx context.Context, pbClient pb.AKSBootstrapTokenRequestClient, nonceRequest *pb.NonceRequest) (*pb.NonceResponse, error) {
-	return pbClient.GetNonce(ctx, nonceRequest)
-}
-
-var newPbClientGetToken = func(ctx context.Context, pbClient pb.AKSBootstrapTokenRequestClient, tokenRequest *pb.TokenRequest) (*pb.TokenResponse, error) {
-	return pbClient.GetToken(ctx, tokenRequest)
-}
-
 var newGetExecCredentialWithToken = func(token string, expirationTimestamp string) (*datamodel.ExecCredential, error) {
 	return getExecCredentialWithToken(token, expirationTimestamp)
 }
@@ -143,8 +138,7 @@ func (c *tlsBootstrapClientImpl) GetBootstrapToken(ctx context.Context) (string,
 		return "", fmt.Errorf("unable to setup GRPC client connection to TLS bootstrap server: %w", err)
 	}
 	defer conn.Close()
-
-	pbClient := pb.NewAKSBootstrapTokenRequestClient(conn)
+	c.pbcClient.AKSBootstrapTokenRequestSetConnection(conn)
 
 	c.logger.Debug("retrieving IMDS instance data...")
 	instanceData, err := c.imdsClient.GetInstanceData(ctx, baseImdsURL)
@@ -154,7 +148,9 @@ func (c *tlsBootstrapClientImpl) GetBootstrapToken(ctx context.Context) (string,
 	c.logger.WithField("vmResourceId", instanceData.Compute.ResourceID).Info("retrieved IMDS instance data")
 
 	c.logger.Debug("retrieving nonce from TLS bootstrap token server...")
-	nonceResponse, err := newPbClientGetNonce(ctx, pbClient, &pb.NonceRequest{ResourceId: instanceData.Compute.ResourceID})
+
+	nonceRequest := &pb.NonceRequest{ResourceId: instanceData.Compute.ResourceID}
+	nonceResponse, err := c.pbcClient.GetNonce(ctx, nonceRequest)
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve a nonce: %w", err)
 	}
@@ -162,7 +158,6 @@ func (c *tlsBootstrapClientImpl) GetBootstrapToken(ctx context.Context) (string,
 	nonce := nonceResponse.GetNonce()
 
 	c.logger.Debug("retrieving IMDS attested data...")
-	// attestedData, err := newGetAttestedData(ctx, c, nonce)
 	attestedData, err := c.imdsClient.GetAttestedData(ctx, baseImdsURL, nonce)
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve attested data from IMDS: %w", err)
@@ -170,11 +165,14 @@ func (c *tlsBootstrapClientImpl) GetBootstrapToken(ctx context.Context) (string,
 	c.logger.Info("retrieved IMDS attested data")
 
 	c.logger.Debug("retrieving bootstrap token from TLS bootstrap server...")
-	tokenResponse, err := newPbClientGetToken(ctx, pbClient, &pb.TokenRequest{
+
+	tokenRequest := &pb.TokenRequest{
 		ResourceId:   instanceData.Compute.ResourceID,
 		Nonce:        nonce,
 		AttestedData: attestedData.Signature,
-	})
+	}
+	tokenResponse, err := c.pbcClient.GetToken(ctx, tokenRequest)
+
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve a token: %w", err)
 	}

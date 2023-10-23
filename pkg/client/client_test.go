@@ -6,12 +6,14 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"os"
 	"strings"
 
 	"github.com/Azure/aks-tls-bootstrap-client/pkg/client/mocks"
 	"github.com/Azure/aks-tls-bootstrap-client/pkg/datamodel"
 	pb "github.com/Azure/aks-tls-bootstrap-client/pkg/protos"
+	protos_mock "github.com/Azure/aks-tls-bootstrap-client/pkg/protos/mocks"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"go.uber.org/mock/gomock"
@@ -87,6 +89,7 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 		mockCtrl           *gomock.Controller
 		imdsClient         *mocks.MockImdsClient
 		aadClient          *mocks.MockAadClient
+		pbcClient          *protos_mock.MockAKSBootstrapTokenRequestClient
 		tlsBootstrapClient *tlsBootstrapClientImpl
 		mockExecCredential *datamodel.ExecCredential
 
@@ -96,8 +99,6 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 		oldLoadAzureJson         func() (*datamodel.AzureConfig, error)
 
 		// GetBootstrapToken mocks
-		oldPbClientGetNonce           func(ctx context.Context, pbClient pb.AKSBootstrapTokenRequestClient, nonceRequest *pb.NonceRequest) (*pb.NonceResponse, error)
-		oldPbClientGetToken           func(ctx context.Context, pbClient pb.AKSBootstrapTokenRequestClient, tokenRequest *pb.TokenRequest) (*pb.TokenResponse, error)
 		oldGetExecCredentialWithToken func(token string, expirationTimestamp string) (*datamodel.ExecCredential, error)
 	)
 
@@ -105,10 +106,13 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 		mockCtrl = gomock.NewController(GinkgoT())
 		imdsClient = mocks.NewMockImdsClient(mockCtrl)
 		aadClient = mocks.NewMockAadClient(mockCtrl)
+		pbcClient = protos_mock.NewMockAKSBootstrapTokenRequestClient(mockCtrl)
+		pbcClient.EXPECT().AKSBootstrapTokenRequestSetConnection(gomock.Any()).Times(1)
 		tlsBootstrapClient = &tlsBootstrapClientImpl{
 			logger:     testLogger,
 			imdsClient: imdsClient,
 			aadClient:  aadClient,
+			pbcClient:  pbcClient,
 		}
 		aadClient.EXPECT().GetAadToken(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(
 			"spToken",
@@ -136,8 +140,6 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 		oldGetTlsConfig = newGetTlsConfig
 		oldLoadAzureJson = newLoadAzureJson
 
-		oldPbClientGetNonce = newPbClientGetNonce
-		oldPbClientGetToken = newPbClientGetToken
 		oldGetExecCredentialWithToken = newGetExecCredentialWithToken
 	})
 
@@ -149,8 +151,6 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 		newGetTlsConfig = oldGetTlsConfig
 		newLoadAzureJson = oldLoadAzureJson
 
-		newPbClientGetNonce = oldPbClientGetNonce
-		newPbClientGetToken = oldPbClientGetToken
 		newGetExecCredentialWithToken = oldGetExecCredentialWithToken
 	})
 
@@ -174,6 +174,7 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 
 				imdsClient.EXPECT().GetInstanceData(gomock.Any(), gomock.Any()).Times(1).Return(&datamodel.VMSSInstanceData{}, nil)
 				mockSetupClientConnectionFuncs(mockExecCredential)
+				pbcClient.EXPECT().GetNonce(gomock.Any(), gomock.Any()).Times(1).Return(&pb.NonceResponse{}, errors.New("error"))
 
 				token, err := tlsBootstrapClient.GetBootstrapToken(ctx)
 				Expect(token).To(BeEmpty())
@@ -190,10 +191,9 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 
 				imdsClient.EXPECT().GetInstanceData(gomock.Any(), gomock.Any()).Times(1).Return(&datamodel.VMSSInstanceData{}, nil)
 				mockSetupClientConnectionFuncs(mockExecCredential)
-				newPbClientGetNonce = func(ctx context.Context, pbClient pb.AKSBootstrapTokenRequestClient, nonceRequest *pb.NonceRequest) (*pb.NonceResponse, error) {
-					return &pb.NonceResponse{}, nil
-				}
+				pbcClient.EXPECT().GetNonce(gomock.Any(), gomock.Any()).Times(1).Return(&pb.NonceResponse{}, nil)
 				imdsClient.EXPECT().GetAttestedData(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(&datamodel.VMSSAttestedData{}, nil)
+				pbcClient.EXPECT().GetToken(gomock.Any(), gomock.Any()).Times(1).Return(&pb.TokenResponse{}, errors.New("error"))
 
 				token, err := tlsBootstrapClient.GetBootstrapToken(ctx)
 				Expect(token).To(BeEmpty())
@@ -210,14 +210,9 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 
 				imdsClient.EXPECT().GetInstanceData(gomock.Any(), gomock.Any()).Times(1).Return(&datamodel.VMSSInstanceData{}, nil)
 				mockSetupClientConnectionFuncs(mockExecCredential)
-				newPbClientGetNonce = func(ctx context.Context, pbClient pb.AKSBootstrapTokenRequestClient, nonceRequest *pb.NonceRequest) (*pb.NonceResponse, error) {
-					return &pb.NonceResponse{}, nil
-				}
+				pbcClient.EXPECT().GetNonce(gomock.Any(), gomock.Any()).Times(1).Return(&pb.NonceResponse{}, nil)
 				imdsClient.EXPECT().GetAttestedData(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(&datamodel.VMSSAttestedData{}, nil)
-				newPbClientGetToken = func(ctx context.Context, pbClient pb.AKSBootstrapTokenRequestClient, tokenRequest *pb.TokenRequest) (*pb.TokenResponse, error) {
-					return &pb.TokenResponse{}, nil
-				}
-
+				pbcClient.EXPECT().GetToken(gomock.Any(), gomock.Any()).Times(1).Return(&pb.TokenResponse{}, nil)
 				token, err := tlsBootstrapClient.GetBootstrapToken(ctx)
 				Expect(token).To(BeEmpty())
 				Expect(err).ToNot(BeNil())
@@ -233,13 +228,9 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 
 				imdsClient.EXPECT().GetInstanceData(gomock.Any(), gomock.Any()).Times(1).Return(&datamodel.VMSSInstanceData{}, nil)
 				mockSetupClientConnectionFuncs(mockExecCredential)
-				newPbClientGetNonce = func(ctx context.Context, pbClient pb.AKSBootstrapTokenRequestClient, nonceRequest *pb.NonceRequest) (*pb.NonceResponse, error) {
-					return &pb.NonceResponse{}, nil
-				}
+				pbcClient.EXPECT().GetNonce(gomock.Any(), gomock.Any()).Times(1).Return(&pb.NonceResponse{}, nil)
 				imdsClient.EXPECT().GetAttestedData(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(&datamodel.VMSSAttestedData{}, nil)
-				newPbClientGetToken = func(ctx context.Context, pbClient pb.AKSBootstrapTokenRequestClient, tokenRequest *pb.TokenRequest) (*pb.TokenResponse, error) {
-					return &pb.TokenResponse{}, nil
-				}
+				pbcClient.EXPECT().GetToken(gomock.Any(), gomock.Any()).Times(1).Return(&pb.TokenResponse{}, nil)
 				newGetExecCredentialWithToken = func(token string, expirationTimestamp string) (*datamodel.ExecCredential, error) {
 					return &datamodel.ExecCredential{}, nil
 				}
