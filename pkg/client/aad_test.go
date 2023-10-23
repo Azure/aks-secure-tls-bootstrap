@@ -13,14 +13,14 @@ import (
 
 var _ = Describe("Aad tests", func() {
 	var (
-		mockCtrl        *gomock.Controller
-		AadClient       = NewAadClient(testLogger)
-		aquireTokenMock *mocks.MockTokenAcquirer
+		mockCtrl     *gomock.Controller
+		AadClient    = NewAadClient(testLogger)
+		mockAcquirer *mocks.MockTokenAcquirer
 	)
 
 	BeforeEach(func() {
 		mockCtrl = gomock.NewController(GinkgoT())
-		aquireTokenMock = mocks.NewMockTokenAcquirer(mockCtrl)
+		mockAcquirer = mocks.NewMockTokenAcquirer(mockCtrl)
 	})
 
 	AfterEach(func() {
@@ -34,12 +34,12 @@ var _ = Describe("Aad tests", func() {
 	})
 
 	Context("Test GetAadToken", func() {
-		When("newTokenAcquirer is expected to be correct", func() {
+		When("newAadTokenAcquirer returns a valid tokenAcquierer", func() {
 			It("should return the mocked token", func() {
 				dummyAuth := base.AuthResult{AccessToken: "dummyAuth"}
-				aquireTokenMock.EXPECT().Acquire(gomock.Any(), gomock.Any()).Return(dummyAuth, nil).Times(1)
+				mockAcquirer.EXPECT().Acquire(gomock.Any(), gomock.Any()).Return(dummyAuth, nil).Times(1)
 				newTokenAcquirer = func(authority, clientID, clientSecret string) (TokenAcquirer, error) {
-					return aquireTokenMock, nil
+					return mockAcquirer, nil
 				}
 
 				originalImpl := newAadTokenAcquirer
@@ -55,12 +55,12 @@ var _ = Describe("Aad tests", func() {
 	})
 
 	Context("Test GetAadToken", func() {
-		When("newTokenAcquirer is expected to fail", func() {
+		When("newAadTokenAcquirer returns an error", func() {
 			It("should return an error", func() {
 				dummyAuth := base.AuthResult{}
-				aquireTokenMock.EXPECT().Acquire(gomock.Any(), gomock.Any()).Return(dummyAuth, fmt.Errorf("error")).AnyTimes()
+				mockAcquirer.EXPECT().Acquire(gomock.Any(), gomock.Any()).Return(dummyAuth, fmt.Errorf("error")).AnyTimes()
 				newTokenAcquirer = func(authority, clientID, clientSecret string) (TokenAcquirer, error) {
-					return aquireTokenMock, nil
+					return mockAcquirer, nil
 				}
 
 				originalImpl := newAadTokenAcquirer
