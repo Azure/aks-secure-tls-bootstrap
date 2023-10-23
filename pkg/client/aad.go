@@ -16,7 +16,7 @@ import (
 )
 
 // can instantiate this with a mock in unit tests
-var newTokenAcquirer = newConfidentialTokenAcquirer
+var newTokenAcquirer = newAadTokenAcquirer
 
 type AadClient interface {
 	GetAadToken(ctx context.Context, clientID, clientSecret, tenantID, resource string) (string, error)
@@ -66,11 +66,11 @@ type TokenAcquirer interface {
 	Acquire(ctx context.Context, scopes []string) (confidential.AuthResult, error)
 }
 
-type confidentialTokenAcquirer struct {
+type aadTokenAcquirer struct {
 	confidential.Client
 }
 
-func newConfidentialTokenAcquirer(authority, clientID, clientSecret string) (TokenAcquirer, error) {
+func newAadTokenAcquirer(authority, clientID, clientSecret string) (TokenAcquirer, error) {
 	credential, err := confidential.NewCredFromSecret(clientSecret)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create secret credential from azure.json: %w", err)
@@ -79,9 +79,9 @@ func newConfidentialTokenAcquirer(authority, clientID, clientSecret string) (Tok
 	if err != nil {
 		return nil, fmt.Errorf("failed to create client from azure.json sp/secret: %w", err)
 	}
-	return &confidentialTokenAcquirer{client}, nil
+	return &aadTokenAcquirer{client}, nil
 }
 
-func (a *confidentialTokenAcquirer) Acquire(ctx context.Context, scopes []string) (confidential.AuthResult, error) {
+func (a *aadTokenAcquirer) Acquire(ctx context.Context, scopes []string) (confidential.AuthResult, error) {
 	return a.AcquireTokenByCredential(ctx, scopes)
 }

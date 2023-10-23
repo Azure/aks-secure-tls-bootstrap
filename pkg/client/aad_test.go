@@ -42,7 +42,7 @@ var _ = Describe("Aad tests", func() {
 					return aquireTokenMock, nil
 				}
 
-				originalImpl := newConfidentialTokenAcquirer
+				originalImpl := newAadTokenAcquirer
 				defer func() {
 					newTokenAcquirer = originalImpl
 				}()
@@ -63,7 +63,7 @@ var _ = Describe("Aad tests", func() {
 					return aquireTokenMock, nil
 				}
 
-				originalImpl := newConfidentialTokenAcquirer
+				originalImpl := newAadTokenAcquirer
 				defer func() {
 					newTokenAcquirer = originalImpl
 				}()
