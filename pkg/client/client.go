@@ -3,6 +3,8 @@
 
 package client
 
+//go:generate ../../bin/mockgen -copyright_file=../../hack/copyright_header.txt -destination=./mocks/mock_client_helpers.go -package=mocks github.com/Azure/aks-tls-bootstrap-client/pkg/client ClientHelpers
+
 import (
 	"context"
 	"crypto/tls"
@@ -32,12 +34,14 @@ func NewTLSBootstrapClient(logger *logrus.Logger, opts SecureTLSBootstrapClientO
 	imdsClient := NewImdsClient(logger)
 	aadClient := NewAadClient(logger)
 	pbcClient := pb.NewAKSBootstrapTokenRequestClient()
+	helperClient := NewClientHelpers()
 
 	return &tlsBootstrapClientImpl{
 		logger:         logger,
 		imdsClient:     imdsClient,
 		pbcClient:      pbcClient,
 		aadClient:      aadClient,
+		helperClient:   helperClient,
 		customClientID: opts.CustomClientID,
 		nextProto:      opts.NextProto,
 		resource:       opts.AADResource,
@@ -48,27 +52,16 @@ type tlsBootstrapClientImpl struct {
 	logger         *logrus.Logger
 	imdsClient     ImdsClient
 	aadClient      AadClient
+	helperClient   ClientHelpers
 	pbcClient      pb.AKSBootstrapTokenRequestClient
 	customClientID string
 	nextProto      string
 	resource       string
 }
 
-var newLoadExecCredential = func() (*datamodel.ExecCredential, error) {
-	return loadExecCredential()
-}
-
-var newGetTlsConfig = func(pemCAs []byte, c *tlsBootstrapClientImpl, execCredential *datamodel.ExecCredential) (*tls.Config, error) {
-	return getTLSConfig(pemCAs, c.nextProto, execCredential.Spec.Cluster.InsecureSkipTLSVerify)
-}
-
-var newLoadAzureJson = func() (*datamodel.AzureConfig, error) {
-	return loadAzureJSON()
-}
-
 func (c *tlsBootstrapClientImpl) setupClientConnection(ctx context.Context) (*grpc.ClientConn, error) {
 	c.logger.Debug("loading exec credential...")
-	execCredential, err := newLoadExecCredential()
+	execCredential, err := c.helperClient.LoadExecCredential()
 	if err != nil {
 		return nil, err
 	}
@@ -82,14 +75,14 @@ func (c *tlsBootstrapClientImpl) setupClientConnection(ctx context.Context) (*gr
 	c.logger.Info("decoded cluster CA data")
 
 	c.logger.Debug("generating TLS config for GRPC client connection...")
-	tlsConfig, err := newGetTlsConfig(pemCAs, c, execCredential)
+	tlsConfig, err := c.helperClient.GetTLSConfig(pemCAs, c.nextProto, execCredential.Spec.Cluster.InsecureSkipTLSVerify)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get TLS config: %w", err)
 	}
 	c.logger.Info("generated TLS config for GRPC client connection")
 
 	c.logger.Debug("loading azure.json...")
-	azureConfig, err := newLoadAzureJson()
+	azureConfig, err := c.helperClient.LoadAzureJSON()
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse azure config from azure.json: %w", err)
 	}
@@ -104,7 +97,7 @@ func (c *tlsBootstrapClientImpl) setupClientConnection(ctx context.Context) (*gr
 	c.logger.Info("generated JWT token for auth")
 
 	c.logger.Debug("extracting server URL from exec credential...")
-	server, err := getServerURL(execCredential)
+	server, err := c.helperClient.GetServerURL(execCredential)
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +203,20 @@ func getExecCredentialWithToken(token, expirationTimestamp string) (*datamodel.E
 	}, nil
 }
 
-func loadExecCredential() (*datamodel.ExecCredential, error) {
+type ClientHelpers interface {
+	LoadExecCredential() (*datamodel.ExecCredential, error)
+	GetServerURL(execCredential *datamodel.ExecCredential) (string, error)
+	GetTLSConfig(pemCAs []byte, nextProto string, insecureSkipVerify bool) (*tls.Config, error)
+	LoadAzureJSON() (*datamodel.AzureConfig, error)
+}
+
+type clientHelpersImpl struct{}
+
+func NewClientHelpers() ClientHelpers {
+	return &clientHelpersImpl{}
+}
+
+func (c *clientHelpersImpl) LoadExecCredential() (*datamodel.ExecCredential, error) {
 	execInfo := os.Getenv(kubernetesExecInfoVarName)
 	if execInfo == "" {
 		return nil, fmt.Errorf("%s must be set to retrieve bootstrap token", kubernetesExecInfoVarName)
@@ -222,7 +228,7 @@ func loadExecCredential() (*datamodel.ExecCredential, error) {
 	return &execCredential, nil
 }
 
-func getServerURL(execCredential *datamodel.ExecCredential) (string, error) {
+func (c *clientHelpersImpl) GetServerURL(execCredential *datamodel.ExecCredential) (string, error) {
 	serverURL, err := url.Parse(execCredential.Spec.Cluster.Server)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse server URL: %w", err)
@@ -231,7 +237,7 @@ func getServerURL(execCredential *datamodel.ExecCredential) (string, error) {
 	return server, nil
 }
 
-func getTLSConfig(pemCAs []byte, nextProto string, insecureSkipVerify bool) (*tls.Config, error) {
+func (c *clientHelpersImpl) GetTLSConfig(pemCAs []byte, nextProto string, insecureSkipVerify bool) (*tls.Config, error) {
 	tlsRootStore := x509.NewCertPool()
 	ok := tlsRootStore.AppendCertsFromPEM(pemCAs)
 	if !ok {
@@ -250,4 +256,8 @@ func getTLSConfig(pemCAs []byte, nextProto string, insecureSkipVerify bool) (*tl
 	}
 
 	return tlsConfig, nil
+}
+
+func (c *clientHelpersImpl) LoadAzureJSON() (*datamodel.AzureConfig, error) {
+	return loadAzureJSON()
 }

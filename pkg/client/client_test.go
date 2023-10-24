@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 
@@ -72,31 +73,16 @@ wEqb8vx9lRpm8Tuo3Pw3MZ8upt8aHTn/BB61YkDsNdAZAWGKgv77doGsWwqWtb+m
 h/ZvW8MtN313Ykv4
 -----END CERTIFICATE-----`
 
-func mockSetupClientConnectionFuncs(mockExecCredential *datamodel.ExecCredential) {
-	newLoadExecCredential = func() (*datamodel.ExecCredential, error) {
-		return mockExecCredential, nil
-	}
-	newGetTlsConfig = func(pemCAs []byte, c *tlsBootstrapClientImpl, execCredential *datamodel.ExecCredential) (*tls.Config, error) {
-		return &tls.Config{}, nil
-	}
-	newLoadAzureJson = func() (*datamodel.AzureConfig, error) {
-		return &datamodel.AzureConfig{ClientID: "clientID", ClientSecret: "secret", TenantID: "tenantID"}, nil
-	}
-}
-
 var _ = Describe("TLS Bootstrap client tests", func() {
 	var (
 		mockCtrl           *gomock.Controller
 		imdsClient         *mocks.MockImdsClient
 		aadClient          *mocks.MockAadClient
 		pbcClient          *protos_mock.MockAKSBootstrapTokenRequestClient
+		mockHelperClient   *mocks.MockClientHelpers
+		helperClient       *clientHelpersImpl
 		tlsBootstrapClient *tlsBootstrapClientImpl
 		mockExecCredential *datamodel.ExecCredential
-
-		// setupClientConnection mocks
-		oldnewLoadExecCredential func() (*datamodel.ExecCredential, error)
-		oldGetTlsConfig          func(pemCAs []byte, c *tlsBootstrapClientImpl, execCredential *datamodel.ExecCredential) (*tls.Config, error)
-		oldLoadAzureJson         func() (*datamodel.AzureConfig, error)
 
 		// GetBootstrapToken mocks
 		oldGetExecCredentialWithToken func(token string, expirationTimestamp string) (*datamodel.ExecCredential, error)
@@ -107,12 +93,16 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 		imdsClient = mocks.NewMockImdsClient(mockCtrl)
 		aadClient = mocks.NewMockAadClient(mockCtrl)
 		pbcClient = protos_mock.NewMockAKSBootstrapTokenRequestClient(mockCtrl)
+		mockHelperClient = mocks.NewMockClientHelpers(mockCtrl)
+		helperClient = &clientHelpersImpl{}
+
 		pbcClient.EXPECT().AKSBootstrapTokenRequestSetConnection(gomock.Any()).Times(1)
 		tlsBootstrapClient = &tlsBootstrapClientImpl{
-			logger:     testLogger,
-			imdsClient: imdsClient,
-			aadClient:  aadClient,
-			pbcClient:  pbcClient,
+			logger:       testLogger,
+			imdsClient:   imdsClient,
+			aadClient:    aadClient,
+			pbcClient:    pbcClient,
+			helperClient: mockHelperClient,
 		}
 		aadClient.EXPECT().GetAadToken(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(
 			"spToken",
@@ -135,11 +125,7 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 			Interactive bool "json:\"interactive,omitempty\""
 		}{}}
 
-		// save all function implementations so that they can be resotred on cleanup
-		oldnewLoadExecCredential = newLoadExecCredential
-		oldGetTlsConfig = newGetTlsConfig
-		oldLoadAzureJson = newLoadAzureJson
-
+		// save all function implementations so that they can be restored on cleanup
 		oldGetExecCredentialWithToken = newGetExecCredentialWithToken
 	})
 
@@ -147,10 +133,6 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 		os.Setenv("KUBERNETES_EXEC_INFO", "")
 
 		// restore all mocked functions
-		newLoadExecCredential = oldnewLoadExecCredential
-		newGetTlsConfig = oldGetTlsConfig
-		newLoadAzureJson = oldLoadAzureJson
-
 		newGetExecCredentialWithToken = oldGetExecCredentialWithToken
 	})
 
@@ -160,7 +142,10 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			token, err := tlsBootstrapClient.GetBootstrapToken(ctx)
+			// not mocked for this test
+			tlsBootstrapClient.helperClient = helperClient
+
+			token, err := tlsBootstrapClient.GetBootstrapToken(ctx) // here
 			Expect(token).To(BeEmpty())
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(ContainSubstring("KUBERNETES_EXEC_INFO must be set to retrieve bootstrap token"))
@@ -172,8 +157,13 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 
+				mockHelperClient.EXPECT().LoadExecCredential().Times(1).Return(mockExecCredential, nil)
+				mockHelperClient.EXPECT().GetTLSConfig(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(&tls.Config{}, nil)
+				mockHelperClient.EXPECT().GetServerURL(gomock.Any()).Times(1).Return("url", nil)
+				mockHelperClient.EXPECT().LoadAzureJSON().Times(1).Return(&datamodel.AzureConfig{ClientID: "clientID", ClientSecret: "secret", TenantID: "tenantID"}, nil)
+
 				imdsClient.EXPECT().GetInstanceData(gomock.Any(), gomock.Any()).Times(1).Return(&datamodel.VMSSInstanceData{}, nil)
-				mockSetupClientConnectionFuncs(mockExecCredential)
+
 				pbcClient.EXPECT().GetNonce(gomock.Any(), gomock.Any()).Times(1).Return(&pb.NonceResponse{}, errors.New("error"))
 
 				token, err := tlsBootstrapClient.GetBootstrapToken(ctx)
@@ -189,10 +179,15 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 
+				mockHelperClient.EXPECT().LoadExecCredential().Times(1).Return(mockExecCredential, nil)
+				mockHelperClient.EXPECT().GetTLSConfig(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(&tls.Config{}, nil)
+				mockHelperClient.EXPECT().GetServerURL(gomock.Any()).Times(1).Return("url", nil)
+				mockHelperClient.EXPECT().LoadAzureJSON().Times(1).Return(&datamodel.AzureConfig{ClientID: "clientID", ClientSecret: "secret", TenantID: "tenantID"}, nil)
+
 				imdsClient.EXPECT().GetInstanceData(gomock.Any(), gomock.Any()).Times(1).Return(&datamodel.VMSSInstanceData{}, nil)
-				mockSetupClientConnectionFuncs(mockExecCredential)
-				pbcClient.EXPECT().GetNonce(gomock.Any(), gomock.Any()).Times(1).Return(&pb.NonceResponse{}, nil)
 				imdsClient.EXPECT().GetAttestedData(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(&datamodel.VMSSAttestedData{}, nil)
+
+				pbcClient.EXPECT().GetNonce(gomock.Any(), gomock.Any()).Times(1).Return(&pb.NonceResponse{}, nil)
 				pbcClient.EXPECT().GetToken(gomock.Any(), gomock.Any()).Times(1).Return(&pb.TokenResponse{}, errors.New("error"))
 
 				token, err := tlsBootstrapClient.GetBootstrapToken(ctx)
@@ -208,11 +203,17 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 
+				mockHelperClient.EXPECT().LoadExecCredential().Times(1).Return(mockExecCredential, nil)
+				mockHelperClient.EXPECT().GetTLSConfig(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(&tls.Config{}, nil)
+				mockHelperClient.EXPECT().GetServerURL(gomock.Any()).Times(1).Return("url", nil)
+				mockHelperClient.EXPECT().LoadAzureJSON().Times(1).Return(&datamodel.AzureConfig{ClientID: "clientID", ClientSecret: "secret", TenantID: "tenantID"}, nil)
+
 				imdsClient.EXPECT().GetInstanceData(gomock.Any(), gomock.Any()).Times(1).Return(&datamodel.VMSSInstanceData{}, nil)
-				mockSetupClientConnectionFuncs(mockExecCredential)
-				pbcClient.EXPECT().GetNonce(gomock.Any(), gomock.Any()).Times(1).Return(&pb.NonceResponse{}, nil)
 				imdsClient.EXPECT().GetAttestedData(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(&datamodel.VMSSAttestedData{}, nil)
+
+				pbcClient.EXPECT().GetNonce(gomock.Any(), gomock.Any()).Times(1).Return(&pb.NonceResponse{}, nil)
 				pbcClient.EXPECT().GetToken(gomock.Any(), gomock.Any()).Times(1).Return(&pb.TokenResponse{}, nil)
+
 				token, err := tlsBootstrapClient.GetBootstrapToken(ctx)
 				Expect(token).To(BeEmpty())
 				Expect(err).ToNot(BeNil())
@@ -226,11 +227,17 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 
+				mockHelperClient.EXPECT().LoadExecCredential().Times(1).Return(mockExecCredential, nil)
+				mockHelperClient.EXPECT().GetTLSConfig(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(&tls.Config{}, nil)
+				mockHelperClient.EXPECT().GetServerURL(gomock.Any()).Times(1).Return("url", nil)
+				mockHelperClient.EXPECT().LoadAzureJSON().Times(1).Return(&datamodel.AzureConfig{ClientID: "clientID", ClientSecret: "secret", TenantID: "tenantID"}, nil)
+
 				imdsClient.EXPECT().GetInstanceData(gomock.Any(), gomock.Any()).Times(1).Return(&datamodel.VMSSInstanceData{}, nil)
-				mockSetupClientConnectionFuncs(mockExecCredential)
-				pbcClient.EXPECT().GetNonce(gomock.Any(), gomock.Any()).Times(1).Return(&pb.NonceResponse{}, nil)
 				imdsClient.EXPECT().GetAttestedData(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(&datamodel.VMSSAttestedData{}, nil)
+
+				pbcClient.EXPECT().GetNonce(gomock.Any(), gomock.Any()).Times(1).Return(&pb.NonceResponse{}, nil)
 				pbcClient.EXPECT().GetToken(gomock.Any(), gomock.Any()).Times(1).Return(&pb.TokenResponse{}, nil)
+
 				newGetExecCredentialWithToken = func(token string, expirationTimestamp string) (*datamodel.ExecCredential, error) {
 					return &datamodel.ExecCredential{}, nil
 				}
@@ -245,7 +252,7 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 	Context("Test loadExecCredential", func() {
 		When("ExecCredential JSON is properly formed", func() {
 			It("should correctly parse and load the exec credential", func() {
-				execCredential, err := loadExecCredential()
+				execCredential, err := helperClient.LoadExecCredential()
 				Expect(err).To(BeNil())
 				Expect(execCredential).ToNot(BeNil())
 				Expect(execCredential.APIVersion).To(Equal("client.authentication.k8s.io/v1"))
@@ -263,7 +270,7 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 		})
 
 		When("ExecCredential JSON is malformed", func() {
-			execCredential, err := loadExecCredential()
+			execCredential, err := helperClient.LoadExecCredential()
 			Expect(err).ToNot(BeNil())
 			Expect(execCredential).To(BeNil())
 		})
@@ -273,7 +280,7 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 		It("should correctly join server name and port with a ':'", func() {
 			execCredential := &datamodel.ExecCredential{}
 			execCredential.Spec.Cluster.Server = "https://1.2.3.4:6443"
-			serverURL, err := getServerURL(execCredential)
+			serverURL, err := helperClient.GetServerURL(execCredential)
 			Expect(err).To(BeNil())
 			Expect(serverURL).To(Equal("1.2.3.4:6443"))
 		})
@@ -284,7 +291,7 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 
 		When("nextProto is not supplied", func() {
 			It("should not include NextProtos in returned config", func() {
-				config, err := getTLSConfig(pemCAs, "", false)
+				config, err := helperClient.GetTLSConfig(pemCAs, "", false)
 				Expect(err).To(BeNil())
 				Expect(config).ToNot(BeNil())
 				Expect(config.NextProtos).To(BeNil())
@@ -298,7 +305,7 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 
 		When("nextProto is supplied", func() {
 			It("should include NextProtos in returned config", func() {
-				config, err := getTLSConfig(pemCAs, "nextProto", false)
+				config, err := helperClient.GetTLSConfig(pemCAs, "nextProto", false)
 				Expect(err).To(BeNil())
 				Expect(config).NotTo(BeNil())
 				Expect(config.NextProtos).NotTo(BeNil())
@@ -313,7 +320,7 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 
 		When("insecureSkipVerify is false", func() {
 			It("should return config with false value of InsecureSkipVerify", func() {
-				config, err := getTLSConfig(pemCAs, "nextProto", false)
+				config, err := helperClient.GetTLSConfig(pemCAs, "nextProto", false)
 				Expect(err).To(BeNil())
 				Expect(config).NotTo(BeNil())
 				Expect(config.InsecureSkipVerify).To(BeFalse())
@@ -326,7 +333,7 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 
 		When("insecureSkipVerify is true", func() {
 			It("should return config with true value of InsecureSkipVerify", func() {
-				config, err := getTLSConfig(pemCAs, "nextProto", true)
+				config, err := helperClient.GetTLSConfig(pemCAs, "nextProto", true)
 				Expect(err).To(BeNil())
 				Expect(config).NotTo(BeNil())
 				Expect(config.InsecureSkipVerify).To(BeTrue())
@@ -345,9 +352,7 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 				defer cancel()
 
 				mockExecCredential.Spec.Cluster.CertificateAuthorityData = "incorrectbase64"
-				newLoadExecCredential = func() (*datamodel.ExecCredential, error) {
-					return mockExecCredential, nil
-				}
+				mockHelperClient.EXPECT().LoadExecCredential().Times(1).Return(mockExecCredential, nil)
 
 				conn, err := tlsBootstrapClient.setupClientConnection(ctx)
 				Expect(conn).To(BeNil())
@@ -361,10 +366,9 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 
-				newLoadExecCredential = func() (*datamodel.ExecCredential, error) {
-					return mockExecCredential, nil
-				}
-				conn, err := tlsBootstrapClient.setupClientConnection(ctx)
+				mockHelperClient.EXPECT().GetTLSConfig(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(&tls.Config{}, fmt.Errorf("error"))
+				mockHelperClient.EXPECT().LoadExecCredential().Times(1).Return(mockExecCredential, nil)
+				conn, err := tlsBootstrapClient.setupClientConnection(ctx) // here
 				Expect(conn).To(BeNil())
 				Expect(err).ToNot(BeNil())
 				Expect(err.Error()).To(ContainSubstring("failed to get TLS config"))
@@ -376,12 +380,10 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 
-				newLoadExecCredential = func() (*datamodel.ExecCredential, error) {
-					return mockExecCredential, nil
-				}
-				newGetTlsConfig = func(pemCAs []byte, c *tlsBootstrapClientImpl, execCredential *datamodel.ExecCredential) (*tls.Config, error) {
-					return &tls.Config{}, nil
-				}
+				mockHelperClient.EXPECT().LoadExecCredential().Times(1).Return(mockExecCredential, nil)
+				mockHelperClient.EXPECT().GetTLSConfig(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(&tls.Config{}, nil)
+				mockHelperClient.EXPECT().LoadAzureJSON().Times(1).Return(&datamodel.AzureConfig{}, errors.New("error"))
+
 				conn, err := tlsBootstrapClient.setupClientConnection(ctx)
 				Expect(conn).To(BeNil())
 				Expect(err).ToNot(BeNil())
@@ -394,15 +396,9 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 
-				newLoadExecCredential = func() (*datamodel.ExecCredential, error) {
-					return mockExecCredential, nil
-				}
-				newGetTlsConfig = func(pemCAs []byte, c *tlsBootstrapClientImpl, execCredential *datamodel.ExecCredential) (*tls.Config, error) {
-					return &tls.Config{}, nil
-				}
-				newLoadAzureJson = func() (*datamodel.AzureConfig, error) {
-					return &datamodel.AzureConfig{}, nil
-				}
+				mockHelperClient.EXPECT().LoadExecCredential().Times(1).Return(mockExecCredential, nil)
+				mockHelperClient.EXPECT().GetTLSConfig(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(&tls.Config{}, nil)
+				mockHelperClient.EXPECT().LoadAzureJSON().Times(1).Return(&datamodel.AzureConfig{}, nil)
 				conn, err := tlsBootstrapClient.setupClientConnection(ctx)
 				Expect(conn).To(BeNil())
 				Expect(err).ToNot(BeNil())
@@ -414,15 +410,10 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 
-				newLoadExecCredential = func() (*datamodel.ExecCredential, error) {
-					return mockExecCredential, nil
-				}
-				newGetTlsConfig = func(pemCAs []byte, c *tlsBootstrapClientImpl, execCredential *datamodel.ExecCredential) (*tls.Config, error) {
-					return &tls.Config{}, nil
-				}
-				newLoadAzureJson = func() (*datamodel.AzureConfig, error) {
-					return &datamodel.AzureConfig{ClientID: "clientID", ClientSecret: "secret", TenantID: "tenantID"}, nil
-				}
+				mockHelperClient.EXPECT().GetServerURL(gomock.Any()).Times(1).Return("serverURL", nil)
+				mockHelperClient.EXPECT().LoadExecCredential().Times(1).Return(mockExecCredential, nil)
+				mockHelperClient.EXPECT().GetTLSConfig(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(&tls.Config{}, nil)
+				mockHelperClient.EXPECT().LoadAzureJSON().Times(1).Return(&datamodel.AzureConfig{ClientID: "clientID", ClientSecret: "secret", TenantID: "tenantID"}, nil)
 
 				conn, err := tlsBootstrapClient.setupClientConnection(ctx)
 				Expect(conn).ToNot(BeNil())
