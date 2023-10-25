@@ -33,13 +33,13 @@ type TLSBootstrapClient interface {
 func NewTLSBootstrapClient(logger *logrus.Logger, opts SecureTLSBootstrapClientOpts) TLSBootstrapClient {
 	imdsClient := NewImdsClient(logger)
 	aadClient := NewAadClient(logger)
-	pbcClient := pb.NewAKSBootstrapTokenRequestClient()
+	pbClient := pb.NewAKSBootstrapTokenRequestClient()
 	helperClient := NewClientHelpers()
 
 	return &tlsBootstrapClientImpl{
 		logger:         logger,
 		imdsClient:     imdsClient,
-		pbcClient:      pbcClient,
+		pbClient:       pbClient,
 		aadClient:      aadClient,
 		helperClient:   helperClient,
 		customClientID: opts.CustomClientID,
@@ -53,7 +53,7 @@ type tlsBootstrapClientImpl struct {
 	imdsClient     ImdsClient
 	aadClient      AadClient
 	helperClient   ClientHelpers
-	pbcClient      pb.AKSBootstrapTokenRequestClient
+	pbClient       pb.AKSBootstrapTokenRequestClient
 	customClientID string
 	nextProto      string
 	resource       string
@@ -131,7 +131,7 @@ func (c *tlsBootstrapClientImpl) GetBootstrapToken(ctx context.Context) (string,
 		return "", fmt.Errorf("unable to setup GRPC client connection to TLS bootstrap server: %w", err)
 	}
 	defer conn.Close()
-	c.pbcClient.AKSBootstrapTokenRequestSetConnection(conn)
+	c.pbClient.AKSBootstrapTokenRequestSetConnection(conn)
 
 	c.logger.Debug("retrieving IMDS instance data...")
 	instanceData, err := c.imdsClient.GetInstanceData(ctx, baseImdsURL)
@@ -143,7 +143,7 @@ func (c *tlsBootstrapClientImpl) GetBootstrapToken(ctx context.Context) (string,
 	c.logger.Debug("retrieving nonce from TLS bootstrap token server...")
 
 	nonceRequest := &pb.NonceRequest{ResourceId: instanceData.Compute.ResourceID}
-	nonceResponse, err := c.pbcClient.GetNonce(ctx, nonceRequest)
+	nonceResponse, err := c.pbClient.GetNonce(ctx, nonceRequest)
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve a nonce: %w", err)
 	}
@@ -164,7 +164,7 @@ func (c *tlsBootstrapClientImpl) GetBootstrapToken(ctx context.Context) (string,
 		Nonce:        nonce,
 		AttestedData: attestedData.Signature,
 	}
-	tokenResponse, err := c.pbcClient.GetToken(ctx, tokenRequest)
+	tokenResponse, err := c.pbClient.GetToken(ctx, tokenRequest)
 
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve a token: %w", err)
