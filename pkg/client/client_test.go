@@ -125,7 +125,7 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			token, err := tlsBootstrapClient.GetBootstrapToken(ctx) // here
+			token, err := tlsBootstrapClient.GetBootstrapToken(ctx)
 			Expect(token).To(BeEmpty())
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(ContainSubstring("KUBERNETES_EXEC_INFO must be set to retrieve bootstrap token"))
