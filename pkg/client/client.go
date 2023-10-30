@@ -119,10 +119,6 @@ func (c *tlsBootstrapClientImpl) setupClientConnection(ctx context.Context) (*gr
 	return conn, nil
 }
 
-var newGetExecCredentialWithToken = func(token string, expirationTimestamp string) (*datamodel.ExecCredential, error) {
-	return getExecCredentialWithToken(token, expirationTimestamp)
-}
-
 func (c *tlsBootstrapClientImpl) GetBootstrapToken(ctx context.Context) (string, error) {
 	conn, err := c.setupClientConnection(ctx)
 	if err != nil {
@@ -170,7 +166,7 @@ func (c *tlsBootstrapClientImpl) GetBootstrapToken(ctx context.Context) (string,
 	c.logger.Info("received new bootstrap token from TLS bootstrap server")
 
 	c.logger.Debug("generating new exec credential with bootstrap token...")
-	execCredentialWithToken, err := newGetExecCredentialWithToken(tokenResponse.GetToken(), tokenResponse.GetExpiration())
+	execCredentialWithToken, err := getExecCredentialWithToken(tokenResponse.GetToken(), tokenResponse.GetExpiration())
 	if err != nil {
 		return "", fmt.Errorf("unable to generate new exec credential with bootstrap token: %w", err)
 	}

@@ -96,9 +96,6 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 		pbClient           *protos_mock.MockAKSBootstrapTokenRequestClient
 		tlsBootstrapClient *tlsBootstrapClientImpl
 		mockreader         *mocks.MockFileReader
-
-		// GetBootstrapToken mocks
-		oldGetExecCredentialWithToken func(token string, expirationTimestamp string) (*datamodel.ExecCredential, error)
 	)
 
 	BeforeEach(func() {
@@ -116,16 +113,10 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 			pbClient:   pbClient,
 			reader:     mockreader,
 		}
-
-		// save all function implementations so that they can be restored on cleanup
-		oldGetExecCredentialWithToken = newGetExecCredentialWithToken
 	})
 
 	AfterEach(func() {
 		os.Setenv("KUBERNETES_EXEC_INFO", "")
-
-		// restore all mocked functions
-		newGetExecCredentialWithToken = oldGetExecCredentialWithToken
 	})
 
 	Context("Test GetBootstrapToken", func() {
@@ -247,7 +238,7 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 				imdsClient.EXPECT().GetInstanceData(gomock.Any(), gomock.Any()).Times(1).Return(&datamodel.VMSSInstanceData{}, nil)
 				imdsClient.EXPECT().GetAttestedData(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(&datamodel.VMSSAttestedData{}, nil)
 				pbClient.EXPECT().GetNonce(gomock.Any(), gomock.Any()).Times(1).Return(&pb.NonceResponse{}, nil)
-				pbClient.EXPECT().GetToken(gomock.Any(), gomock.Any()).Times(1).Return(&pb.TokenResponse{}, nil)
+				pbClient.EXPECT().GetToken(gomock.Any(), gomock.Any()).Times(1).Return(&pb.TokenResponse{Token: "", Expiration: "expirationTimestamp"}, nil)
 
 				token, err := tlsBootstrapClient.GetBootstrapToken(ctx)
 				Expect(token).To(BeEmpty())
@@ -270,11 +261,7 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 				imdsClient.EXPECT().GetInstanceData(gomock.Any(), gomock.Any()).Times(1).Return(&datamodel.VMSSInstanceData{}, nil)
 				imdsClient.EXPECT().GetAttestedData(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(&datamodel.VMSSAttestedData{}, nil)
 				pbClient.EXPECT().GetNonce(gomock.Any(), gomock.Any()).Times(1).Return(&pb.NonceResponse{}, nil)
-				pbClient.EXPECT().GetToken(gomock.Any(), gomock.Any()).Times(1).Return(&pb.TokenResponse{}, nil)
-
-				newGetExecCredentialWithToken = func(token string, expirationTimestamp string) (*datamodel.ExecCredential, error) {
-					return &datamodel.ExecCredential{}, nil
-				}
+				pbClient.EXPECT().GetToken(gomock.Any(), gomock.Any()).Times(1).Return(&pb.TokenResponse{Token: "token", Expiration: "expirationTimestamp"}, nil)
 
 				token, err := tlsBootstrapClient.GetBootstrapToken(ctx)
 				Expect(token).ToNot(BeEmpty())
