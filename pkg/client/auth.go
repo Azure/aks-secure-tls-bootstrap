@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 
 	"github.com/Azure/aks-tls-bootstrap-client/pkg/datamodel"
 )
@@ -67,15 +66,15 @@ func (c *tlsBootstrapClientImpl) getAuthToken(ctx context.Context, customClientI
 
 }
 
-func loadAzureJSON() (*datamodel.AzureConfig, error) {
+func loadAzureJSON(reader fileReader) (*datamodel.AzureConfig, error) {
 	if isWindows() {
-		return loadAzureJSONFromPath(defaultWindowsAzureJSONPath)
+		return loadAzureJSONFromPath(reader, defaultWindowsAzureJSONPath)
 	}
-	return loadAzureJSONFromPath(defaultLinuxAzureJSONPath)
+	return loadAzureJSONFromPath(reader, defaultLinuxAzureJSONPath)
 }
 
-func loadAzureJSONFromPath(path string) (*datamodel.AzureConfig, error) {
-	azureJSON, err := os.ReadFile(path)
+func loadAzureJSONFromPath(reader fileReader, path string) (*datamodel.AzureConfig, error) {
+	azureJSON, err := reader.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse %s", path)
 	}

@@ -9,6 +9,8 @@
 
 package protos
 
+//go:generate ../../bin/mockgen -copyright_file=../../hack/copyright_header.txt -destination=./mocks/mock_bootstrap_grpc.go -package=mocks github.com/Azure/aks-tls-bootstrap-client/pkg/protos AKSBootstrapTokenRequestClient
+
 import (
 	context "context"
 	grpc "google.golang.org/grpc"
@@ -36,14 +38,19 @@ type AKSBootstrapTokenRequestClient interface {
 	// Step 2 of retrieving a bootstrap token; validates the attested data and the
 	// nonce, then generates and returns the bootstrap token to the client.
 	GetToken(ctx context.Context, in *TokenRequest, opts ...grpc.CallOption) (*TokenResponse, error)
+	SetGRPCConnection(conn *grpc.ClientConn)
 }
 
 type aKSBootstrapTokenRequestClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewAKSBootstrapTokenRequestClient(cc grpc.ClientConnInterface) AKSBootstrapTokenRequestClient {
-	return &aKSBootstrapTokenRequestClient{cc}
+func NewAKSBootstrapTokenRequestClient() AKSBootstrapTokenRequestClient {
+	return &aKSBootstrapTokenRequestClient{}
+}
+
+func (c *aKSBootstrapTokenRequestClient) SetGRPCConnection(conn *grpc.ClientConn) {
+	c.cc = conn
 }
 
 func (c *aKSBootstrapTokenRequestClient) GetNonce(ctx context.Context, in *NonceRequest, opts ...grpc.CallOption) (*NonceResponse, error) {
