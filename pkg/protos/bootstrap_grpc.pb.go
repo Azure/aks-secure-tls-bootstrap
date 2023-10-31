@@ -38,7 +38,7 @@ type AKSBootstrapTokenRequestClient interface {
 	// Step 2 of retrieving a bootstrap token; validates the attested data and the
 	// nonce, then generates and returns the bootstrap token to the client.
 	GetToken(ctx context.Context, in *TokenRequest, opts ...grpc.CallOption) (*TokenResponse, error)
-	AKSBootstrapTokenRequestSetConnection(conn *grpc.ClientConn)
+	SetGRPCConnection(conn *grpc.ClientConn)
 }
 
 type aKSBootstrapTokenRequestClient struct {
@@ -49,7 +49,7 @@ func NewAKSBootstrapTokenRequestClient() AKSBootstrapTokenRequestClient {
 	return &aKSBootstrapTokenRequestClient{}
 }
 
-func (c *aKSBootstrapTokenRequestClient) AKSBootstrapTokenRequestSetConnection(conn *grpc.ClientConn) {
+func (c *aKSBootstrapTokenRequestClient) SetGRPCConnection(conn *grpc.ClientConn) {
 	c.cc = conn
 }
 

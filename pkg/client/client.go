@@ -124,7 +124,7 @@ func (c *tlsBootstrapClientImpl) GetBootstrapToken(ctx context.Context) (string,
 		return "", fmt.Errorf("unable to setup GRPC client connection to TLS bootstrap server: %w", err)
 	}
 	defer conn.Close()
-	c.pbClient.AKSBootstrapTokenRequestSetConnection(conn)
+	c.pbClient.SetGRPCConnection(conn)
 
 	c.logger.Debug("retrieving IMDS instance data...")
 	instanceData, err := c.imdsClient.GetInstanceData(ctx, baseImdsURL)

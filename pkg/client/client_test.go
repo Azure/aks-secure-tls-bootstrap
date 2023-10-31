@@ -105,7 +105,7 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 		pbClient = protos_mock.NewMockAKSBootstrapTokenRequestClient(mockCtrl)
 		mockreader = mocks.NewMockfileReader(mockCtrl)
 
-		pbClient.EXPECT().AKSBootstrapTokenRequestSetConnection(gomock.Any()).Times(1)
+		pbClient.EXPECT().SetGRPCConnection(gomock.Any()).Times(1)
 		tlsBootstrapClient = &tlsBootstrapClientImpl{
 			logger:     testLogger,
 			imdsClient: imdsClient,

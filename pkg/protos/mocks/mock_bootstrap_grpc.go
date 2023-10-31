@@ -39,18 +39,6 @@ func (m *MockAKSBootstrapTokenRequestClient) EXPECT() *MockAKSBootstrapTokenRequ
 	return m.recorder
 }
 
-// AKSBootstrapTokenRequestSetConnection mocks base method.
-func (m *MockAKSBootstrapTokenRequestClient) AKSBootstrapTokenRequestSetConnection(arg0 *grpc.ClientConn) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "AKSBootstrapTokenRequestSetConnection", arg0)
-}
-
-// AKSBootstrapTokenRequestSetConnection indicates an expected call of AKSBootstrapTokenRequestSetConnection.
-func (mr *MockAKSBootstrapTokenRequestClientMockRecorder) AKSBootstrapTokenRequestSetConnection(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AKSBootstrapTokenRequestSetConnection", reflect.TypeOf((*MockAKSBootstrapTokenRequestClient)(nil).AKSBootstrapTokenRequestSetConnection), arg0)
-}
-
 // GetNonce mocks base method.
 func (m *MockAKSBootstrapTokenRequestClient) GetNonce(arg0 context.Context, arg1 *protos.NonceRequest, arg2 ...grpc.CallOption) (*protos.NonceResponse, error) {
 	m.ctrl.T.Helper()
@@ -89,4 +77,16 @@ func (mr *MockAKSBootstrapTokenRequestClientMockRecorder) GetToken(arg0, arg1 in
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{arg0, arg1}, arg2...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetToken", reflect.TypeOf((*MockAKSBootstrapTokenRequestClient)(nil).GetToken), varargs...)
+}
+
+// SetGRPCConnection mocks base method.
+func (m *MockAKSBootstrapTokenRequestClient) SetGRPCConnection(arg0 *grpc.ClientConn) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetGRPCConnection", arg0)
+}
+
+// SetGRPCConnection indicates an expected call of SetGRPCConnection.
+func (mr *MockAKSBootstrapTokenRequestClientMockRecorder) SetGRPCConnection(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetGRPCConnection", reflect.TypeOf((*MockAKSBootstrapTokenRequestClient)(nil).SetGRPCConnection), arg0)
 }
