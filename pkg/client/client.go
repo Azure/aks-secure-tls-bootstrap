@@ -79,7 +79,7 @@ func (c *tlsBootstrapClientImpl) setupClientConnection(ctx context.Context) (*gr
 	c.logger.Info("generated TLS config for GRPC client connection")
 
 	c.logger.Debug("loading azure.json...")
-	azureConfig, err := LoadAzureJSON(c.reader)
+	azureConfig, err := loadAzureJSON(c.reader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse azure config from azure.json: %w", err)
 	}
@@ -236,8 +236,4 @@ func getTLSConfig(pemCAs []byte, nextProto string, insecureSkipVerify bool) (*tl
 	}
 
 	return tlsConfig, nil
-}
-
-func LoadAzureJSON(reader fileReader) (*datamodel.AzureConfig, error) {
-	return loadAzureJSON(reader)
 }
