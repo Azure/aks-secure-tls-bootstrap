@@ -7,9 +7,6 @@ package client
 
 import "os"
 
-// fileReader proves methods to interact with the host file system
-// needed by the bootstrap server in order to properly perform setup.
-// This is primarily used for mockability within unit tests.
 type FileReader interface {
 	ReadFile(name string) ([]byte, error)
 	ReadDir(name string) ([]os.DirEntry, error)

@@ -274,7 +274,7 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 		When("ExecCredential JSON is properly formed", func() {
 			It("should correctly parse and load the exec credential", func() {
 				setExecCredential("", "")
-				execCredential, err := LoadExecCredential()
+				execCredential, err := loadExecCredential()
 				Expect(err).To(BeNil())
 				Expect(execCredential).ToNot(BeNil())
 				Expect(execCredential.APIVersion).To(Equal("client.authentication.k8s.io/v1"))
@@ -292,7 +292,7 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 		})
 
 		When("ExecCredential JSON is malformed", func() {
-			execCredential, err := LoadExecCredential()
+			execCredential, err := loadExecCredential()
 			Expect(err).ToNot(BeNil())
 			Expect(execCredential).To(BeNil())
 		})
@@ -302,7 +302,7 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 		It("should correctly join server name and port with a ':'", func() {
 			execCredential := &datamodel.ExecCredential{}
 			execCredential.Spec.Cluster.Server = "https://1.2.3.4:6443"
-			serverURL, err := GetServerURL(execCredential)
+			serverURL, err := getServerURL(execCredential)
 			Expect(err).To(BeNil())
 			Expect(serverURL).To(Equal("1.2.3.4:6443"))
 		})
@@ -310,7 +310,7 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 		It("should fail when given an invalid server URL", func() {
 			execCredential := &datamodel.ExecCredential{}
 			execCredential.Spec.Cluster.Server = ":invalidurl.com"
-			serverURL, err := GetServerURL(execCredential)
+			serverURL, err := getServerURL(execCredential)
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(ContainSubstring("failed to parse server URL"))
 			Expect(serverURL).To(BeEmpty())
@@ -322,7 +322,7 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 
 		When("nextProto is not supplied", func() {
 			It("should not include NextProtos in returned config", func() {
-				config, err := GetTLSConfig(pemCAs, "", false)
+				config, err := getTLSConfig(pemCAs, "", false)
 				Expect(err).To(BeNil())
 				Expect(config).ToNot(BeNil())
 				Expect(config.NextProtos).To(BeNil())
@@ -336,7 +336,7 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 
 		When("nextProto is supplied", func() {
 			It("should include NextProtos in returned config", func() {
-				config, err := GetTLSConfig(pemCAs, "nextProto", false)
+				config, err := getTLSConfig(pemCAs, "nextProto", false)
 				Expect(err).To(BeNil())
 				Expect(config).NotTo(BeNil())
 				Expect(config.NextProtos).NotTo(BeNil())
@@ -351,7 +351,7 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 
 		When("insecureSkipVerify is false", func() {
 			It("should return config with false value of InsecureSkipVerify", func() {
-				config, err := GetTLSConfig(pemCAs, "nextProto", false)
+				config, err := getTLSConfig(pemCAs, "nextProto", false)
 				Expect(err).To(BeNil())
 				Expect(config).NotTo(BeNil())
 				Expect(config.InsecureSkipVerify).To(BeFalse())
@@ -364,7 +364,7 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 
 		When("insecureSkipVerify is true", func() {
 			It("should return config with true value of InsecureSkipVerify", func() {
-				config, err := GetTLSConfig(pemCAs, "nextProto", true)
+				config, err := getTLSConfig(pemCAs, "nextProto", true)
 				Expect(err).To(BeNil())
 				Expect(config).NotTo(BeNil())
 				Expect(config.InsecureSkipVerify).To(BeTrue())
@@ -458,8 +458,8 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 			})
 		})
 
-		When("GetServerURL is mocked to fail", func() {
-			It("should fail on GetServerURL", func() {
+		When("getServerURL is mocked to fail", func() {
+			It("should fail on getServerURL", func() {
 				setExecCredential("", ":invalidurl.com")
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()

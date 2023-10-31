@@ -25,7 +25,6 @@ import (
 // TLSBootstrapClient retrieves tokens for performing node TLS bootstrapping.
 type TLSBootstrapClient interface {
 	GetBootstrapToken(ctx context.Context) (string, error)
-	setupClientConnection(ctx context.Context) (*grpc.ClientConn, error)
 }
 
 func NewTLSBootstrapClient(logger *logrus.Logger, opts SecureTLSBootstrapClientOpts) TLSBootstrapClient {
@@ -59,7 +58,7 @@ type tlsBootstrapClientImpl struct {
 
 func (c *tlsBootstrapClientImpl) setupClientConnection(ctx context.Context) (*grpc.ClientConn, error) {
 	c.logger.Debug("loading exec credential...")
-	execCredential, err := LoadExecCredential()
+	execCredential, err := loadExecCredential()
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +72,7 @@ func (c *tlsBootstrapClientImpl) setupClientConnection(ctx context.Context) (*gr
 	c.logger.Info("decoded cluster CA data")
 
 	c.logger.Debug("generating TLS config for GRPC client connection...")
-	tlsConfig, err := GetTLSConfig(pemCAs, c.nextProto, execCredential.Spec.Cluster.InsecureSkipTLSVerify)
+	tlsConfig, err := getTLSConfig(pemCAs, c.nextProto, execCredential.Spec.Cluster.InsecureSkipTLSVerify)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get TLS config: %w", err)
 	}
@@ -95,7 +94,7 @@ func (c *tlsBootstrapClientImpl) setupClientConnection(ctx context.Context) (*gr
 	c.logger.Info("generated JWT token for auth")
 
 	c.logger.Debug("extracting server URL from exec credential...")
-	server, err := GetServerURL(execCredential)
+	server, err := getServerURL(execCredential)
 	if err != nil {
 		return nil, err
 	}
@@ -197,7 +196,7 @@ func getExecCredentialWithToken(token, expirationTimestamp string) (*datamodel.E
 	}, nil
 }
 
-func LoadExecCredential() (*datamodel.ExecCredential, error) {
+func loadExecCredential() (*datamodel.ExecCredential, error) {
 	execInfo := os.Getenv(kubernetesExecInfoVarName)
 	if execInfo == "" {
 		return nil, fmt.Errorf("%s must be set to retrieve bootstrap token", kubernetesExecInfoVarName)
@@ -209,7 +208,7 @@ func LoadExecCredential() (*datamodel.ExecCredential, error) {
 	return &execCredential, nil
 }
 
-func GetServerURL(execCredential *datamodel.ExecCredential) (string, error) {
+func getServerURL(execCredential *datamodel.ExecCredential) (string, error) {
 	serverURL, err := url.Parse(execCredential.Spec.Cluster.Server)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse server URL: %w", err)
@@ -218,7 +217,7 @@ func GetServerURL(execCredential *datamodel.ExecCredential) (string, error) {
 	return server, nil
 }
 
-func GetTLSConfig(pemCAs []byte, nextProto string, insecureSkipVerify bool) (*tls.Config, error) {
+func getTLSConfig(pemCAs []byte, nextProto string, insecureSkipVerify bool) (*tls.Config, error) {
 	tlsRootStore := x509.NewCertPool()
 	ok := tlsRootStore.AppendCertsFromPEM(pemCAs)
 	if !ok {
