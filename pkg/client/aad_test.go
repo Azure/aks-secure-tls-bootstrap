@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/Azure/aks-tls-bootstrap-client/pkg/client/mocks"
@@ -13,9 +14,9 @@ import (
 
 var _ = Describe("Aad tests", func() {
 	var (
-		mockCtrl     *gomock.Controller
-		AadClient    = NewAadClient(testLogger)
-		mockAcquirer *mocks.MockTokenAcquirer
+		mockCtrl         *gomock.Controller
+		mockAcquirer     *mocks.MockTokenAcquirer
+		newTokenAcquirer func(authority, clientID, clientSecret string) (TokenAcquirer, error)
 	)
 
 	BeforeEach(func() {
@@ -25,16 +26,18 @@ var _ = Describe("Aad tests", func() {
 
 	AfterEach(func() {
 		mockCtrl.Finish()
+		newTokenAcquirer = newAadTokenAcquirer
 	})
 
 	Context("Test NewAadClient", func() {
 		It("should return a new AadClient", func() {
-			Expect(AadClient).ToNot(BeNil())
+			aadClient := NewAadClient(testLogger, newAadTokenAcquirer)
+			Expect(aadClient).ToNot(BeNil())
 		})
 	})
 
 	Context("Test GetAadToken", func() {
-		When("newAadTokenAcquirer returns a valid tokenAcquierer", func() {
+		When("tokenAcquirerFunc returns a valid tokenAcquierer", func() {
 			It("should return the mocked token", func() {
 				dummyAuth := base.AuthResult{AccessToken: "dummyAuth"}
 				mockAcquirer.EXPECT().Acquire(gomock.Any(), gomock.Any()).Return(dummyAuth, nil).Times(1)
@@ -42,20 +45,15 @@ var _ = Describe("Aad tests", func() {
 					return mockAcquirer, nil
 				}
 
-				originalImpl := newAadTokenAcquirer
-				defer func() {
-					newTokenAcquirer = originalImpl
-				}()
+				aadClient := NewAadClient(testLogger, newTokenAcquirer)
 
-				token, err := AadClient.GetAadToken(context.Background(), gomock.Any().String(), gomock.Any().String(), gomock.Any().String(), gomock.Any().String())
+				token, err := aadClient.GetAadToken(context.Background(), gomock.Any().String(), gomock.Any().String(), gomock.Any().String(), gomock.Any().String())
 				Expect(token).To(Equal(dummyAuth.AccessToken))
 				Expect(err).To(BeNil())
 			})
 		})
-	})
 
-	Context("Test GetAadToken", func() {
-		When("newAadTokenAcquirer returns an error", func() {
+		When("tokenAcquirerFunc returns an error", func() {
 			It("should return an error", func() {
 				dummyAuth := base.AuthResult{}
 				mockAcquirer.EXPECT().Acquire(gomock.Any(), gomock.Any()).Return(dummyAuth, fmt.Errorf("error")).AnyTimes()
@@ -63,14 +61,55 @@ var _ = Describe("Aad tests", func() {
 					return mockAcquirer, nil
 				}
 
-				originalImpl := newAadTokenAcquirer
-				defer func() {
-					newTokenAcquirer = originalImpl
-				}()
+				aadClient := NewAadClient(testLogger, newTokenAcquirer)
 
-				token, err := AadClient.GetAadToken(context.Background(), gomock.Any().String(), gomock.Any().String(), gomock.Any().String(), gomock.Any().String())
+				token, err := aadClient.GetAadToken(context.Background(), gomock.Any().String(), gomock.Any().String(), gomock.Any().String(), gomock.Any().String())
 				Expect(token).To(Equal(""))
 				Expect(err).ToNot(BeNil())
+				Expect(err.Error()).To(ContainSubstring("failed to acquire token via service principal"))
+			})
+		})
+
+		When("Aquire returns an error", func() {
+			It("should return an error", func() {
+				dummyAuth := base.AuthResult{}
+				mockAcquirer.EXPECT().Acquire(gomock.Any(), gomock.Any()).Return(dummyAuth, nil).AnyTimes()
+				newTokenAcquirer = func(authority, clientID, clientSecret string) (TokenAcquirer, error) {
+					return mockAcquirer, errors.New("error")
+				}
+
+				aadClient := NewAadClient(testLogger, newTokenAcquirer)
+				token, err := aadClient.GetAadToken(context.Background(), gomock.Any().String(), gomock.Any().String(), gomock.Any().String(), gomock.Any().String())
+
+				Expect(token).To(Equal(""))
+				Expect(err).ToNot(BeNil())
+				Expect(err.Error()).To(ContainSubstring("unable to construct new AAD token"))
+			})
+		})
+	})
+
+	Context("Test newAadTokenAcquirer", func() {
+		It("should return a new tokenAcquirer", func() {
+			tokenAcquirer, err := newAadTokenAcquirer("https://login.microsoft.com/dummy", "clientID", "clientSecret")
+			Expect(tokenAcquirer).ToNot(BeNil())
+			Expect(err).To(BeNil())
+		})
+
+		When("authority string is not a valid URL", func() {
+			It("should return an error", func() {
+				tokenAcquirer, err := newAadTokenAcquirer("invalid", "clientID", "clientSecret")
+				Expect(err).ToNot(BeNil())
+				Expect(err.Error()).To(ContainSubstring("failed to create client"))
+				Expect(tokenAcquirer).To(BeNil())
+			})
+		})
+
+		When("secret is an empty string", func() {
+			It("should return an error", func() {
+				tokenAcquirer, err := newAadTokenAcquirer("invalid", "clientID", "")
+				Expect(err).ToNot(BeNil())
+				Expect(err.Error()).To(ContainSubstring("secret can't be empty string"))
+				Expect(tokenAcquirer).To(BeNil())
 			})
 		})
 	})

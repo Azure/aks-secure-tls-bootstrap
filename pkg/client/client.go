@@ -29,7 +29,7 @@ type TLSBootstrapClient interface {
 
 func NewTLSBootstrapClient(logger *logrus.Logger, opts SecureTLSBootstrapClientOpts) TLSBootstrapClient {
 	imdsClient := NewImdsClient(logger)
-	aadClient := NewAadClient(logger)
+	aadClient := NewAadClient(logger, newAadTokenAcquirer)
 
 	return &tlsBootstrapClientImpl{
 		logger:         logger,
