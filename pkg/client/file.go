@@ -3,18 +3,18 @@
 
 package client
 
-//go:generate ../../bin/mockgen -copyright_file=../../hack/copyright_header.txt -destination=./mocks/mock_file.go -package=mocks github.com/Azure/aks-tls-bootstrap-client/pkg/client FileReader
+//go:generate ../../bin/mockgen -source=file.go -copyright_file=../../hack/copyright_header.txt -destination=./mocks/mock_file.go -package=mocks github.com/Azure/aks-tls-bootstrap-client/pkg/client FileReader
 
 import "os"
 
-type FileReader interface {
+type fileReader interface {
 	ReadFile(name string) ([]byte, error)
 	ReadDir(name string) ([]os.DirEntry, error)
 }
 
 type osFileReader struct{}
 
-func NewOSFileReader() FileReader {
+func newOSFileReader() fileReader {
 	return &osFileReader{}
 }
 

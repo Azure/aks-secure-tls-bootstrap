@@ -31,7 +31,7 @@ func NewTLSBootstrapClient(logger *logrus.Logger, opts SecureTLSBootstrapClientO
 	imdsClient := NewImdsClient(logger)
 	aadClient := NewAadClient(logger)
 	pbClient := pb.NewAKSBootstrapTokenRequestClient()
-	reader := NewOSFileReader()
+	reader := newOSFileReader()
 
 	return &tlsBootstrapClientImpl{
 		reader:         reader,
@@ -49,7 +49,7 @@ type tlsBootstrapClientImpl struct {
 	logger         *logrus.Logger
 	imdsClient     ImdsClient
 	aadClient      AadClient
-	reader         FileReader
+	reader         fileReader
 	pbClient       pb.AKSBootstrapTokenRequestClient
 	customClientID string
 	nextProto      string
@@ -238,6 +238,6 @@ func getTLSConfig(pemCAs []byte, nextProto string, insecureSkipVerify bool) (*tl
 	return tlsConfig, nil
 }
 
-func LoadAzureJSON(reader FileReader) (*datamodel.AzureConfig, error) {
+func LoadAzureJSON(reader fileReader) (*datamodel.AzureConfig, error) {
 	return loadAzureJSON(reader)
 }

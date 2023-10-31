@@ -66,14 +66,14 @@ func (c *tlsBootstrapClientImpl) getAuthToken(ctx context.Context, customClientI
 
 }
 
-func loadAzureJSON(reader FileReader) (*datamodel.AzureConfig, error) {
+func loadAzureJSON(reader fileReader) (*datamodel.AzureConfig, error) {
 	if isWindows() {
 		return loadAzureJSONFromPath(reader, defaultWindowsAzureJSONPath)
 	}
 	return loadAzureJSONFromPath(reader, defaultLinuxAzureJSONPath)
 }
 
-func loadAzureJSONFromPath(reader FileReader, path string) (*datamodel.AzureConfig, error) {
+func loadAzureJSONFromPath(reader fileReader, path string) (*datamodel.AzureConfig, error) {
 	azureJSON, err := reader.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse %s", path)

@@ -95,7 +95,7 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 		aadClient          *mocks.MockAadClient
 		pbClient           *protos_mock.MockAKSBootstrapTokenRequestClient
 		tlsBootstrapClient *tlsBootstrapClientImpl
-		mockreader         *mocks.MockFileReader
+		mockreader         *mocks.MockfileReader
 	)
 
 	BeforeEach(func() {
@@ -103,7 +103,7 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 		imdsClient = mocks.NewMockImdsClient(mockCtrl)
 		aadClient = mocks.NewMockAadClient(mockCtrl)
 		pbClient = protos_mock.NewMockAKSBootstrapTokenRequestClient(mockCtrl)
-		mockreader = mocks.NewMockFileReader(mockCtrl)
+		mockreader = mocks.NewMockfileReader(mockCtrl)
 
 		pbClient.EXPECT().AKSBootstrapTokenRequestSetConnection(gomock.Any()).Times(1)
 		tlsBootstrapClient = &tlsBootstrapClientImpl{
