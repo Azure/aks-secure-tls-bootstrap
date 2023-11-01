@@ -21,12 +21,32 @@ type AadClient interface {
 
 func NewAadClient(logger *logrus.Logger) AadClient {
 	return &aadClientImpl{
-		Logger: logger,
+		Logger:              logger,
+		acquireAADTokenFunc: getAADTokenWithCredential,
 	}
 }
 
+type acquireAADTokenFunc func(ctx context.Context, authority, clientID, clientSecret string, scopes []string) (confidential.AuthResult, error)
+
 type aadClientImpl struct {
-	Logger *logrus.Logger
+	Logger              *logrus.Logger
+	acquireAADTokenFunc acquireAADTokenFunc
+}
+
+func getAADTokenWithCredential(ctx context.Context, authority, clientID, clientSecret string, scopes []string) (confidential.AuthResult, error) {
+	credential, err := confidential.NewCredFromSecret(clientSecret)
+	if err != nil {
+		return confidential.AuthResult{}, fmt.Errorf("failed to create secret credential from azure.json: %w", err)
+	}
+	confidentialClient, err := confidential.New(authority, clientID, credential)
+	if err != nil {
+		return confidential.AuthResult{}, fmt.Errorf("failed to create client from azure.json sp/secret: %w", err)
+	}
+	result, err := confidentialClient.AcquireTokenByCredential(ctx, scopes)
+	if err != nil {
+		return confidential.AuthResult{}, fmt.Errorf("unable to acquire token by credential: %w", err)
+	}
+	return result, nil
 }
 
 func (c *aadClientImpl) GetAadToken(ctx context.Context, clientID, clientSecret, tenantID, resource string) (string, error) {
@@ -34,24 +54,15 @@ func (c *aadClientImpl) GetAadToken(ctx context.Context, clientID, clientSecret,
 		fmt.Sprintf("%s/.default", resource),
 	}
 
-	credential, err := confidential.NewCredFromSecret(clientSecret)
-	if err != nil {
-		return "", fmt.Errorf("failed to create secret credential from azure.json: %w", err)
-	}
-
 	// TODO(cameissner): modify so this works on all clouds later
 	authority := fmt.Sprintf(microsoftLoginAuthorityTemplate, tenantID)
-	client, err := confidential.New(authority, clientID, credential)
-	if err != nil {
-		return "", fmt.Errorf("failed to create client from azure.json sp/secret: %w", err)
-	}
 
 	c.Logger.WithField("scopes", strings.Join(scopes, ",")).Info("requesting new AAD token")
 
 	authResult, err := retry.DoWithData(func() (confidential.AuthResult, error) {
-		authResult, err := client.AcquireTokenByCredential(ctx, scopes)
+		authResult, err := c.acquireAADTokenFunc(ctx, authority, clientID, clientSecret, scopes)
 		if err != nil {
-			return confidential.AuthResult{}, err
+			return confidential.AuthResult{}, fmt.Errorf("unable to acquire AAD token: %w", err)
 		}
 		return authResult, nil
 	},
