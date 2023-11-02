@@ -6,8 +6,14 @@ package client
 import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 )
+
+func setupLogsCapture() (*zap.Logger, *observer.ObservedLogs) {
+	core, logs := observer.New(zap.InfoLevel)
+	return zap.New(core), logs
+}
 
 var _ = Describe("Log tests", func() {
 	Context("getLogger tests", func() {
@@ -19,35 +25,29 @@ var _ = Describe("Log tests", func() {
 				)
 				logger := GetLogger(format, debug)
 				Expect(logger).ToNot(BeNil())
-				Expect(logger.Formatter).To(BeAssignableToTypeOf(&logrus.JSONFormatter{}))
-				Expect(logger.Level).ToNot(Equal(logrus.DebugLevel))
-			})
-		})
-
-		When("format is text", func() {
-			It("should return a new logger with format set to text", func() {
-				var (
-					format = "text"
-					debug  = false
-				)
-				logger := GetLogger(format, debug)
-				Expect(logger).ToNot(BeNil())
-				Expect(logger.Formatter).To(BeAssignableToTypeOf(&logrus.TextFormatter{}))
-				Expect(logger.Level).ToNot(Equal(logrus.DebugLevel))
+				Expect(logger.Core().Enabled(zap.InfoLevel)).To(BeTrue())
+				Expect(logger.Core().Enabled(zap.DebugLevel)).To(BeFalse())
 			})
 		})
 
 		When("debug is true", func() {
 			It("should return a new logger using the debug level", func() {
 				var (
-					format = "text"
+					format = "json"
 					debug  = true
 				)
 				logger := GetLogger(format, debug)
 				Expect(logger).ToNot(BeNil())
-				Expect(logger.Formatter).To(BeAssignableToTypeOf(&logrus.TextFormatter{}))
-				Expect(logger.Level).To(Equal(logrus.DebugLevel))
+				Expect(logger.Core().Enabled(zap.InfoLevel)).To(BeTrue())
+				Expect(logger.Core().Enabled(zap.DebugLevel)).To(BeTrue())
 			})
+		})
+
+		When("using", func() {
+			logger, logs := setupLogsCapture()
+			logger.Warn("This is the warning")
+			Expect(logs.Len()).To(Equal(1))
+			Expect(logs.All()[0].Message).To(Equal("This is the warning"))
 		})
 	})
 })

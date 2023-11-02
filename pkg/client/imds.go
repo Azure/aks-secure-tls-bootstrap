@@ -13,7 +13,7 @@ import (
 	"net/http"
 
 	"github.com/Azure/aks-tls-bootstrap-client/pkg/datamodel"
-	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 
 	"github.com/avast/retry-go/v4"
 )
@@ -24,14 +24,14 @@ type ImdsClient interface {
 	GetAttestedData(ctx context.Context, imdsURL, nonce string) (*datamodel.VMSSAttestedData, error)
 }
 
-func NewImdsClient(logger *logrus.Logger) ImdsClient {
+func NewImdsClient(logger *zap.Logger) ImdsClient {
 	return &imdsClientImpl{
 		logger: logger,
 	}
 }
 
 type imdsClientImpl struct {
-	logger *logrus.Logger
+	logger *zap.Logger
 }
 
 func (c *imdsClientImpl) GetMSIToken(ctx context.Context, imdsURL, clientID, resource string) (*datamodel.AADTokenResponse, error) {
@@ -53,7 +53,7 @@ func (c *imdsClientImpl) GetMSIToken(ctx context.Context, imdsURL, clientID, res
 		return nil, fmt.Errorf("failed to retrieve MSI token: %s: %s", tokenResponse.Error, tokenResponse.ErrorDescription)
 	}
 
-	c.logger.WithField("accessToken", tokenResponse.AccessToken).Debugf("retrieved access token")
+	c.logger.Debug("retrieved access token", zap.String("accessToken", tokenResponse.AccessToken))
 	return tokenResponse, nil
 }
 
@@ -88,7 +88,7 @@ func (c *imdsClientImpl) GetAttestedData(ctx context.Context, imdsURL, nonce str
 	return data, nil
 }
 
-func getImdsData(ctx context.Context, logger *logrus.Logger, url string, queryParameters map[string]string, responseObject interface{}) error {
+func getImdsData(ctx context.Context, logger *zap.Logger, url string, queryParameters map[string]string, responseObject interface{}) error {
 	client := http.Client{
 		Transport: &http.Transport{
 			Proxy: nil,
@@ -129,7 +129,7 @@ func getImdsData(ctx context.Context, logger *logrus.Logger, url string, queryPa
 		return fmt.Errorf("unable to retrieve data from IMDS: %w", err)
 	}
 
-	logger.WithField("responseBody", string(responseBody)).Debug("received IMDS reply")
+	logger.Debug("received IMDS reply", zap.String("responseBody", string(responseBody)))
 
 	if err := json.Unmarshal(responseBody, responseObject); err != nil {
 		return fmt.Errorf("failed to unmarshal IMDS data: %w", err)

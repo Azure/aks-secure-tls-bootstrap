@@ -15,7 +15,7 @@ import (
 
 	"github.com/Azure/aks-tls-bootstrap-client/pkg/datamodel"
 	pb "github.com/Azure/aks-tls-bootstrap-client/pkg/protos"
-	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -27,7 +27,7 @@ type TLSBootstrapClient interface {
 	GetBootstrapToken(ctx context.Context) (string, error)
 }
 
-func NewTLSBootstrapClient(logger *logrus.Logger, opts SecureTLSBootstrapClientOpts) TLSBootstrapClient {
+func NewTLSBootstrapClient(logger *zap.Logger, opts SecureTLSBootstrapClientOpts) TLSBootstrapClient {
 	imdsClient := NewImdsClient(logger)
 	aadClient := NewAadClient(logger)
 	pbClient := pb.NewAKSBootstrapTokenRequestClient()
@@ -46,7 +46,7 @@ func NewTLSBootstrapClient(logger *logrus.Logger, opts SecureTLSBootstrapClientO
 }
 
 type tlsBootstrapClientImpl struct {
-	logger         *logrus.Logger
+	logger         *zap.Logger
 	imdsClient     ImdsClient
 	aadClient      AadClient
 	reader         fileReader
@@ -131,7 +131,7 @@ func (c *tlsBootstrapClientImpl) GetBootstrapToken(ctx context.Context) (string,
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve instance metadata from IMDS: %w", err)
 	}
-	c.logger.WithField("vmResourceId", instanceData.Compute.ResourceID).Info("retrieved IMDS instance data")
+	c.logger.Info("retrieved IMDS instance data", zap.String("vmResourceId", instanceData.Compute.ResourceID))
 
 	c.logger.Debug("retrieving nonce from TLS bootstrap token server...")
 

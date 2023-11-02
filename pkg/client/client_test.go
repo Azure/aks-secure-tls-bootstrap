@@ -7,7 +7,6 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
 	"strings"
 
@@ -151,7 +150,6 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 				imdsClient.EXPECT().GetInstanceData(gomock.Any(), gomock.Any()).Times(1).Return(&datamodel.VMSSInstanceData{}, nil)
 				pbClient.EXPECT().GetNonce(gomock.Any(), gomock.Any()).Times(1).Return(&pb.NonceResponse{}, errors.New("error"))
 
-				fmt.Println("KUBERNETES_EXEC_INFO:", os.Getenv("KUBERNETES_EXEC_INFO"))
 				token, err := tlsBootstrapClient.GetBootstrapToken(ctx)
 				Expect(token).To(BeEmpty())
 				Expect(err).ToNot(BeNil())

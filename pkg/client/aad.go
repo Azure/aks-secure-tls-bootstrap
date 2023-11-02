@@ -12,21 +12,21 @@ import (
 
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/confidential"
 	"github.com/avast/retry-go/v4"
-	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 )
 
 type AadClient interface {
 	GetAadToken(ctx context.Context, clientID, clientSecret, tenantID, resource string) (string, error)
 }
 
-func NewAadClient(logger *logrus.Logger) AadClient {
+func NewAadClient(logger *zap.Logger) AadClient {
 	return &aadClientImpl{
 		Logger: logger,
 	}
 }
 
 type aadClientImpl struct {
-	Logger *logrus.Logger
+	Logger *zap.Logger
 }
 
 func (c *aadClientImpl) GetAadToken(ctx context.Context, clientID, clientSecret, tenantID, resource string) (string, error) {
@@ -46,7 +46,7 @@ func (c *aadClientImpl) GetAadToken(ctx context.Context, clientID, clientSecret,
 		return "", fmt.Errorf("failed to create client from azure.json sp/secret: %w", err)
 	}
 
-	c.Logger.WithField("scopes", strings.Join(scopes, ",")).Info("requesting new AAD token")
+	c.Logger.Info("requesting new AAD token", zap.String("scopes", strings.Join(scopes, ",")))
 
 	authResult, err := retry.DoWithData(func() (confidential.AuthResult, error) {
 		authResult, err := client.AcquireTokenByCredential(ctx, scopes)
