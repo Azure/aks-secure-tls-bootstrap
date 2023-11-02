@@ -43,11 +43,13 @@ var _ = Describe("Log tests", func() {
 			})
 		})
 
-		When("using", func() {
-			logger, logs := setupLogsCapture()
-			logger.Warn("This is the warning")
-			Expect(logs.Len()).To(Equal(1))
-			Expect(logs.All()[0].Message).To(Equal("This is the warning"))
+		When("using a capture logger", func() {
+			It("should be able to capture the string in the log", func() {
+				logger, logs := setupLogsCapture()
+				logger.Warn("This is the warning")
+				Expect(logs.Len()).To(Equal(1))
+				Expect(logs.All()[0].Message).To(Equal("This is the warning"))
+			})
 		})
 	})
 })
