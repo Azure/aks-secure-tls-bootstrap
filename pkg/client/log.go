@@ -4,25 +4,34 @@
 package client
 
 import (
-	"strings"
-
-	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 )
 
-func GetLogger(format string, debug bool) *logrus.Logger {
-	logger := logrus.New()
-	logger.SetReportCaller(true)
-
-	switch strings.ToLower(format) {
-	case "text":
-		logger.SetFormatter(&logrus.TextFormatter{})
-	default:
-		logger.SetFormatter(&logrus.JSONFormatter{})
-	}
-
+func GetLogger(format string, debug bool) (*zap.Logger, error) {
+	var logLevel zap.AtomicLevel
 	if debug {
-		logger.SetLevel(logrus.DebugLevel)
+		logLevel = zap.NewAtomicLevelAt(zap.DebugLevel)
+	} else {
+		logLevel = zap.NewAtomicLevelAt(zap.InfoLevel)
 	}
 
-	return logger
+	cfg := zap.Config{
+		Encoding: format,
+		Level:    logLevel,
+	}
+
+	logger, err := cfg.Build()
+	if err != nil {
+		return nil, err
+	}
+
+	logger.Info("Logger initialized")
+
+	return logger, nil
+}
+
+func FlushBufferOnExit(logger *zap.Logger) {
+	if err := logger.Sync(); err != nil {
+		logger.Error("Error during logger synchronization", zap.Error(err))
+	}
 }

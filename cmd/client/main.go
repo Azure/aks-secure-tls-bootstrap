@@ -45,7 +45,12 @@ func createBootstrapCommand() *cobra.Command {
 				return err
 			}
 
-			logger := client.GetLogger(opts.LogFormat, opts.Verbose)
+			logger, err := client.GetLogger(opts.LogFormat, opts.Verbose)
+			if err != nil {
+				return err
+			}
+			defer client.FlushBufferOnExit(logger)
+
 			bootstrapClient := client.NewTLSBootstrapClient(logger, opts)
 
 			ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

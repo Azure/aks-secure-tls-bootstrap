@@ -8,12 +8,15 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 )
 
-var testLogger = logrus.New()
+var testLogger *zap.Logger
 
 func TestTLSBootstrapClient(t *testing.T) {
+	testLogger, _ = zap.NewProduction()
+	defer FlushBufferOnExit(testLogger)
+
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "TLS Bootstrap Client Suite")
 }
