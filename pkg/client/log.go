@@ -20,11 +20,7 @@ func GetLogger(format string, debug bool) *zap.Logger {
 		Level:    logLevel,
 	}
 
-	logger, err := cfg.Build()
-	if err != nil {
-		panic("Failed to initialize logger: " + err.Error())
-	}
-	defer logger.Sync()
+	logger, _ := cfg.Build()
 
 	logger.Info("Logger initialized")
 

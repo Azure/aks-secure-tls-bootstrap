@@ -129,8 +129,6 @@ func getImdsData(ctx context.Context, logger *zap.Logger, url string, queryParam
 		return fmt.Errorf("unable to retrieve data from IMDS: %w", err)
 	}
 
-	logger.Debug("received IMDS reply", zap.String("responseBody", string(responseBody)))
-
 	if err := json.Unmarshal(responseBody, responseObject); err != nil {
 		return fmt.Errorf("failed to unmarshal IMDS data: %w", err)
 	}

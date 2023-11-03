@@ -12,6 +12,7 @@ import (
 
 	"github.com/Azure/aks-tls-bootstrap-client/pkg/client"
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 )
 
 const (
@@ -46,6 +47,11 @@ func createBootstrapCommand() *cobra.Command {
 			}
 
 			logger := client.GetLogger(opts.LogFormat, opts.Verbose)
+			defer func() {
+				if err := logger.Sync(); err != nil {
+					logger.Error("Error during logger synchronization", zap.Error(err))
+				}
+			}()
 			bootstrapClient := client.NewTLSBootstrapClient(logger, opts)
 
 			ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

@@ -15,7 +15,11 @@ var testLogger *zap.Logger
 
 func TestTLSBootstrapClient(t *testing.T) {
 	testLogger, _ = zap.NewProduction()
-	defer testLogger.Sync()
+	defer func() {
+		if err := testLogger.Sync(); err != nil {
+			testLogger.Error("Error during logger synchronization", zap.Error(err))
+		}
+	}()
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "TLS Bootstrap Client Suite")
 }
