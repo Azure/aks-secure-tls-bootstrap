@@ -31,6 +31,18 @@ var _ = Describe("Log tests", func() {
 			})
 		})
 
+		When("format is text", func() {
+			It("should return an error", func() {
+				var (
+					format = "text"
+					debug  = false
+				)
+				logger, err := GetLogger(format, debug)
+				Expect(err).ToNot(BeNil())
+				Expect(logger).To(BeNil())
+			})
+		})
+
 		When("debug is true", func() {
 			It("should return a new logger using the debug level", func() {
 				var (
