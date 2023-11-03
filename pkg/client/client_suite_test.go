@@ -15,9 +15,8 @@ var testLogger *zap.Logger
 
 func TestTLSBootstrapClient(t *testing.T) {
 	testLogger, _ = zap.NewProduction()
-	defer func() {
-		FlushBufferOnExit(testLogger)
-	}()
+	defer FlushBufferOnExit(testLogger)
+
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "TLS Bootstrap Client Suite")
 }

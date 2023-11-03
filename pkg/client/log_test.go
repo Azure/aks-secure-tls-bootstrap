@@ -23,7 +23,8 @@ var _ = Describe("Log tests", func() {
 					format = "json"
 					debug  = false
 				)
-				logger := GetLogger(format, debug)
+				logger, err := GetLogger(format, debug)
+				Expect(err).To(BeNil())
 				Expect(logger).ToNot(BeNil())
 				Expect(logger.Core().Enabled(zap.InfoLevel)).To(BeTrue())
 				Expect(logger.Core().Enabled(zap.DebugLevel)).To(BeFalse())
@@ -36,7 +37,8 @@ var _ = Describe("Log tests", func() {
 					format = "json"
 					debug  = true
 				)
-				logger := GetLogger(format, debug)
+				logger, err := GetLogger(format, debug)
+				Expect(err).To(BeNil())
 				Expect(logger).ToNot(BeNil())
 				Expect(logger.Core().Enabled(zap.InfoLevel)).To(BeTrue())
 				Expect(logger.Core().Enabled(zap.DebugLevel)).To(BeTrue())

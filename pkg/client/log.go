@@ -7,7 +7,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func GetLogger(format string, debug bool) *zap.Logger {
+func GetLogger(format string, debug bool) (*zap.Logger, error) {
 	var logLevel zap.AtomicLevel
 	if debug {
 		logLevel = zap.NewAtomicLevelAt(zap.DebugLevel)
@@ -22,12 +22,12 @@ func GetLogger(format string, debug bool) *zap.Logger {
 
 	logger, err := cfg.Build()
 	if err != nil {
-		panic("Failed to initialize logger: " + err.Error())
+		return nil, err
 	}
 
 	logger.Info("Logger initialized")
 
-	return logger
+	return logger, nil
 }
 
 func FlushBufferOnExit(logger *zap.Logger) {
