@@ -26,3 +26,9 @@ func GetLogger(format string, debug bool) *zap.Logger {
 
 	return logger
 }
+
+func FlushBufferOnExit(logger *zap.Logger) {
+	if err := logger.Sync(); err != nil {
+		logger.Error("Error during logger synchronization", zap.Error(err))
+	}
+}
