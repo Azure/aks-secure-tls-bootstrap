@@ -95,7 +95,6 @@ h/ZvW8MtN313Ykv4
 )
 
 var (
-	emptyPool  = x509.NewCertPool()
 	mockPEMCAs = []byte(exampleCACert)
 
 	defaultMockAzureConfig = datamodel.AzureConfig{
