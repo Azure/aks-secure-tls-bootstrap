@@ -8,10 +8,6 @@ import "time"
 const (
 	// This is used to retrieve cluster details (such as cluster CA details + apiserver hostname) from the environment.
 	kubernetesExecInfoVarName = "KUBERNETES_EXEC_INFO"
-	// The default azure config path on Linux systems, used to infer identity-related details.
-	defaultLinuxAzureJSONPath = "/etc/kubernetes/azure.json"
-	// The default azure config path on Windows systems.
-	defaultWindowsAzureJSONPath = "c:\\k\\azure.json"
 	// The clientId used to denote Managed Service Identities (MSI).
 	managedServiceIdentity = "msi"
 	// Used to specify JSON format within IMDS requests.
@@ -28,8 +24,6 @@ const (
 	nonceHeaderKey = "nonce"
 
 	// AAD-related consts
-	// The template used to specify the AAD login authority in public cloud environments.
-	microsoftLoginAuthorityTemplate = "https://login.microsoftonline.com/%s"
 	// Max delay for retrying requests to AAD.
 	getAadTokenMaxDelay = 10 * time.Second
 	// Max number of retries for requests to AAD.
