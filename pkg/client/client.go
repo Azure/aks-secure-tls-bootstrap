@@ -24,7 +24,7 @@ import (
 
 // TLSBootstrapClient retrieves tokens for performing node TLS bootstrapping.
 type TLSBootstrapClient interface {
-	GetBootstrapToken(ctx context.Context) (string, error)
+	GetCredential(ctx context.Context) (string, error)
 }
 
 func NewTLSBootstrapClient(logger *zap.Logger, opts SecureTLSBootstrapClientOpts) TLSBootstrapClient {
@@ -107,7 +107,7 @@ func (c *tlsBootstrapClientImpl) setupClientConnection(ctx context.Context, exec
 	return conn, nil
 }
 
-func (c *tlsBootstrapClientImpl) GetBootstrapToken(ctx context.Context) (string, error) {
+func (c *tlsBootstrapClientImpl) GetCredential(ctx context.Context) (string, error) {
 	c.logger.Debug("loading exec credential...")
 	execCredential, err := loadExecCredential()
 	if err != nil {
@@ -152,28 +152,28 @@ func (c *tlsBootstrapClientImpl) GetBootstrapToken(ctx context.Context) (string,
 	}
 	c.logger.Info("retrieved IMDS attested data")
 
-	c.logger.Debug("retrieving bootstrap token from TLS bootstrap server...")
+	c.logger.Debug("retrieving credential from TLS bootstrap server...")
 
-	tokenRequest := &pb.TokenRequest{
+	credentialRequest := &pb.CredentialRequest{
 		ResourceId:   instanceData.Compute.ResourceID,
 		Nonce:        nonce,
 		AttestedData: attestedData.Signature,
 	}
-	tokenResponse, err := c.pbClient.GetToken(ctx, tokenRequest)
+	credentialResponse, err := c.pbClient.GetCredential(ctx, credentialRequest)
 
 	if err != nil {
-		return "", fmt.Errorf("failed to retrieve a new TLS bootstrap token from the bootstrap server: %w", err)
+		return "", fmt.Errorf("failed to retrieve a credential from the bootstrap server: %w", err)
 	}
-	c.logger.Info("received new bootstrap token from TLS bootstrap server")
+	c.logger.Info("received new credential from TLS bootstrap server")
 
-	c.logger.Debug("generating new exec credential with bootstrap token...")
-	execCredentialWithToken, err := getExecCredentialWithToken(tokenResponse.GetToken(), tokenResponse.GetExpiration())
+	c.logger.Debug("generating new exec credential with cert/key data...")
+	newExecCredential, err := getExecCredentialWithData(credentialResponse.GetCertificateData(), credentialResponse.GetKeyData())
 	if err != nil {
-		return "", fmt.Errorf("unable to generate new exec credential with bootstrap token: %w", err)
+		return "", fmt.Errorf("unable to generate new exec credential with cert/key data: %w", err)
 	}
-	c.logger.Info("generated new exec credential with bootstrap token")
+	c.logger.Info("generated new exec credential with cert/key data")
 
-	execCredentialBytes, err := json.Marshal(execCredentialWithToken)
+	execCredentialBytes, err := json.Marshal(newExecCredential)
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal execCredential")
 	}
@@ -181,19 +181,19 @@ func (c *tlsBootstrapClientImpl) GetBootstrapToken(ctx context.Context) (string,
 	return string(execCredentialBytes), nil
 }
 
-func getExecCredentialWithToken(token, expirationTimestamp string) (*datamodel.ExecCredential, error) {
-	if token == "" {
-		return nil, fmt.Errorf("token string is empty, cannot generate exec credential")
+func getExecCredentialWithData(certData, keyData string) (*datamodel.ExecCredential, error) {
+	if certData == "" {
+		return nil, fmt.Errorf("cert data is empty, cannot generate exec credential")
 	}
-	if expirationTimestamp == "" {
-		return nil, fmt.Errorf("token expiration timestamp is empty, cannot generate exec credential")
+	if keyData == "" {
+		return nil, fmt.Errorf("key data is empty, cannot generate exec credential")
 	}
 	return &datamodel.ExecCredential{
 		APIVersion: "client.authentication.k8s.io/v1",
 		Kind:       "ExecCredential",
 		Status: datamodel.ExecCredentialStatus{
-			Token:               token,
-			ExpirationTimestamp: expirationTimestamp,
+			ClientCertificateData: certData,
+			ClientKeyData:         keyData,
 		},
 	}, nil
 }
@@ -221,16 +221,15 @@ func getServerURL(execCredential *datamodel.ExecCredential) (string, error) {
 
 func getTLSConfig(pemCAs []byte, nextProto string, insecureSkipVerify bool) (*tls.Config, error) {
 	tlsRootStore := x509.NewCertPool()
+
 	ok := tlsRootStore.AppendCertsFromPEM(pemCAs)
 	if !ok {
 		return nil, fmt.Errorf("failed to load cluster root CA(s)")
 	}
 
-	//nolint: gosec // ignore tls min version for now
+	//nolint: gosec // let server dictate TLS version
 	tlsConfig := &tls.Config{
-		RootCAs: tlsRootStore,
-		// TODO(cameissner): fix me
-		// MinVersion: tls.VersionTLS13,
+		RootCAs:            tlsRootStore,
 		InsecureSkipVerify: insecureSkipVerify,
 	}
 	if nextProto != "" {

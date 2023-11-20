@@ -59,24 +59,24 @@ func (mr *MockAKSBootstrapTokenRequestClientMockRecorder) GetNonce(arg0, arg1 in
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNonce", reflect.TypeOf((*MockAKSBootstrapTokenRequestClient)(nil).GetNonce), varargs...)
 }
 
-// GetToken mocks base method.
-func (m *MockAKSBootstrapTokenRequestClient) GetToken(arg0 context.Context, arg1 *protos.TokenRequest, arg2 ...grpc.CallOption) (*protos.TokenResponse, error) {
+// GetCredential mocks base method.
+func (m *MockAKSBootstrapTokenRequestClient) GetCredential(arg0 context.Context, arg1 *protos.CredentialRequest, arg2 ...grpc.CallOption) (*protos.CredentialResponse, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0, arg1}
 	for _, a := range arg2 {
 		varargs = append(varargs, a)
 	}
-	ret := m.ctrl.Call(m, "GetToken", varargs...)
-	ret0, _ := ret[0].(*protos.TokenResponse)
+	ret := m.ctrl.Call(m, "GetCredential", varargs...)
+	ret0, _ := ret[0].(*protos.CredentialResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetToken indicates an expected call of GetToken.
-func (mr *MockAKSBootstrapTokenRequestClientMockRecorder) GetToken(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+// GetCredential indicates an expected call of GetCredential.
+func (mr *MockAKSBootstrapTokenRequestClientMockRecorder) GetCredential(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{arg0, arg1}, arg2...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetToken", reflect.TypeOf((*MockAKSBootstrapTokenRequestClient)(nil).GetToken), varargs...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCredential", reflect.TypeOf((*MockAKSBootstrapTokenRequestClient)(nil).GetCredential), varargs...)
 }
 
 // SetGRPCConnection mocks base method.

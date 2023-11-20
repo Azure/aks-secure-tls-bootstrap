@@ -56,13 +56,13 @@ func createBootstrapCommand() *cobra.Command {
 			ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 			defer cancel()
 
-			bootstrapToken, err := bootstrapClient.GetBootstrapToken(ctx)
+			cred, err := bootstrapClient.GetCredential(ctx)
 			if err != nil {
 				return err
 			}
 
-			//nolint:forbidigo // kubelet needs the token printed to stdout
-			fmt.Println(bootstrapToken)
+			//nolint:forbidigo // kubelet needs the credential printed to stdout
+			fmt.Println(cred)
 			return nil
 		},
 	}

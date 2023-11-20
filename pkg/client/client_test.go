@@ -160,7 +160,7 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 		})
 	})
 
-	Context("GetBootstrapToken tests", func() {
+	Context("GetCredential tests", func() {
 		BeforeEach(func() {
 			mockCtrl = gomock.NewController(GinkgoT())
 			imdsClient = mocks.NewMockImdsClient(mockCtrl)
@@ -187,7 +187,7 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 
-				token, err := tlsBootstrapClient.GetBootstrapToken(ctx)
+				token, err := tlsBootstrapClient.GetCredential(ctx)
 				Expect(token).To(BeEmpty())
 				Expect(err).ToNot(BeNil())
 				Expect(err.Error()).To(ContainSubstring("KUBERNETES_EXEC_INFO must be set to retrieve bootstrap token"))
@@ -210,7 +210,7 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 					Return(nil, errors.New("cannot get VM instance data from IMDS")).
 					Times(1)
 
-				token, err := tlsBootstrapClient.GetBootstrapToken(ctx)
+				token, err := tlsBootstrapClient.GetCredential(ctx)
 				Expect(token).To(BeEmpty())
 				Expect(err).ToNot(BeNil())
 				Expect(err.Error()).To(ContainSubstring("failed to retrieve instance metadata"))
@@ -237,7 +237,7 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 					Return(&pb.NonceResponse{}, errors.New("cannot get nonce response")).
 					Times(1)
 
-				token, err := tlsBootstrapClient.GetBootstrapToken(ctx)
+				token, err := tlsBootstrapClient.GetCredential(ctx)
 				Expect(token).To(BeEmpty())
 				Expect(err).ToNot(BeNil())
 				Expect(err.Error()).To(ContainSubstring("failed to retrieve a nonce from bootstrap server"))
@@ -267,7 +267,7 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 					Return(&pb.NonceResponse{}, nil).
 					Times(1)
 
-				token, err := tlsBootstrapClient.GetBootstrapToken(ctx)
+				token, err := tlsBootstrapClient.GetCredential(ctx)
 				Expect(token).To(BeEmpty())
 				Expect(err).ToNot(BeNil())
 				Expect(err.Error()).To(ContainSubstring("failed to retrieve attested data"))
@@ -275,7 +275,7 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 			})
 		})
 
-		When("unable to retrieve a TLS bootstrap token from the server", func() {
+		When("unable to retrieve credential from the server", func() {
 			It("should return an error", func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
@@ -296,19 +296,19 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 				pbClient.EXPECT().GetNonce(gomock.Any(), gomock.Any()).
 					Return(&pb.NonceResponse{}, nil).
 					Times(1)
-				pbClient.EXPECT().GetToken(gomock.Any(), gomock.Any()).
-					Return(&pb.TokenResponse{}, errors.New("cannot get bootstrap token from server")).
+				pbClient.EXPECT().GetCredential(gomock.Any(), gomock.Any()).
+					Return(&pb.CredentialResponse{}, errors.New("cannot get credential from server")).
 					Times(1)
 
-				token, err := tlsBootstrapClient.GetBootstrapToken(ctx)
+				token, err := tlsBootstrapClient.GetCredential(ctx)
 				Expect(token).To(BeEmpty())
 				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("failed to retrieve a new TLS bootstrap token from the bootstrap server"))
-				Expect(err.Error()).To(ContainSubstring("cannot get bootstrap token from server"))
+				Expect(err.Error()).To(ContainSubstring("failed to retrieve a credential from the bootstrap server"))
+				Expect(err.Error()).To(ContainSubstring("cannot get credential from server"))
 			})
 		})
 
-		When("server responds with an invalid bootstrap token", func() {
+		When("server responds with an invalid credential", func() {
 			It("should fail to create a new exec credential and return an error", func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
@@ -329,15 +329,15 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 				pbClient.EXPECT().GetNonce(gomock.Any(), gomock.Any()).
 					Return(&pb.NonceResponse{}, nil).
 					Times(1)
-				pbClient.EXPECT().GetToken(gomock.Any(), gomock.Any()).
-					Return(&pb.TokenResponse{Token: "", Expiration: "expirationTimestamp"}, nil).
+				pbClient.EXPECT().GetCredential(gomock.Any(), gomock.Any()).
+					Return(&pb.CredentialResponse{CertificateData: "data", KeyData: ""}, nil).
 					Times(1)
 
-				token, err := tlsBootstrapClient.GetBootstrapToken(ctx)
+				token, err := tlsBootstrapClient.GetCredential(ctx)
 				Expect(token).To(BeEmpty())
 				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("unable to generate new exec credential with bootstrap token"))
-				Expect(err.Error()).To(ContainSubstring("token string is empty, cannot generate exec credential"))
+				Expect(err.Error()).To(ContainSubstring("unable to generate new exec credential with cert/key data"))
+				Expect(err.Error()).To(ContainSubstring("key data is empty, cannot generate exec credential"))
 			})
 		})
 
@@ -362,16 +362,17 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 				pbClient.EXPECT().GetNonce(gomock.Any(), gomock.Any()).
 					Return(&pb.NonceResponse{}, nil).
 					Times(1)
-				pbClient.EXPECT().GetToken(gomock.Any(), gomock.Any()).
-					Return(&pb.TokenResponse{Token: "secure.bootstraptoken", Expiration: "expirationTimestamp"}, nil).
+				pbClient.EXPECT().GetCredential(gomock.Any(), gomock.Any()).
+					Return(&pb.CredentialResponse{CertificateData: "certData", KeyData: "keyData"}, nil).
 					Times(1)
 
-				execCredentialWithToken, err := tlsBootstrapClient.GetBootstrapToken(ctx)
+				execCredentialWithToken, err := tlsBootstrapClient.GetCredential(ctx)
 				Expect(err).To(BeNil())
 				Expect(execCredentialWithToken).ToNot(BeEmpty())
 				Expect(execCredentialWithToken).To(ContainSubstring("client.authentication.k8s.io/v1"))
 				Expect(execCredentialWithToken).To(ContainSubstring("ExecCredential"))
-				Expect(execCredentialWithToken).To(ContainSubstring(`"token":"secure.bootstraptoken"`))
+				Expect(execCredentialWithToken).To(ContainSubstring(`"clientCertificateData":"certData"`))
+				Expect(execCredentialWithToken).To(ContainSubstring(`"clientKeyData":"keyData"`))
 			})
 		})
 	})
@@ -580,32 +581,32 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 		})
 	})
 
-	Context("getExecCredentialWithToken tests", func() {
-		When("token and timestamp strings are non-empty", func() {
+	Context("getExecCredentialWithData tests", func() {
+		When("cert and key data are non-empty", func() {
 			It("should return an exec credential without error", func() {
-				cred, err := getExecCredentialWithToken("token", "timestamp")
+				cred, err := getExecCredentialWithData("certData", "keyData")
 				Expect(err).To(BeNil())
 				Expect(cred).ToNot(BeNil())
-				Expect(cred.Status.Token).To(Equal("token"))
-				Expect(cred.Status.ExpirationTimestamp).To(Equal("timestamp"))
+				Expect(cred.Status.ClientCertificateData).To(Equal("certData"))
+				Expect(cred.Status.ClientKeyData).To(Equal("keyData"))
 			})
 		})
 
-		When("token string is empty", func() {
+		When("cert data is empty", func() {
 			It("should return an error", func() {
-				cred, err := getExecCredentialWithToken("", "timestamp")
+				cred, err := getExecCredentialWithData("", "keyData")
 				Expect(cred).To(BeNil())
 				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("token string is empty, cannot generate exec credential"))
+				Expect(err.Error()).To(ContainSubstring("cert data is empty, cannot generate exec credential"))
 			})
 		})
 
-		When("There is no timestamp given", func() {
+		When("key data is empty", func() {
 			It("should return an error", func() {
-				cred, err := getExecCredentialWithToken("token", "")
+				cred, err := getExecCredentialWithData("certData", "")
 				Expect(cred).To(BeNil())
 				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("token expiration timestamp is empty"))
+				Expect(err.Error()).To(ContainSubstring("key data is empty, cannot generate exec credential"))
 			})
 		})
 	})
