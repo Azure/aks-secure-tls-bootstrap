@@ -68,8 +68,6 @@ var _ = Describe("Auth tests", func() {
 						gomock.Any(),
 						gomock.Any(),
 						gomock.Any(),
-						gomock.Any(),
-						gomock.Any(),
 					).Times(0)
 					azureConfig := &datamodel.AzureConfig{
 						ClientSecret: "secret",
@@ -95,8 +93,6 @@ var _ = Describe("Auth tests", func() {
 						gomock.Any(),
 					).Times(0)
 					aadClient.EXPECT().GetAadToken(
-						gomock.Any(),
-						gomock.Any(),
 						gomock.Any(),
 						gomock.Any(),
 						gomock.Any(),
@@ -128,8 +124,6 @@ var _ = Describe("Auth tests", func() {
 						gomock.Any(),
 						gomock.Any(),
 						gomock.Any(),
-						gomock.Any(),
-						gomock.Any(),
 					).Times(0)
 					azureConfig := &datamodel.AzureConfig{
 						ClientID:     "cid",
@@ -155,8 +149,6 @@ var _ = Describe("Auth tests", func() {
 						}, nil,
 					).Times(1)
 					aadClient.EXPECT().GetAadToken(
-						gomock.Any(),
-						gomock.Any(),
 						gomock.Any(),
 						gomock.Any(),
 						gomock.Any(),
@@ -186,8 +178,6 @@ var _ = Describe("Auth tests", func() {
 						gomock.Any(),
 						gomock.Any(),
 						gomock.Any(),
-						gomock.Any(),
-						gomock.Any(),
 					).Times(0)
 					azureConfigMsi := &datamodel.AzureConfig{
 						ClientID: "msi",
@@ -204,7 +194,12 @@ var _ = Describe("Auth tests", func() {
 
 			When("azure config contains non-MSI clientId", func() {
 				It("should use service principal and acquire token from AAD", func() {
-					aadClient.EXPECT().GetAadToken(gomock.Any(), "clientId", "clientSecret", "tenantId", resource).Return(
+					azureConfigNoMsi := &datamodel.AzureConfig{
+						ClientID:     "clientId",
+						ClientSecret: "clientSecret",
+						TenantID:     "tenantId",
+					}
+					aadClient.EXPECT().GetAadToken(gomock.Any(), azureConfigNoMsi, resource).Return(
 						"spToken",
 						nil,
 					).Times(1)
@@ -214,11 +209,6 @@ var _ = Describe("Auth tests", func() {
 						gomock.Any(),
 						gomock.Any(),
 					).Times(0)
-					azureConfigNoMsi := &datamodel.AzureConfig{
-						ClientID:     "clientId",
-						ClientSecret: "clientSecret",
-						TenantID:     "tenantId",
-					}
 
 					ctx, cancel := context.WithCancel(context.Background())
 					defer cancel()
@@ -240,8 +230,6 @@ var _ = Describe("Auth tests", func() {
 					}, nil,
 				).Times(1)
 				aadClient.EXPECT().GetAadToken(
-					gomock.Any(),
-					gomock.Any(),
 					gomock.Any(),
 					gomock.Any(),
 					gomock.Any(),

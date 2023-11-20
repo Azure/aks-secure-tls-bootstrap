@@ -14,6 +14,7 @@ type AADTokenResponse struct {
 // AzureConfig represents the fields we need from the azure.json
 // file present on all AKS nodes.
 type AzureConfig struct {
+	Cloud                  string `json:"cloud"`
 	ClientID               string `json:"aadClientId,omitempty"`
 	ClientSecret           string `json:"aadClientSecret,omitempty"`
 	TenantID               string `json:"tenantId,omitempty"`

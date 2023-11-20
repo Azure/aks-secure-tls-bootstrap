@@ -5,7 +5,6 @@ package client
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/Azure/aks-tls-bootstrap-client/pkg/datamodel"
@@ -52,37 +51,10 @@ func (c *tlsBootstrapClientImpl) getAuthToken(ctx context.Context, customClientI
 	if azureConfig.TenantID == "" {
 		return "", fmt.Errorf("cannot retrieve SP token from AAD: azure.json missing tenantId")
 	}
-	token, err := c.aadClient.GetAadToken(
-		ctx,
-		azureConfig.ClientID,
-		azureConfig.ClientSecret,
-		azureConfig.TenantID,
-		resource,
-	)
+	token, err := c.aadClient.GetAadToken(ctx, azureConfig, resource)
 	if err != nil {
 		return "", fmt.Errorf("unable to get SPN token from AAD: %w", err)
 	}
 	return token, nil
 
-}
-
-func loadAzureJSON(reader fileReader) (*datamodel.AzureConfig, error) {
-	if isWindows() {
-		return loadAzureJSONFromPath(reader, defaultWindowsAzureJSONPath)
-	}
-	return loadAzureJSONFromPath(reader, defaultLinuxAzureJSONPath)
-}
-
-func loadAzureJSONFromPath(reader fileReader, path string) (*datamodel.AzureConfig, error) {
-	azureJSON, err := reader.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse %s", path)
-	}
-
-	azureConfig := &datamodel.AzureConfig{}
-	if err = json.Unmarshal(azureJSON, azureConfig); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal %s", path)
-	}
-
-	return azureConfig, nil
 }

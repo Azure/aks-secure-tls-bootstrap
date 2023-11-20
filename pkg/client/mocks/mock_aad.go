@@ -11,6 +11,7 @@ import (
 	context "context"
 	reflect "reflect"
 
+	datamodel "github.com/Azure/aks-tls-bootstrap-client/pkg/datamodel"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -38,16 +39,16 @@ func (m *MockAadClient) EXPECT() *MockAadClientMockRecorder {
 }
 
 // GetAadToken mocks base method.
-func (m *MockAadClient) GetAadToken(arg0 context.Context, arg1, arg2, arg3, arg4 string) (string, error) {
+func (m *MockAadClient) GetAadToken(arg0 context.Context, arg1 *datamodel.AzureConfig, arg2 string) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetAadToken", arg0, arg1, arg2, arg3, arg4)
+	ret := m.ctrl.Call(m, "GetAadToken", arg0, arg1, arg2)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetAadToken indicates an expected call of GetAadToken.
-func (mr *MockAadClientMockRecorder) GetAadToken(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
+func (mr *MockAadClientMockRecorder) GetAadToken(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAadToken", reflect.TypeOf((*MockAadClient)(nil).GetAadToken), arg0, arg1, arg2, arg3, arg4)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAadToken", reflect.TypeOf((*MockAadClient)(nil).GetAadToken), arg0, arg1, arg2)
 }

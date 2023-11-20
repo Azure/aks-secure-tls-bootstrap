@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 
@@ -19,7 +20,8 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
-const exampleCACert = `-----BEGIN CERTIFICATE-----
+const (
+	exampleCACert = `-----BEGIN CERTIFICATE-----
 MIIE6DCCAtCgAwIBAgIQOW6Z2RWWbs0WB/DvwlB+ATANBgkqhkiG9w0BAQsFADAN
 MQswCQYDVQQDEwJjYTAgFw0yMzA1MTkxNzU5MjlaGA8yMDUzMDUxOTE4MDkyOVow
 DTELMAkGA1UEAxMCY2EwggIiMA0GCSqGSIb3DQEBAQUAA4ICDwAwggIKAoICAQC9
@@ -49,42 +51,92 @@ wEqb8vx9lRpm8Tuo3Pw3MZ8upt8aHTn/BB61YkDsNdAZAWGKgv77doGsWwqWtb+m
 h/ZvW8MtN313Ykv4
 -----END CERTIFICATE-----`
 
-var defaultPem = "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUZtakNDQTRJQ0NRQ0d3OEVzRExCNEl6QU5CZ2txaGtpRzl3MEJBUXNGQURDQmpqRUxNQWtHQTFVRUJoTUMKVlZNeEV6QVJCZ05WQkFnTUNsZGhjMmhwYm1kMGIyNHhFREFPQmdOVkJBY01CMU5sWVhSMGJHVXhFakFRQmdOVgpCQW9NQ1UxcFkzSnZjMjltZERFUk1BOEdBMVVFQ3d3SVRtOWtaU0JUYVdjeERUQUxCZ05WQkFNTUJHaHZjM1F4CklqQWdCZ2txaGtpRzl3MEJDUUVXRTJSMWJXMTVRRzFwWTNKdmMyOW1kQzVqYjIwd0hoY05Nak14TURJMk1qQXkKTkRJeVdoY05NalF4TURJMU1qQXlOREl5V2pDQmpqRUxNQWtHQTFVRUJoTUNWVk14RXpBUkJnTlZCQWdNQ2xkaApjMmhwYm1kMGIyNHhFREFPQmdOVkJBY01CMU5sWVhSMGJHVXhFakFRQmdOVkJBb01DVTFwWTNKdmMyOW1kREVSCk1BOEdBMVVFQ3d3SVRtOWtaU0JUYVdjeERUQUxCZ05WQkFNTUJHaHZjM1F4SWpBZ0Jna3Foa2lHOXcwQkNRRVcKRTJSMWJXMTVRRzFwWTNKdmMyOW1kQzVqYjIwd2dnSWlNQTBHQ1NxR1NJYjNEUUVCQVFVQUE0SUNEd0F3Z2dJSwpBb0lDQVFEWHp3Mytsb3NDY0IwbXJaSmg2aDZkaDVUYVdhK09hOHNpQTJsaUtFdDl6MXo0b2RYZVkxR3VTeTZkCnNienZ0RW1EVkR1QnBZM2lkaXQ0YVE4VHEzK2hMNnRTUUFXMkt5OG5ZU0YrMnMxRHBJcFg4TlJHbStyQ2hUNXEKOWpCY2pGUUIxdDdWTWZZd3hNL1RWQ3VuL0EvWjRIOUI1Sm9zc3BHdURMYjNEMzhUNDZRMmRsa3h6ODNMUVpONApscWM3cGJ4QlBRQk50TlF0WnhNNFZpRU1hdTV0Z293TlBIOG1MSHExMHpQS3pGMWE4b1R5Tnp4KzAyY0s3WVR1CjVFWTFwRDhLQnhlLzRrRjFKOGdsWFJmUFpEaTRmcG1QSUlCRFRSTmcvUmtmTFhRelRZL2RtOHZwcUZSaGgwdHQKZEZEdVRYRkFIWkJFTkZYMFdVS3ZhNXNLbVhuUW9ieS9GRGp1UGJtUmNvVjlEMC9hQnJVVG05bS8rZ05aa3BzMQplNTJreVBjSnJ2ZkhMdjdCTDI0cy9RQjhKMmlKYms2MHh4eUYzcUx1K2k4OE52anNScHVMb3QrTVYxNGFnc1VXCndhaXEvbHdXMjg1TGE4MUttak9WcEs0WHZ3VFJSRG5JZkZUcW9pMTJ2TllCaVphMVNnQUxUeWNVd1J0YU1NTE8KOE56U25FdHNIWWdBVnVKdTE3dUJiMDIyeGl5SU9VR0xSU2dUZnJoSHFjVklsQ0FkdzhwMnhRdjI2dDdVdTNBYwppRHlhQ2s2V1hyTTFhVGNSUzFWYS85ZnlWWmtJZEtNVGFpNHVJOEJzbXZtOGUwakJtRGF1Zyt5VWxDdmVENFZaCk85RXNvRVRGS2VMaEVUUWpKWGhRTkhyZ3ZEckxNT1UrYThzUjhNOEJQL01zelUrbURRSURBUUFCTUEwR0NTcUcKU0liM0RRRUJDd1VBQTRJQ0FRQm1CY0FISm9iMXJUV2JTOUxRZEZPT2ZTYXR5bXc5UkRjZncya1k1UllobmFJbQpsZFJ6ZDMwUnQyRUp5YnV3V2NJSXJYKzMvM2pZNkQ2cmhMUkRJK2xMNExHYXdXVk9JMGNwakl6QWMrbm0yYisxCnJwelV1bjZPUm5IaUIvVmFQeTlMRWZnMHBSeGVwTWJrY2xOckQ5ODUwK1NWeTZOd2twRmtab2hRQ0FHRnhPRDUKaW5FNDJwWnBabkd1eWVvYmtFZ0todk5tZUtscG1WRUF4ZVdVRUNBRmtEY1I5TWhuUWpCOGk1UnhncVBaVnFabgpPc0Z1MTkvRmh3cHBwTkVzNFdzT0pjT2F3eTlpTG05SE1vdStLeDIzK3JNdCtraEpKai94b25lRkliUXJKbHpkCmFsclRrSm4wOHJLU0U5bGlGNEl6QlVjVkVKc1o3WGNYZE1TcXpkLzZsWXA5MVErUEdscmlHb3ZWRUthYmRkZjQKZzRIMTVnSFJYamp0WllJOW1kQlN5WWI0WkNtVXJsQVEzcmpvSVVqN3pPUDZDQ3E0UjhXNUpsUWM0eWN4MEpwQwpablZNUC9Wc01qd3A5TWE0dWdtWGxtaCt2U0ZJTHlKZCtod21ZNE1wLzduVEVFTUljRUxDRjVUdFU1clFLSGtZCmgvOTFwUmlkTS80MDhnMW5Ja3dqakVJUkNvSE9CUy8wdFV3KzR6bmVlRkZ0S2dRNDZ5clBvZmRhczY3OUlnbVEKd2IxYVpxVVF0KzVueHRnNEt4aHV6akI5Y1o2b2RuMWRrV2NJT2Qxd3VpeHdMSnVmenR1YWd3ekxEMHdFbFhCWAovenZRSnlsdE0wenl3VFBmT01YZXQxaGxLYXhyd3lvQks5ZzFOY3F5OW9jSzN6djlNUDhKZmFIV005WnZiZz09Ci0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0="
-var defaultServerURL = "https://1.2.3.4:6443"
-var dummyAzureConfig = datamodel.AzureConfig{ClientID: "dummyclientID", ClientSecret: "dummyClientSecret", TenantID: "dummyTenantID", UserAssignedIdentityID: "dummyUserAssignedIdentityID"}
-
-func setExecCredential(dummyPEM, dummyServerURL string) {
-	if dummyPEM == "" {
-		dummyPEM = defaultPem
-	}
-	if dummyServerURL == "" {
-		dummyServerURL = defaultServerURL
-	}
-
-	testExecInfoJSON := `{
-		"apiVersion": "client.authentication.k8s.io/v1",
-		"kind": "ExecCredential",
-		"spec": {
-			"cluster": {
-				"certificate-authority-data": "` + dummyPEM + `",
-				"config": {},
-				"insecure-skip-tls-verify": false,
-				"proxy-url": "proxyurl",
-				"server": "` + dummyServerURL + `",
-				"tls-server-name": "someserver"
-			},
-			"interactive": false
+	mockExecCredentialTemplate = `
+{
+	"apiVersion": "client.authentication.k8s.io/v1",
+	"kind": "ExecCredential",
+	"spec": {
+		"cluster": {
+			"certificate-authority-data": "%[1]s",
+			"config": {},
+			"insecure-skip-tls-verify": false,
+			"proxy-url": "proxyurl",
+			"server": "%[2]s",
+			"tls-server-name": "someserver"
 		},
-		"status": {
-			"clientCertificateData": "certdata",
-			"clientKeyData": "keydata",
-			"token": "token"
-		}
-		}`
+		"interactive": false
+	},
+	"status": {
+		"clientCertificateData": "certdata",
+		"clientKeyData": "keydata"
+	}
+}`
 
-	testExecInfoJSON = strings.ReplaceAll(testExecInfoJSON, "\n", "")
-	testExecInfoJSON = strings.ReplaceAll(testExecInfoJSON, "\t", "")
-	os.Setenv("KUBERNETES_EXEC_INFO", testExecInfoJSON) // s: "KUBERNETES_EXEC_INFO must be set to retrieve bootstrap token",}
+	defaultMockServerURL = "https://1.2.3.4:6443"
+
+	defaultMockEncodedCAData = "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUZtakNDQTRJQ0NRQ0d3OEVzRExCNEl6QU5CZ2txaGtpRzl3MEJBUXNGQURDQmpqRUxNQWtHQTFVRUJoTUMKVlZNeE" +
+		"V6QVJCZ05WQkFnTUNsZGhjMmhwYm1kMGIyNHhFREFPQmdOVkJBY01CMU5sWVhSMGJHVXhFakFRQmdOVgpCQW9NQ1UxcFkzSnZjMjltZERFUk1BOEdBMVVFQ3d3SVRtOWtaU0JUYVdjeERUQUxCZ05WQ" +
+		"kFNTUJHaHZjM1F4CklqQWdCZ2txaGtpRzl3MEJDUUVXRTJSMWJXMTVRRzFwWTNKdmMyOW1kQzVqYjIwd0hoY05Nak14TURJMk1qQXkKTkRJeVdoY05NalF4TURJMU1qQXlOREl5V2pDQmpqRUxNQWtH" +
+		"QTFVRUJoTUNWVk14RXpBUkJnTlZCQWdNQ2xkaApjMmhwYm1kMGIyNHhFREFPQmdOVkJBY01CMU5sWVhSMGJHVXhFakFRQmdOVkJBb01DVTFwWTNKdmMyOW1kREVSCk1BOEdBMVVFQ3d3SVRtOWtaU0J" +
+		"UYVdjeERUQUxCZ05WQkFNTUJHaHZjM1F4SWpBZ0Jna3Foa2lHOXcwQkNRRVcKRTJSMWJXMTVRRzFwWTNKdmMyOW1kQzVqYjIwd2dnSWlNQTBHQ1NxR1NJYjNEUUVCQVFVQUE0SUNEd0F3Z2dJSwpBb0" +
+		"lDQVFEWHp3Mytsb3NDY0IwbXJaSmg2aDZkaDVUYVdhK09hOHNpQTJsaUtFdDl6MXo0b2RYZVkxR3VTeTZkCnNienZ0RW1EVkR1QnBZM2lkaXQ0YVE4VHEzK2hMNnRTUUFXMkt5OG5ZU0YrMnMxRHBJc" +
+		"Fg4TlJHbStyQ2hUNXEKOWpCY2pGUUIxdDdWTWZZd3hNL1RWQ3VuL0EvWjRIOUI1Sm9zc3BHdURMYjNEMzhUNDZRMmRsa3h6ODNMUVpONApscWM3cGJ4QlBRQk50TlF0WnhNNFZpRU1hdTV0Z293TlBI" +
+		"OG1MSHExMHpQS3pGMWE4b1R5Tnp4KzAyY0s3WVR1CjVFWTFwRDhLQnhlLzRrRjFKOGdsWFJmUFpEaTRmcG1QSUlCRFRSTmcvUmtmTFhRelRZL2RtOHZwcUZSaGgwdHQKZEZEdVRYRkFIWkJFTkZYMFd" +
+		"VS3ZhNXNLbVhuUW9ieS9GRGp1UGJtUmNvVjlEMC9hQnJVVG05bS8rZ05aa3BzMQplNTJreVBjSnJ2ZkhMdjdCTDI0cy9RQjhKMmlKYms2MHh4eUYzcUx1K2k4OE52anNScHVMb3QrTVYxNGFnc1VXCn" +
+		"dhaXEvbHdXMjg1TGE4MUttak9WcEs0WHZ3VFJSRG5JZkZUcW9pMTJ2TllCaVphMVNnQUxUeWNVd1J0YU1NTE8KOE56U25FdHNIWWdBVnVKdTE3dUJiMDIyeGl5SU9VR0xSU2dUZnJoSHFjVklsQ0Fkd" +
+		"zhwMnhRdjI2dDdVdTNBYwppRHlhQ2s2V1hyTTFhVGNSUzFWYS85ZnlWWmtJZEtNVGFpNHVJOEJzbXZtOGUwakJtRGF1Zyt5VWxDdmVENFZaCk85RXNvRVRGS2VMaEVUUWpKWGhRTkhyZ3ZEckxNT1Ur" +
+		"YThzUjhNOEJQL01zelUrbURRSURBUUFCTUEwR0NTcUcKU0liM0RRRUJDd1VBQTRJQ0FRQm1CY0FISm9iMXJUV2JTOUxRZEZPT2ZTYXR5bXc5UkRjZncya1k1UllobmFJbQpsZFJ6ZDMwUnQyRUp5YnV" +
+		"3V2NJSXJYKzMvM2pZNkQ2cmhMUkRJK2xMNExHYXdXVk9JMGNwakl6QWMrbm0yYisxCnJwelV1bjZPUm5IaUIvVmFQeTlMRWZnMHBSeGVwTWJrY2xOckQ5ODUwK1NWeTZOd2twRmtab2hRQ0FHRnhPRD" +
+		"UKaW5FNDJwWnBabkd1eWVvYmtFZ0todk5tZUtscG1WRUF4ZVdVRUNBRmtEY1I5TWhuUWpCOGk1UnhncVBaVnFabgpPc0Z1MTkvRmh3cHBwTkVzNFdzT0pjT2F3eTlpTG05SE1vdStLeDIzK3JNdCtra" +
+		"EpKai94b25lRkliUXJKbHpkCmFsclRrSm4wOHJLU0U5bGlGNEl6QlVjVkVKc1o3WGNYZE1TcXpkLzZsWXA5MVErUEdscmlHb3ZWRUthYmRkZjQKZzRIMTVnSFJYamp0WllJOW1kQlN5WWI0WkNtVXJs" +
+		"QVEzcmpvSVVqN3pPUDZDQ3E0UjhXNUpsUWM0eWN4MEpwQwpablZNUC9Wc01qd3A5TWE0dWdtWGxtaCt2U0ZJTHlKZCtod21ZNE1wLzduVEVFTUljRUxDRjVUdFU1clFLSGtZCmgvOTFwUmlkTS80MDh" +
+		"nMW5Ja3dqakVJUkNvSE9CUy8wdFV3KzR6bmVlRkZ0S2dRNDZ5clBvZmRhczY3OUlnbVEKd2IxYVpxVVF0KzVueHRnNEt4aHV6akI5Y1o2b2RuMWRrV2NJT2Qxd3VpeHdMSnVmenR1YWd3ekxEMHdFbF" +
+		"hCWAovenZRSnlsdE0wenl3VFBmT01YZXQxaGxLYXhyd3lvQks5ZzFOY3F5OW9jSzN6djlNUDhKZmFIV005WnZiZz09Ci0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0="
+)
+
+var (
+	mockPEMCAs = []byte(exampleCACert)
+
+	defaultMockAzureConfig = datamodel.AzureConfig{
+		ClientID:               "clientId",
+		ClientSecret:           "clientSecret",
+		TenantID:               "tenantId",
+		UserAssignedIdentityID: "userAssignedIdentityId",
+	}
+
+	defaultMockAzureConfigBytes, _ = json.Marshal(defaultMockAzureConfig)
+)
+
+func setDefaultMockExecCredential() {
+	setMockExecCredential(defaultMockEncodedCAData, defaultMockServerURL)
+}
+
+func setMockExecCredential(dummyPEM, dummyServerURL string) {
+	rawExecCredential := fmt.Sprintf(mockExecCredentialTemplate, dummyPEM, dummyServerURL)
+	rawExecCredential = strings.ReplaceAll(rawExecCredential, "\n", "")
+	rawExecCredential = strings.ReplaceAll(rawExecCredential, "\t", "")
+	os.Setenv(kubernetesExecInfoVarName, rawExecCredential)
+}
+
+func getDefaultMockExecCredential() *datamodel.ExecCredential {
+	return getMockExecCredential(defaultMockEncodedCAData, defaultMockServerURL)
+}
+
+func getMockExecCredential(pem, serverURL string) *datamodel.ExecCredential {
+	credential := &datamodel.ExecCredential{
+		APIVersion: "client.authentication.k8s.io/v1",
+		Kind:       "ExecCredential",
+		Status: datamodel.ExecCredentialStatus{
+			ClientCertificateData: "certdata",
+			ClientKeyData:         "keydata",
+		},
+	}
+	credential.Spec.Cluster.CertificateAuthorityData = pem
+	credential.Spec.Cluster.InsecureSkipTLSVerify = false
+	credential.Spec.Cluster.ProxyURL = "proxyurl"
+	credential.Spec.Cluster.Server = serverURL
+	credential.Spec.Cluster.TLSServerName = "someserver"
+	return credential
 }
 
 var _ = Describe("TLS Bootstrap client tests", func() {
@@ -94,154 +146,198 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 		aadClient          *mocks.MockAadClient
 		pbClient           *protos_mock.MockAKSBootstrapTokenRequestClient
 		tlsBootstrapClient *tlsBootstrapClientImpl
-		mockreader         *mocks.MockfileReader
+		mockReader         *mocks.MockfileReader
 	)
 
-	BeforeEach(func() {
-		mockCtrl = gomock.NewController(GinkgoT())
-		imdsClient = mocks.NewMockImdsClient(mockCtrl)
-		aadClient = mocks.NewMockAadClient(mockCtrl)
-		pbClient = protos_mock.NewMockAKSBootstrapTokenRequestClient(mockCtrl)
-		mockreader = mocks.NewMockfileReader(mockCtrl)
-
-		pbClient.EXPECT().SetGRPCConnection(gomock.Any()).Times(1)
-		tlsBootstrapClient = &tlsBootstrapClientImpl{
-			logger:     testLogger,
-			imdsClient: imdsClient,
-			aadClient:  aadClient,
-			pbClient:   pbClient,
-			reader:     mockreader,
-		}
-	})
-
 	AfterEach(func() {
-		os.Setenv("KUBERNETES_EXEC_INFO", "")
+		os.Setenv(kubernetesExecInfoVarName, "")
 	})
 
-	Context("Test GetBootstrapToken", func() {
-		It("should return an error when KUBERNETES_EXEC_INFO is missing", func() {
-			os.Setenv("KUBERNETES_EXEC_INFO", "")
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+	Context("NewTLSBootstrapClient tests", func() {
+		It("should return a new TLS bootstrap client", func() {
+			bootstrapClient := NewTLSBootstrapClient(testLogger, SecureTLSBootstrapClientOpts{})
+			Expect(bootstrapClient).ToNot(BeNil())
+		})
+	})
 
-			token, err := tlsBootstrapClient.GetBootstrapToken(ctx)
-			Expect(token).To(BeEmpty())
-			Expect(err).ToNot(BeNil())
-			Expect(err.Error()).To(ContainSubstring("KUBERNETES_EXEC_INFO must be set to retrieve bootstrap token"))
+	Context("GetBootstrapToken tests", func() {
+		BeforeEach(func() {
+			mockCtrl = gomock.NewController(GinkgoT())
+			imdsClient = mocks.NewMockImdsClient(mockCtrl)
+			aadClient = mocks.NewMockAadClient(mockCtrl)
+			pbClient = protos_mock.NewMockAKSBootstrapTokenRequestClient(mockCtrl)
+			mockReader = mocks.NewMockfileReader(mockCtrl)
+
+			tlsBootstrapClient = &tlsBootstrapClientImpl{
+				logger:     testLogger,
+				imdsClient: imdsClient,
+				aadClient:  aadClient,
+				pbClient:   pbClient,
+				reader:     mockReader,
+			}
 		})
 
-		It("should return a new TLS client", func() {
-			var opts SecureTLSBootstrapClientOpts
-			tlsClient := NewTLSBootstrapClient(testLogger, opts)
-			Expect(tlsClient).ToNot(BeNil())
+		AfterEach(func() {
+			mockCtrl.Finish()
 		})
 
-		When("setupClientConnection and getInstanceData are mocked to succeed", func() {
-			It("should fail to recieve nonce", func() {
+		When("KUBERNETES_EXEC_INFO env var is unset", func() {
+			It("should return an error", func() {
+				os.Setenv(kubernetesExecInfoVarName, "")
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
-
-				setExecCredential("", "")
-				dummyJsonAzureConfig, err := json.Marshal(dummyAzureConfig)
-				Expect(err).To(BeNil())
-				mockreader.EXPECT().ReadFile(gomock.Any()).Times(1).Return([]byte(dummyJsonAzureConfig), nil)
-
-				aadClient.EXPECT().GetAadToken(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("spToken", nil).Times(1)
-				imdsClient.EXPECT().GetInstanceData(gomock.Any(), gomock.Any()).Times(1).Return(&datamodel.VMSSInstanceData{}, nil)
-				pbClient.EXPECT().GetNonce(gomock.Any(), gomock.Any()).Times(1).Return(&pb.NonceResponse{}, errors.New("error"))
 
 				token, err := tlsBootstrapClient.GetBootstrapToken(ctx)
 				Expect(token).To(BeEmpty())
 				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("failed to retrieve a nonce"))
+				Expect(err.Error()).To(ContainSubstring("KUBERNETES_EXEC_INFO must be set to retrieve bootstrap token"))
 			})
 		})
 
-		When("GetInstanceData is mocked to fail", func() {
-			It("should fail to retrieve instance metadata", func() {
+		When("unable to retrieve instance data from IMDS", func() {
+			It("should return an error", func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
-
-				setExecCredential("", "")
-				dummyJsonAzureConfig, err := json.Marshal(dummyAzureConfig)
-				Expect(err).To(BeNil())
-				mockreader.EXPECT().ReadFile(gomock.Any()).Times(1).Return([]byte(dummyJsonAzureConfig), nil)
-
-				aadClient.EXPECT().GetAadToken(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("spToken", nil).Times(1)
-				imdsClient.EXPECT().GetInstanceData(gomock.Any(), gomock.Any()).Times(1).Return(nil, errors.New("error"))
+				setDefaultMockExecCredential()
+				pbClient.EXPECT().SetGRPCConnection(gomock.Any()).Times(1)
+				mockReader.EXPECT().ReadFile(gomock.Any()).
+					Return(defaultMockAzureConfigBytes, nil).
+					Times(1)
+				aadClient.EXPECT().GetAadToken(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return("spToken", nil).
+					Times(1)
+				imdsClient.EXPECT().GetInstanceData(gomock.Any(), gomock.Any()).
+					Return(nil, errors.New("cannot get VM instance data from IMDS")).
+					Times(1)
 
 				token, err := tlsBootstrapClient.GetBootstrapToken(ctx)
 				Expect(token).To(BeEmpty())
 				Expect(err).ToNot(BeNil())
 				Expect(err.Error()).To(ContainSubstring("failed to retrieve instance metadata"))
+				Expect(err.Error()).To(ContainSubstring("cannot get VM instance data from IMDS"))
 			})
 		})
 
-		When("GetNonce and GetAttestedData are mocked to succeed", func() {
-			It("should fail to get a token", func() {
+		When("unable to retrieve nonce from bootstrap server", func() {
+			It("should return an error", func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
-
-				setExecCredential("", "")
-				dummyJsonAzureConfig, err := json.Marshal(dummyAzureConfig)
-				Expect(err).To(BeNil())
-				mockreader.EXPECT().ReadFile(gomock.Any()).Times(1).Return([]byte(dummyJsonAzureConfig), nil)
-
-				aadClient.EXPECT().GetAadToken(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("spToken", nil).Times(1)
-				imdsClient.EXPECT().GetInstanceData(gomock.Any(), gomock.Any()).Times(1).Return(&datamodel.VMSSInstanceData{}, nil)
-				imdsClient.EXPECT().GetAttestedData(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(&datamodel.VMSSAttestedData{}, nil)
-				pbClient.EXPECT().GetNonce(gomock.Any(), gomock.Any()).Times(1).Return(&pb.NonceResponse{}, nil)
-				pbClient.EXPECT().GetToken(gomock.Any(), gomock.Any()).Times(1).Return(&pb.TokenResponse{}, errors.New("error"))
+				setDefaultMockExecCredential()
+				pbClient.EXPECT().SetGRPCConnection(gomock.Any()).Times(1)
+				mockReader.EXPECT().ReadFile(gomock.Any()).
+					Return(defaultMockAzureConfigBytes, nil).
+					Times(1)
+				aadClient.EXPECT().GetAadToken(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return("spToken", nil).
+					Times(1)
+				imdsClient.EXPECT().GetInstanceData(gomock.Any(), gomock.Any()).
+					Return(&datamodel.VMSSInstanceData{}, nil).
+					Times(1)
+				pbClient.EXPECT().GetNonce(gomock.Any(), gomock.Any()).
+					Return(&pb.NonceResponse{}, errors.New("cannot get nonce response")).
+					Times(1)
 
 				token, err := tlsBootstrapClient.GetBootstrapToken(ctx)
 				Expect(token).To(BeEmpty())
 				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("failed to retrieve a token"))
+				Expect(err.Error()).To(ContainSubstring("failed to retrieve a nonce from bootstrap server"))
+				Expect(err.Error()).To(ContainSubstring("cannot get nonce response"))
 			})
 		})
 
-		When("GetAttestedData is mocked to fail", func() {
-			It("should fail on GetAttesteddata", func() {
+		When("unable to retrieve attested data from IMDS", func() {
+			It("should return an error", func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
-
-				setExecCredential("", "")
-				dummyJsonAzureConfig, err := json.Marshal(dummyAzureConfig)
-				Expect(err).To(BeNil())
-				mockreader.EXPECT().ReadFile(gomock.Any()).Times(1).Return([]byte(dummyJsonAzureConfig), nil)
-
-				aadClient.EXPECT().GetAadToken(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("spToken", nil).Times(1)
-				imdsClient.EXPECT().GetInstanceData(gomock.Any(), gomock.Any()).Times(1).Return(&datamodel.VMSSInstanceData{}, nil)
-				imdsClient.EXPECT().GetAttestedData(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(nil, errors.New("error"))
-				pbClient.EXPECT().GetNonce(gomock.Any(), gomock.Any()).Times(1).Return(&pb.NonceResponse{}, nil)
+				setDefaultMockExecCredential()
+				pbClient.EXPECT().SetGRPCConnection(gomock.Any()).Times(1)
+				mockReader.EXPECT().ReadFile(gomock.Any()).
+					Return(defaultMockAzureConfigBytes, nil).
+					Times(1)
+				aadClient.EXPECT().GetAadToken(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return("spToken", nil).
+					Times(1)
+				imdsClient.EXPECT().GetInstanceData(gomock.Any(), gomock.Any()).
+					Return(&datamodel.VMSSInstanceData{}, nil).
+					Times(1)
+				imdsClient.EXPECT().GetAttestedData(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(nil, errors.New("cannot get VM attested data")).
+					Times(1)
+				pbClient.EXPECT().GetNonce(gomock.Any(), gomock.Any()).
+					Return(&pb.NonceResponse{}, nil).
+					Times(1)
 
 				token, err := tlsBootstrapClient.GetBootstrapToken(ctx)
 				Expect(token).To(BeEmpty())
 				Expect(err).ToNot(BeNil())
 				Expect(err.Error()).To(ContainSubstring("failed to retrieve attested data"))
+				Expect(err.Error()).To(ContainSubstring("cannot get VM attested data"))
 			})
 		})
 
-		When("PbClientGetToken is mocked to succeed", func() {
-			It("should fail to generate new exec credential", func() {
+		When("unable to retrieve a TLS bootstrap token from the server", func() {
+			It("should return an error", func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
-
-				setExecCredential("", "")
-				dummyJsonAzureConfig, err := json.Marshal(dummyAzureConfig)
-				Expect(err).To(BeNil())
-				mockreader.EXPECT().ReadFile(gomock.Any()).Times(1).Return([]byte(dummyJsonAzureConfig), nil)
-
-				aadClient.EXPECT().GetAadToken(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("spToken", nil).Times(1)
-				imdsClient.EXPECT().GetInstanceData(gomock.Any(), gomock.Any()).Times(1).Return(&datamodel.VMSSInstanceData{}, nil)
-				imdsClient.EXPECT().GetAttestedData(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(&datamodel.VMSSAttestedData{}, nil)
-				pbClient.EXPECT().GetNonce(gomock.Any(), gomock.Any()).Times(1).Return(&pb.NonceResponse{}, nil)
-				pbClient.EXPECT().GetToken(gomock.Any(), gomock.Any()).Times(1).Return(&pb.TokenResponse{Token: "", Expiration: "expirationTimestamp"}, nil)
+				setDefaultMockExecCredential()
+				pbClient.EXPECT().SetGRPCConnection(gomock.Any()).Times(1)
+				mockReader.EXPECT().ReadFile(gomock.Any()).
+					Return(defaultMockAzureConfigBytes, nil).
+					Times(1)
+				aadClient.EXPECT().GetAadToken(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return("spToken", nil).
+					Times(1)
+				imdsClient.EXPECT().GetInstanceData(gomock.Any(), gomock.Any()).
+					Return(&datamodel.VMSSInstanceData{}, nil).
+					Times(1)
+				imdsClient.EXPECT().GetAttestedData(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(&datamodel.VMSSAttestedData{}, nil).
+					Times(1)
+				pbClient.EXPECT().GetNonce(gomock.Any(), gomock.Any()).
+					Return(&pb.NonceResponse{}, nil).
+					Times(1)
+				pbClient.EXPECT().GetToken(gomock.Any(), gomock.Any()).
+					Return(&pb.TokenResponse{}, errors.New("cannot get bootstrap token from server")).
+					Times(1)
 
 				token, err := tlsBootstrapClient.GetBootstrapToken(ctx)
 				Expect(token).To(BeEmpty())
 				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("generate new exec credential"))
+				Expect(err.Error()).To(ContainSubstring("failed to retrieve a new TLS bootstrap token from the bootstrap server"))
+				Expect(err.Error()).To(ContainSubstring("cannot get bootstrap token from server"))
+			})
+		})
+
+		When("server responds with an invalid bootstrap token", func() {
+			It("should fail to create a new exec credential and return an error", func() {
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+				setDefaultMockExecCredential()
+				pbClient.EXPECT().SetGRPCConnection(gomock.Any()).Times(1)
+				mockReader.EXPECT().ReadFile(gomock.Any()).
+					Return(defaultMockAzureConfigBytes, nil).
+					Times(1)
+				aadClient.EXPECT().GetAadToken(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return("spToken", nil).
+					Times(1)
+				imdsClient.EXPECT().GetInstanceData(gomock.Any(), gomock.Any()).
+					Return(&datamodel.VMSSInstanceData{}, nil).
+					Times(1)
+				imdsClient.EXPECT().GetAttestedData(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(&datamodel.VMSSAttestedData{}, nil).
+					Times(1)
+				pbClient.EXPECT().GetNonce(gomock.Any(), gomock.Any()).
+					Return(&pb.NonceResponse{}, nil).
+					Times(1)
+				pbClient.EXPECT().GetToken(gomock.Any(), gomock.Any()).
+					Return(&pb.TokenResponse{Token: "", Expiration: "expirationTimestamp"}, nil).
+					Times(1)
+
+				token, err := tlsBootstrapClient.GetBootstrapToken(ctx)
+				Expect(token).To(BeEmpty())
+				Expect(err).ToNot(BeNil())
+				Expect(err.Error()).To(ContainSubstring("unable to generate new exec credential with bootstrap token"))
+				Expect(err.Error()).To(ContainSubstring("token string is empty, cannot generate exec credential"))
 			})
 		})
 
@@ -249,35 +345,57 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 			It("should return a bootstrap token", func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
+				setDefaultMockExecCredential()
+				pbClient.EXPECT().SetGRPCConnection(gomock.Any()).Times(1)
+				mockReader.EXPECT().ReadFile(gomock.Any()).
+					Return(defaultMockAzureConfigBytes, nil).
+					Times(1)
+				aadClient.EXPECT().GetAadToken(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return("spToken", nil).
+					Times(1)
+				imdsClient.EXPECT().GetInstanceData(gomock.Any(), gomock.Any()).
+					Return(&datamodel.VMSSInstanceData{}, nil).
+					Times(1)
+				imdsClient.EXPECT().GetAttestedData(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(&datamodel.VMSSAttestedData{}, nil).
+					Times(1)
+				pbClient.EXPECT().GetNonce(gomock.Any(), gomock.Any()).
+					Return(&pb.NonceResponse{}, nil).
+					Times(1)
+				pbClient.EXPECT().GetToken(gomock.Any(), gomock.Any()).
+					Return(&pb.TokenResponse{Token: "secure.bootstraptoken", Expiration: "expirationTimestamp"}, nil).
+					Times(1)
 
-				setExecCredential("", "")
-				dummyJsonAzureConfig, err := json.Marshal(dummyAzureConfig)
+				execCredentialWithToken, err := tlsBootstrapClient.GetBootstrapToken(ctx)
 				Expect(err).To(BeNil())
-				mockreader.EXPECT().ReadFile(gomock.Any()).Times(1).Return([]byte(dummyJsonAzureConfig), nil)
-
-				aadClient.EXPECT().GetAadToken(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("spToken", nil).Times(1)
-				imdsClient.EXPECT().GetInstanceData(gomock.Any(), gomock.Any()).Times(1).Return(&datamodel.VMSSInstanceData{}, nil)
-				imdsClient.EXPECT().GetAttestedData(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).Return(&datamodel.VMSSAttestedData{}, nil)
-				pbClient.EXPECT().GetNonce(gomock.Any(), gomock.Any()).Times(1).Return(&pb.NonceResponse{}, nil)
-				pbClient.EXPECT().GetToken(gomock.Any(), gomock.Any()).Times(1).Return(&pb.TokenResponse{Token: "token", Expiration: "expirationTimestamp"}, nil)
-
-				token, err := tlsBootstrapClient.GetBootstrapToken(ctx)
-				Expect(token).ToNot(BeEmpty())
-				Expect(err).To(BeNil())
+				Expect(execCredentialWithToken).ToNot(BeEmpty())
+				Expect(execCredentialWithToken).To(ContainSubstring("client.authentication.k8s.io/v1"))
+				Expect(execCredentialWithToken).To(ContainSubstring("ExecCredential"))
+				Expect(execCredentialWithToken).To(ContainSubstring(`"token":"secure.bootstraptoken"`))
 			})
 		})
 	})
 
-	Context("Test loadExecCredential", func() {
-		When("ExecCredential JSON is properly formed", func() {
+	Context("loadExecCredential tests", func() {
+		When("exec credential JSON is malformed", func() {
+			It("should return an error", func() {
+				os.Setenv(kubernetesExecInfoVarName, malformedJSON)
+				execCredential, err := loadExecCredential()
+				Expect(execCredential).To(BeNil())
+				Expect(err).ToNot(BeNil())
+				Expect(err.Error()).To(ContainSubstring("unable to parse KUBERNETES_EXEC_INFO data"))
+			})
+		})
+
+		When("the exec credential is properly formed", func() {
 			It("should correctly parse and load the exec credential", func() {
-				setExecCredential("", "")
+				setDefaultMockExecCredential()
 				execCredential, err := loadExecCredential()
 				Expect(err).To(BeNil())
 				Expect(execCredential).ToNot(BeNil())
 				Expect(execCredential.APIVersion).To(Equal("client.authentication.k8s.io/v1"))
 				Expect(execCredential.Kind).To(Equal("ExecCredential"))
-				Expect(execCredential.Spec.Cluster.CertificateAuthorityData).To(Equal(defaultPem))
+				Expect(execCredential.Spec.Cluster.CertificateAuthorityData).To(Equal(defaultMockEncodedCAData))
 				Expect(execCredential.Spec.Cluster.InsecureSkipTLSVerify).To(BeFalse())
 				Expect(execCredential.Spec.Cluster.ProxyURL).To(Equal("proxyurl"))
 				Expect(execCredential.Spec.Cluster.Server).To(Equal("https://1.2.3.4:6443"))
@@ -285,210 +403,210 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 				Expect(execCredential.Spec.Interactive).To(BeFalse())
 				Expect(execCredential.Status.ClientCertificateData).To(Equal("certdata"))
 				Expect(execCredential.Status.ClientKeyData).To(Equal("keydata"))
-				Expect(execCredential.Status.Token).To(Equal("token"))
+				Expect(execCredential.Status.Token).To(BeEmpty())
+			})
+		})
+	})
+
+	Context("getServerURL tests", func() {
+		When("the server URL is invalid", func() {
+			It("should return an error", func() {
+				execCredential := &datamodel.ExecCredential{}
+				execCredential.Spec.Cluster.Server = ":invalidurl.com"
+				serverURL, err := getServerURL(execCredential)
+				Expect(serverURL).To(BeEmpty())
+				Expect(err).ToNot(BeNil())
+				Expect(err.Error()).To(ContainSubstring("failed to parse server URL"))
 			})
 		})
 
-		When("ExecCredential JSON is malformed", func() {
-			execCredential, err := loadExecCredential()
-			Expect(err).ToNot(BeNil())
-			Expect(execCredential).To(BeNil())
+		When("the server URL is valid", func() {
+			It("should correctly join server name and port with a ':'", func() {
+				execCredential := &datamodel.ExecCredential{}
+				execCredential.Spec.Cluster.Server = defaultMockServerURL
+				serverURL, err := getServerURL(execCredential)
+				Expect(err).To(BeNil())
+				Expect(serverURL).To(Equal("1.2.3.4:6443"))
+			})
 		})
 	})
 
-	Context("Test getServerURL", func() {
-		It("should correctly join server name and port with a ':'", func() {
-			execCredential := &datamodel.ExecCredential{}
-			execCredential.Spec.Cluster.Server = "https://1.2.3.4:6443"
-			serverURL, err := getServerURL(execCredential)
-			Expect(err).To(BeNil())
-			Expect(serverURL).To(Equal("1.2.3.4:6443"))
-		})
+	Context("getTLSConfig tests", func() {
+		var poolWithCACert *x509.CertPool
 
-		It("should fail when given an invalid server URL", func() {
-			execCredential := &datamodel.ExecCredential{}
-			execCredential.Spec.Cluster.Server = ":invalidurl.com"
-			serverURL, err := getServerURL(execCredential)
-			Expect(err).ToNot(BeNil())
-			Expect(err.Error()).To(ContainSubstring("failed to parse server URL"))
-			Expect(serverURL).To(BeEmpty())
+		BeforeEach(func() {
+			poolWithCACert = x509.NewCertPool()
+			ok := poolWithCACert.AppendCertsFromPEM(mockPEMCAs)
+			Expect(ok).To(BeTrue())
 		})
-	})
-
-	Context("Test getTLSConfig", func() {
-		var pemCAs = []byte(exampleCACert)
 
 		When("nextProto is not supplied", func() {
 			It("should not include NextProtos in returned config", func() {
-				config, err := getTLSConfig(pemCAs, "", false)
+				config, err := getTLSConfig(mockPEMCAs, "", false)
 				Expect(err).To(BeNil())
 				Expect(config).ToNot(BeNil())
 				Expect(config.NextProtos).To(BeNil())
 				Expect(config.InsecureSkipVerify).To(BeFalse())
-
-				pool := x509.NewCertPool()
-				Expect(pool.AppendCertsFromPEM([]byte(exampleCACert))).To(BeTrue())
-				Expect(config.RootCAs.Equal(pool)).To(BeTrue())
+				Expect(config.RootCAs.Equal(poolWithCACert)).To(BeTrue())
 			})
 		})
 
 		When("nextProto is supplied", func() {
 			It("should include NextProtos in returned config", func() {
-				config, err := getTLSConfig(pemCAs, "nextProto", false)
+				config, err := getTLSConfig(mockPEMCAs, "bootstrap", false)
 				Expect(err).To(BeNil())
 				Expect(config).NotTo(BeNil())
 				Expect(config.NextProtos).NotTo(BeNil())
-				Expect(config.NextProtos).To(Equal([]string{"nextProto", "h2"}))
+				Expect(config.NextProtos).To(Equal([]string{"bootstrap", "h2"}))
 				Expect(config.InsecureSkipVerify).To(BeFalse())
-
-				pool := x509.NewCertPool()
-				Expect(pool.AppendCertsFromPEM([]byte(exampleCACert))).To(BeTrue())
-				Expect(config.RootCAs.Equal(pool)).To(BeTrue())
+				Expect(config.RootCAs.Equal(poolWithCACert)).To(BeTrue())
 			})
 		})
 
 		When("insecureSkipVerify is false", func() {
 			It("should return config with false value of InsecureSkipVerify", func() {
-				config, err := getTLSConfig(pemCAs, "nextProto", false)
+				config, err := getTLSConfig(mockPEMCAs, "nextProto", false)
 				Expect(err).To(BeNil())
 				Expect(config).NotTo(BeNil())
 				Expect(config.InsecureSkipVerify).To(BeFalse())
-
-				pool := x509.NewCertPool()
-				Expect(pool.AppendCertsFromPEM([]byte(exampleCACert))).To(BeTrue())
-				Expect(config.RootCAs.Equal(pool)).To(BeTrue())
+				Expect(config.RootCAs.Equal(poolWithCACert)).To(BeTrue())
 			})
 		})
 
 		When("insecureSkipVerify is true", func() {
 			It("should return config with true value of InsecureSkipVerify", func() {
-				config, err := getTLSConfig(pemCAs, "nextProto", true)
+				config, err := getTLSConfig(mockPEMCAs, "nextProto", true)
 				Expect(err).To(BeNil())
 				Expect(config).NotTo(BeNil())
 				Expect(config.InsecureSkipVerify).To(BeTrue())
-
-				pool := x509.NewCertPool()
-				Expect(pool.AppendCertsFromPEM([]byte(exampleCACert))).To(BeTrue())
-				Expect(config.RootCAs.Equal(pool)).To(BeTrue())
+				Expect(config.RootCAs.Equal(poolWithCACert)).To(BeTrue())
 			})
 		})
 	})
 
-	Context("Test setupClientConnection", func() {
-		When("loadExecCredential is mocked to fail", func() {
-			It("should fail on DecodeString", func() {
-				setExecCredential("YW55IGNhcm5hbCBwbGVhc3U======", "")
+	Context("setupClientConnection tests", func() {
+		BeforeEach(func() {
+			mockCtrl = gomock.NewController(GinkgoT())
+			aadClient = mocks.NewMockAadClient(mockCtrl)
+
+			tlsBootstrapClient = &tlsBootstrapClientImpl{
+				logger:      testLogger,
+				aadClient:   aadClient,
+				azureConfig: &defaultMockAzureConfig,
+			}
+		})
+
+		AfterEach(func() {
+			mockCtrl.Finish()
+		})
+
+		When("KUBERNETES_EXEC_INFO cluster CA data is invalid", func() {
+			It("should return an error", func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
+				badCAData := "YW55IGNhcm5hbCBwbGVhc3U======"
+				credential := &datamodel.ExecCredential{}
+				credential.Spec.Cluster.CertificateAuthorityData = badCAData
 
-				conn, err := tlsBootstrapClient.setupClientConnection(ctx)
+				conn, err := tlsBootstrapClient.setupClientConnection(ctx, credential)
 				Expect(conn).To(BeNil())
 				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("failed to decode"))
+				Expect(err.Error()).To(ContainSubstring("failed to decode base64 cluster certificates"))
 			})
 		})
 
-		When("loadExecCredential is mocked to succeed", func() {
-			It("should fail on getTLSConfig", func() {
-				setExecCredential("SGVsbG8gV29ybGQh", "")
+		When("azure config is empty", func() {
+			It("should return an error", func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
+				credential := &datamodel.ExecCredential{}
+				credential.Spec.Cluster.CertificateAuthorityData = "SGVsbG8gV29ybGQh"
+				credential.Spec.Cluster.Server = defaultMockServerURL
+				tlsBootstrapClient.azureConfig = &datamodel.AzureConfig{}
 
-				customDummyAzureConfig := datamodel.AzureConfig{}
-				dummyJsonAzureConfig, err := json.Marshal(customDummyAzureConfig)
-				Expect(err).To(BeNil())
-				mockreader.EXPECT().ReadFile(gomock.Any()).Times(1).Return([]byte(dummyJsonAzureConfig), nil)
-
-				conn, err := tlsBootstrapClient.setupClientConnection(ctx)
+				conn, err := tlsBootstrapClient.setupClientConnection(ctx, credential)
 				Expect(conn).To(BeNil())
 				Expect(err).ToNot(BeNil())
 				Expect(err.Error()).To(ContainSubstring("failed to get TLS config"))
 			})
 		})
 
-		When("getTlsConfig is mocked to succeed", func() {
-			It("should fail on loadAzureJson", func() {
-				setExecCredential("", "")
+		When("an auth token can be generated and client connection can be created", func() {
+			It("should create the connection without error", func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
+				credential := getDefaultMockExecCredential()
+				aadClient.EXPECT().GetAadToken(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return("spToken", nil).
+					Times(1)
 
-				mockreader.EXPECT().ReadFile(gomock.Any()).Times(1).Return(nil, errors.New("error"))
-
-				conn, err := tlsBootstrapClient.setupClientConnection(ctx)
-				Expect(conn).To(BeNil())
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("failed to parse azure"))
-			})
-		})
-
-		When("getAuthToken is mocked to succeed", func() {
-			It("setupClientConnection should succeed", func() {
-				setExecCredential("", "")
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
-
-				dummyJsonAzureConfig, err := json.Marshal(dummyAzureConfig)
+				conn, err := tlsBootstrapClient.setupClientConnection(ctx, credential)
 				Expect(err).To(BeNil())
-				mockreader.EXPECT().ReadFile(gomock.Any()).Times(1).Return([]byte(dummyJsonAzureConfig), nil)
-				aadClient.EXPECT().GetAadToken(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("spToken", nil).Times(1)
-
-				conn, err := tlsBootstrapClient.setupClientConnection(ctx)
 				Expect(conn).ToNot(BeNil())
-				Expect(err).To(BeNil())
 			})
 		})
 
-		When("getAuthToken is mocked to fail", func() {
-			It("should fail on getAuthToken", func() {
-				setExecCredential("", "")
+		When("an auth token cannot be retrieved", func() {
+			It("return an error", func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
+				credential := getDefaultMockExecCredential()
+				aadClient.EXPECT().GetAadToken(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return("", errors.New("cannot retrieve AAD token")).
+					Times(1)
 
-				dummyJsonAzureConfig, err := json.Marshal(dummyAzureConfig)
-				Expect(err).To(BeNil())
-				mockreader.EXPECT().ReadFile(gomock.Any()).Times(1).Return([]byte(dummyJsonAzureConfig), nil)
-				aadClient.EXPECT().GetAadToken(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("", errors.New("error")).Times(1)
-
-				conn, err := tlsBootstrapClient.setupClientConnection(ctx)
+				conn, err := tlsBootstrapClient.setupClientConnection(ctx, credential)
 				Expect(conn).To(BeNil())
 				Expect(err).ToNot(BeNil())
 				Expect(err.Error()).To(ContainSubstring("unable to get SPN"))
+				Expect(err.Error()).To(ContainSubstring("cannot retrieve AAD token"))
 			})
 		})
 
-		When("getServerURL is mocked to fail", func() {
-			It("should fail on getServerURL", func() {
-				setExecCredential("", ":invalidurl.com")
+		When("the server URL is invalid", func() {
+			It("should return an error", func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
+				credential := getMockExecCredential(defaultMockEncodedCAData, ":invalidurl.com")
+				aadClient.EXPECT().GetAadToken(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return("spToken", nil).
+					Times(1)
 
-				dummyJsonAzureConfig, err := json.Marshal(dummyAzureConfig)
-				Expect(err).To(BeNil())
-				mockreader.EXPECT().ReadFile(gomock.Any()).Times(1).Return([]byte(dummyJsonAzureConfig), nil)
-				aadClient.EXPECT().GetAadToken(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("spToken", nil).Times(1)
-
-				conn, err := tlsBootstrapClient.setupClientConnection(ctx)
+				conn, err := tlsBootstrapClient.setupClientConnection(ctx, credential)
 				Expect(conn).To(BeNil())
 				Expect(err).ToNot(BeNil())
 				Expect(err.Error()).To(ContainSubstring("failed to parse server URL"))
 			})
 		})
-
 	})
 
-	Context("Test getExecCredentialWithToken", func() {
-		It("Shiuld return a new exec credential", func() {
-			cred, err := getExecCredentialWithToken("dummyToken", "dummyTimestamp")
-			Expect(err).To(BeNil())
-			Expect(cred.Status.Token).To(Equal("dummyToken"))
-			Expect(cred.Status.ExpirationTimestamp).To(Equal("dummyTimestamp"))
+	Context("getExecCredentialWithToken tests", func() {
+		When("token and timestamp strings are non-empty", func() {
+			It("should return an exec credential without error", func() {
+				cred, err := getExecCredentialWithToken("token", "timestamp")
+				Expect(err).To(BeNil())
+				Expect(cred).ToNot(BeNil())
+				Expect(cred.Status.Token).To(Equal("token"))
+				Expect(cred.Status.ExpirationTimestamp).To(Equal("timestamp"))
+			})
+		})
+
+		When("token string is empty", func() {
+			It("should return an error", func() {
+				cred, err := getExecCredentialWithToken("", "timestamp")
+				Expect(cred).To(BeNil())
+				Expect(err).ToNot(BeNil())
+				Expect(err.Error()).To(ContainSubstring("token string is empty, cannot generate exec credential"))
+			})
 		})
 
 		When("There is no timestamp given", func() {
-			cred, err := getExecCredentialWithToken("dummyToken", "")
-			Expect(err).ToNot(BeNil())
-			Expect(err.Error()).To(ContainSubstring("token expiration timestamp is empty"))
-			Expect(cred).To(BeNil())
+			It("should return an error", func() {
+				cred, err := getExecCredentialWithToken("token", "")
+				Expect(cred).To(BeNil())
+				Expect(err).ToNot(BeNil())
+				Expect(err.Error()).To(ContainSubstring("token expiration timestamp is empty"))
+			})
 		})
 	})
 })

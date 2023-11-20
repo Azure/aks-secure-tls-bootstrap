@@ -28,10 +28,10 @@ type TLSBootstrapClient interface {
 }
 
 func NewTLSBootstrapClient(logger *zap.Logger, opts SecureTLSBootstrapClientOpts) TLSBootstrapClient {
-	imdsClient := NewImdsClient(logger)
-	aadClient := NewAadClient(logger)
-	pbClient := pb.NewAKSBootstrapTokenRequestClient()
 	reader := newOSFileReader()
+	imdsClient := NewImdsClient(logger)
+	aadClient := NewAadClient(reader, logger)
+	pbClient := pb.NewAKSBootstrapTokenRequestClient()
 
 	return &tlsBootstrapClientImpl{
 		reader:         reader,
@@ -47,6 +47,7 @@ func NewTLSBootstrapClient(logger *zap.Logger, opts SecureTLSBootstrapClientOpts
 
 type tlsBootstrapClientImpl struct {
 	logger         *zap.Logger
+	azureConfig    *datamodel.AzureConfig
 	imdsClient     ImdsClient
 	aadClient      AadClient
 	reader         fileReader
@@ -56,13 +57,8 @@ type tlsBootstrapClientImpl struct {
 	resource       string
 }
 
-func (c *tlsBootstrapClientImpl) setupClientConnection(ctx context.Context) (*grpc.ClientConn, error) {
-	c.logger.Debug("loading exec credential...")
-	execCredential, err := loadExecCredential()
-	if err != nil {
-		return nil, err
-	}
-	c.logger.Info("exec credential successfully loaded")
+func (c *tlsBootstrapClientImpl) setupClientConnection(ctx context.Context, execCredential *datamodel.ExecCredential) (*grpc.ClientConn, error) {
+	c.logger.Info("setting up GRPC connection with bootstrap server...")
 
 	c.logger.Debug("decoding cluster CA data...")
 	pemCAs, err := base64.StdEncoding.DecodeString(execCredential.Spec.Cluster.CertificateAuthorityData)
@@ -78,23 +74,16 @@ func (c *tlsBootstrapClientImpl) setupClientConnection(ctx context.Context) (*gr
 	}
 	c.logger.Info("generated TLS config for GRPC client connection")
 
-	c.logger.Debug("loading azure.json...")
-	azureConfig, err := loadAzureJSON(c.reader)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse azure config from azure.json: %w", err)
-	}
-	c.logger.Info("loaded azure.json")
-
 	c.logger.Debug("generating JWT token for auth...")
 
-	token, err := c.getAuthToken(ctx, c.customClientID, c.resource, azureConfig)
+	token, err := c.getAuthToken(ctx, c.customClientID, c.resource, c.azureConfig)
 	if err != nil {
 		return nil, err
 	}
 	c.logger.Info("generated JWT token for auth")
 
 	c.logger.Debug("extracting server URL from exec credential...")
-	server, err := getServerURL(execCredential)
+	serverURL, err := getServerURL(execCredential)
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +91,7 @@ func (c *tlsBootstrapClientImpl) setupClientConnection(ctx context.Context) (*gr
 
 	c.logger.Debug("dialing TLS bootstrap server and creating GRPC connection...")
 	conn, err := grpc.DialContext(
-		ctx, server,
+		ctx, serverURL,
 		grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)),
 		grpc.WithPerRPCCredentials(oauth.TokenSource{
 			TokenSource: oauth2.StaticTokenSource(&oauth2.Token{
@@ -119,7 +108,20 @@ func (c *tlsBootstrapClientImpl) setupClientConnection(ctx context.Context) (*gr
 }
 
 func (c *tlsBootstrapClientImpl) GetBootstrapToken(ctx context.Context) (string, error) {
-	conn, err := c.setupClientConnection(ctx)
+	c.logger.Debug("loading exec credential...")
+	execCredential, err := loadExecCredential()
+	if err != nil {
+		return "", err
+	}
+	c.logger.Info("loaded kubernetes exec credential")
+
+	c.logger.Debug("loading azure config...")
+	if err = c.loadAzureConfig(); err != nil {
+		return "", fmt.Errorf("failed to parse azure config: %w", err)
+	}
+	c.logger.Info("loaded azure config")
+
+	conn, err := c.setupClientConnection(ctx, execCredential)
 	if err != nil {
 		return "", fmt.Errorf("unable to setup GRPC client connection to TLS bootstrap server: %w", err)
 	}
@@ -138,7 +140,7 @@ func (c *tlsBootstrapClientImpl) GetBootstrapToken(ctx context.Context) (string,
 	nonceRequest := &pb.NonceRequest{ResourceId: instanceData.Compute.ResourceID}
 	nonceResponse, err := c.pbClient.GetNonce(ctx, nonceRequest)
 	if err != nil {
-		return "", fmt.Errorf("failed to retrieve a nonce: %w", err)
+		return "", fmt.Errorf("failed to retrieve a nonce from bootstrap server: %w", err)
 	}
 	c.logger.Info("received new nonce from TLS bootstrap server")
 	nonce := nonceResponse.GetNonce()
@@ -160,7 +162,7 @@ func (c *tlsBootstrapClientImpl) GetBootstrapToken(ctx context.Context) (string,
 	tokenResponse, err := c.pbClient.GetToken(ctx, tokenRequest)
 
 	if err != nil {
-		return "", fmt.Errorf("failed to retrieve a token: %w", err)
+		return "", fmt.Errorf("failed to retrieve a new TLS bootstrap token from the bootstrap server: %w", err)
 	}
 	c.logger.Info("received new bootstrap token from TLS bootstrap server")
 
@@ -203,7 +205,7 @@ func loadExecCredential() (*datamodel.ExecCredential, error) {
 	}
 	var execCredential datamodel.ExecCredential
 	if err := json.Unmarshal([]byte(execInfo), &execCredential); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to parse KUBERNETES_EXEC_INFO data: %w", err)
 	}
 	return &execCredential, nil
 }
