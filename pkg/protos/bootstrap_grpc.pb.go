@@ -9,6 +9,8 @@
 
 package protos
 
+//go:generate ../../bin/mockgen -copyright_file=../../hack/copyright_header.txt -destination=./mocks/mock_bootstrap_grpc.go -package=mocks github.com/Azure/aks-tls-bootstrap-client/pkg/protos AKSBootstrapTokenRequestClient
+
 import (
 	context "context"
 	grpc "google.golang.org/grpc"
