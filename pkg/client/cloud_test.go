@@ -27,7 +27,9 @@ var _ = Describe("TLS Bootstrap cloud tests", func() {
 	})
 
 	Context("getAADAuthorityURL tests", func() {
-		var azureConfig = &datamodel.AzureConfig{}
+		var azureConfig = &datamodel.AzureConfig{
+			TenantID: "tenantId",
+		}
 
 		When("cloud is AzurePublicCloud", func() {
 			It("should return the correct AAD endpoint", func() {
@@ -36,7 +38,7 @@ var _ = Describe("TLS Bootstrap cloud tests", func() {
 
 				url, err := getAADAuthorityURL(fileReader, azureConfig)
 				Expect(err).To(BeNil())
-				Expect(url).To(Equal("https://login.microsoftonline.com/"))
+				Expect(url).To(Equal("https://login.microsoftonline.com/tenantId"))
 			})
 		})
 
@@ -47,7 +49,7 @@ var _ = Describe("TLS Bootstrap cloud tests", func() {
 
 				url, err := getAADAuthorityURL(fileReader, azureConfig)
 				Expect(err).To(BeNil())
-				Expect(url).To(Equal("https://login.microsoftonline.us/"))
+				Expect(url).To(Equal("https://login.microsoftonline.us/tenantId"))
 			})
 		})
 
@@ -58,7 +60,7 @@ var _ = Describe("TLS Bootstrap cloud tests", func() {
 
 				url, err := getAADAuthorityURL(fileReader, azureConfig)
 				Expect(err).To(BeNil())
-				Expect(url).To(Equal("https://login.chinacloudapi.cn/"))
+				Expect(url).To(Equal("https://login.chinacloudapi.cn/tenantId"))
 			})
 		})
 
@@ -74,7 +76,7 @@ var _ = Describe("TLS Bootstrap cloud tests", func() {
 
 				url, err := getAADAuthorityURL(fileReader, azureConfig)
 				Expect(err).To(BeNil())
-				Expect(url).To(Equal("https://customCloudAADEndpoint.com/"))
+				Expect(url).To(Equal("https://customCloudAADEndpoint.com/tenantId"))
 			})
 		})
 

@@ -14,7 +14,7 @@ import (
 var testLogger *zap.Logger
 
 func TestTLSBootstrapClient(t *testing.T) {
-	testLogger, _ = zap.NewProduction()
+	testLogger, _ = zap.NewDevelopment()
 	defer FlushBufferOnExit(testLogger)
 
 	RegisterFailHandler(Fail)

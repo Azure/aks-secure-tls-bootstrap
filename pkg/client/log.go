@@ -4,20 +4,18 @@
 package client
 
 import (
+	"errors"
+	"syscall"
+
 	"go.uber.org/zap"
 )
 
-func GetLogger(format string, debug bool) (*zap.Logger, error) {
-	var logLevel zap.AtomicLevel
-	if debug {
-		logLevel = zap.NewAtomicLevelAt(zap.DebugLevel)
-	} else {
-		logLevel = zap.NewAtomicLevelAt(zap.InfoLevel)
-	}
+func GetLogger(verbose bool) (*zap.Logger, error) {
+	cfg := zap.NewProductionConfig()
+	cfg.OutputPaths = []string{"stdout"}
 
-	cfg := zap.Config{
-		Encoding: format,
-		Level:    logLevel,
+	if verbose {
+		cfg.Level = zap.NewAtomicLevelAt(zap.DebugLevel)
 	}
 
 	logger, err := cfg.Build()
@@ -25,13 +23,12 @@ func GetLogger(format string, debug bool) (*zap.Logger, error) {
 		return nil, err
 	}
 
-	logger.Info("Logger initialized")
-
+	logger.Info("zap logger initialized")
 	return logger, nil
 }
 
 func FlushBufferOnExit(logger *zap.Logger) {
-	if err := logger.Sync(); err != nil {
-		logger.Error("Error during logger synchronization", zap.Error(err))
+	if err := logger.Sync(); err != nil && !errors.Is(err, syscall.ENOTTY) {
+		logger.Error("error during zap logger synchronization", zap.Error(err))
 	}
 }

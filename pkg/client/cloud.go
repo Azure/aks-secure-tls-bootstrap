@@ -31,7 +31,7 @@ func getAADAuthorityURL(reader fileReader, azureConfig *datamodel.AzureConfig) (
 		if err != nil {
 			return "", fmt.Errorf("unable to determine cloud environment config from cloud name %s: %w", cloudName, err)
 		}
-		return env.ActiveDirectoryEndpoint, nil
+		return env.ActiveDirectoryEndpoint + azureConfig.TenantID, nil
 	}
 
 	// azure.EnvironmnetFromName does something similar for stack, but that relies on AZURE_ENVIRONMENT_FILENAME being set
@@ -49,7 +49,7 @@ func getAADAuthorityURL(reader fileReader, azureConfig *datamodel.AzureConfig) (
 		return "", fmt.Errorf("unable to load custom cloud environment config: %w", err)
 	}
 
-	return customEnv.ActiveDirectoryEndpoint, nil
+	return customEnv.ActiveDirectoryEndpoint + azureConfig.TenantID, nil
 }
 
 func (c *tlsBootstrapClientImpl) loadAzureConfig() error {

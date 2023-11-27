@@ -9,7 +9,6 @@ type SecureTLSBootstrapClientOpts struct {
 	CustomClientID string
 	NextProto      string
 	AADResource    string
-	LogFormat      string
 	Verbose        bool
 }
 

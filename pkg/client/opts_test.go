@@ -17,7 +17,6 @@ var _ = Describe("SecureTLSBootstrapClientOpts tests", func() {
 				CustomClientID: "clientId",
 				NextProto:      "alpn",
 				AADResource:    "appID",
-				LogFormat:      "json",
 			}
 		})
 

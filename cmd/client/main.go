@@ -16,7 +16,6 @@ import (
 
 const (
 	flagCustomClientID = "custom-client-id"
-	flagLogFormat      = "log-format"
 	flagNextProto      = "next-proto"
 	flagAADResource    = "aad-resource"
 	flagVerbose        = "verbose"
@@ -45,7 +44,7 @@ func createBootstrapCommand() *cobra.Command {
 				return err
 			}
 
-			logger, err := client.GetLogger(opts.LogFormat, opts.Verbose)
+			logger, err := client.GetLogger(opts.Verbose)
 			if err != nil {
 				return err
 			}
@@ -70,7 +69,6 @@ func createBootstrapCommand() *cobra.Command {
 	cmd.Flags().StringVar(&opts.CustomClientID, flagCustomClientID, "", "The custome user-specified client ID for the assigned identity to use.")
 	cmd.Flags().StringVar(&opts.AADResource, flagAADResource, "", "The resource (audience) used to request JWT tokens from AAD for authentication")
 	cmd.Flags().StringVar(&opts.NextProto, flagNextProto, "", "The ALPN Next Protocol value to send within requests to the bootstrap server.")
-	cmd.Flags().StringVar(&opts.LogFormat, flagLogFormat, "json", "Log format: json or text.")
 	cmd.Flags().BoolVar(&opts.Verbose, flagVerbose, false, "Enable verbose logging.")
 	return cmd
 }
