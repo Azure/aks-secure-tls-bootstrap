@@ -5,6 +5,7 @@ package client
 import (
 	"context"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -363,7 +364,9 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 					Return(&pb.NonceResponse{}, nil).
 					Times(1)
 				pbClient.EXPECT().GetCredential(gomock.Any(), gomock.Any()).
-					Return(&pb.CredentialResponse{CertificateData: "certData", KeyData: "keyData"}, nil).
+					Return(&pb.CredentialResponse{
+						CertificateData: base64.StdEncoding.EncodeToString([]byte("certData")),
+						KeyData:         base64.StdEncoding.EncodeToString([]byte("keyData"))}, nil).
 					Times(1)
 
 				execCredentialWithToken, err := tlsBootstrapClient.GetCredential(ctx)

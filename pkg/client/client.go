@@ -166,8 +166,19 @@ func (c *tlsBootstrapClientImpl) GetCredential(ctx context.Context) (string, err
 	}
 	c.logger.Info("received new credential from TLS bootstrap server")
 
+	c.logger.Debug("decoding cert and key from credential response")
+	certData, err := base64.StdEncoding.DecodeString(credentialResponse.GetCertificateData())
+	if err != nil {
+		return "", fmt.Errorf("unable to decode cert data within credential response: %w", err)
+	}
+	keyData, err := base64.StdEncoding.DecodeString(credentialResponse.GetKeyData())
+	if err != nil {
+		return "", fmt.Errorf("unable to decode key data within credential response: %w", err)
+	}
+	c.logger.Info("decoded cert and key from credential response")
+
 	c.logger.Debug("generating new exec credential with cert/key data...")
-	newExecCredential, err := getExecCredentialWithData(credentialResponse.GetCertificateData(), credentialResponse.GetKeyData())
+	newExecCredential, err := getExecCredentialWithData(string(certData), string(keyData))
 	if err != nil {
 		return "", fmt.Errorf("unable to generate new exec credential with cert/key data: %w", err)
 	}
