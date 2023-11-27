@@ -42,11 +42,12 @@ func (c *aadClientImpl) GetAadToken(ctx context.Context, azureConfig *datamodel.
 		return "", fmt.Errorf("failed to create secret credential from azure.json: %w", err)
 	}
 
-	authority, err := getAADAuthorityURL(c.reader, azureConfig)
+	authorityURL, err := getAADAuthorityURL(c.reader, azureConfig)
 	if err != nil {
 		return "", fmt.Errorf("unable to get AAD authority URL: %w", err)
 	}
 
+	authority := fmt.Sprintf("%s/%s", authorityURL, azureConfig.TenantID)
 	client, err := confidential.New(authority, azureConfig.ClientID, credential)
 	if err != nil {
 		return "", fmt.Errorf("failed to create client from azure.json sp/secret: %w", err)
