@@ -4,6 +4,9 @@
 package client
 
 import (
+	"errors"
+	"syscall"
+
 	"go.uber.org/zap"
 )
 
@@ -31,7 +34,7 @@ func GetLogger(format string, debug bool) (*zap.Logger, error) {
 }
 
 func FlushBufferOnExit(logger *zap.Logger) {
-	if err := logger.Sync(); err != nil {
+	if err := logger.Sync(); err != nil && !errors.Is(err, syscall.ENOTTY) {
 		logger.Error("Error during logger synchronization", zap.Error(err))
 	}
 }
