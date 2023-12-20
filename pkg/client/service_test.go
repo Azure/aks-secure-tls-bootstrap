@@ -6,6 +6,7 @@ import (
 	"github.com/Azure/aks-tls-bootstrap-client/pkg/datamodel"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"google.golang.org/grpc/test/bufconn"
 )
 
 const (
@@ -84,7 +85,10 @@ var _ = Describe("Secure TLS Bootstrap Client service factory tests", func() {
 			It("should create the connection without error", func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
+				lis := bufconn.Listen(1024)
+				defer lis.Close()
 				credential := getDefaultMockExecCredential()
+				credential.Spec.Cluster.Server = lis.Addr().String()
 
 				serviceClient, conn, err := secureTLSBootstrapServiceClientFactory(ctx, testLogger, serviceClientFactoryOpts{
 					execCredential: credential,

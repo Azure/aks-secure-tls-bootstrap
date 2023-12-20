@@ -53,7 +53,10 @@ func secureTLSBootstrapServiceClientFactory(
 	}
 	logger.Info("extracted server URL from exec credential")
 
-	logger.Debug("dialing TLS bootstrap server and creating GRPC connection...")
+	logger.Debug("dialing TLS bootstrap server and creating GRPC connection...",
+		zap.String("serverURL", serverURL),
+		zap.Strings("tlsConfig.NextProtos", tlsConfig.NextProtos),
+		zap.Bool("tlsConfig.InsecureSkipVerify", tlsConfig.InsecureSkipVerify))
 	conn, err := grpc.DialContext(
 		ctx, serverURL,
 		grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)),
