@@ -62,7 +62,13 @@ test-coverage:
 ##@ Build
 
 .PHONY: generate
-generate: mockgen ## Run go generate against code.
+generate: mockgen ## Generate gomocks.
+	$(PROJECT_DIR)/bin/mockgen \
+		-copyright_file=$(PROJECT_DIR)/hack/copyright_header.txt \
+		-source=$(PROJECT_DIR)/pkg/protos/bootstrap_grpc.pb.go \
+		-destination=$(PROJECT_DIR)/pkg/protos/mocks/mock_client.go \
+		-package=mocks github.com/Azure/aks-tls-bootstrap-client/protos \
+		SecureTLSBootstrapServiceClient
 	go generate ./...
 
 .PHONY: protobuf

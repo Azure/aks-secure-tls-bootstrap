@@ -9,8 +9,6 @@
 
 package protos
 
-//go:generate ../../bin/mockgen -copyright_file=../../hack/copyright_header.txt -destination=./mocks/mock_bootstrap_grpc.go -package=mocks github.com/Azure/aks-tls-bootstrap-client/pkg/protos AKSBootstrapTokenRequestClient
-
 import (
 	context "context"
 	grpc "google.golang.org/grpc"
@@ -24,140 +22,176 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	AKSBootstrapTokenRequest_GetNonce_FullMethodName = "/azure.aks.tlsbootstrap.AKSBootstrapTokenRequest/GetNonce"
-	AKSBootstrapTokenRequest_GetToken_FullMethodName = "/azure.aks.tlsbootstrap.AKSBootstrapTokenRequest/GetToken"
+	SecureTLSBootstrapService_GetNonce_FullMethodName      = "/azure.aks.tlsbootstrap.SecureTLSBootstrapService/GetNonce"
+	SecureTLSBootstrapService_GetCredential_FullMethodName = "/azure.aks.tlsbootstrap.SecureTLSBootstrapService/GetCredential"
+	SecureTLSBootstrapService_GetToken_FullMethodName      = "/azure.aks.tlsbootstrap.SecureTLSBootstrapService/GetToken"
 )
 
-// AKSBootstrapTokenRequestClient is the client API for AKSBootstrapTokenRequest service.
+// SecureTLSBootstrapServiceClient is the client API for SecureTLSBootstrapService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-type AKSBootstrapTokenRequestClient interface {
-	// Step 1 of retrieving a bootstrap token; generates a nonce to be used by the
-	// client when requesting attested data.
+type SecureTLSBootstrapServiceClient interface {
+	// Step 1 of retrieving a kubelet client credential; generates a nonce to be used by the
+	// client when requesting attested data from IMDS.
 	GetNonce(ctx context.Context, in *NonceRequest, opts ...grpc.CallOption) (*NonceResponse, error)
-	// Step 2 of retrieving a bootstrap token; validates the attested data and the
+	// Step 2 of retrieving a kubelet client credential; validates the attested data and the
+	// nonce, then generates and returns the bootstrap token to the client.
+	GetCredential(ctx context.Context, in *CredentialRequest, opts ...grpc.CallOption) (*CredentialResponse, error)
+	// DEPRECATED: Step 2 of retrieving a bootstrap token; validates the attested data and the
 	// nonce, then generates and returns the bootstrap token to the client.
 	GetToken(ctx context.Context, in *TokenRequest, opts ...grpc.CallOption) (*TokenResponse, error)
-	SetGRPCConnection(conn *grpc.ClientConn)
 }
 
-type aKSBootstrapTokenRequestClient struct {
+type secureTLSBootstrapServiceClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewAKSBootstrapTokenRequestClient() AKSBootstrapTokenRequestClient {
-	return &aKSBootstrapTokenRequestClient{}
+func NewSecureTLSBootstrapServiceClient(cc grpc.ClientConnInterface) SecureTLSBootstrapServiceClient {
+	return &secureTLSBootstrapServiceClient{cc}
 }
 
-func (c *aKSBootstrapTokenRequestClient) SetGRPCConnection(conn *grpc.ClientConn) {
-	c.cc = conn
-}
-
-func (c *aKSBootstrapTokenRequestClient) GetNonce(ctx context.Context, in *NonceRequest, opts ...grpc.CallOption) (*NonceResponse, error) {
+func (c *secureTLSBootstrapServiceClient) GetNonce(ctx context.Context, in *NonceRequest, opts ...grpc.CallOption) (*NonceResponse, error) {
 	out := new(NonceResponse)
-	err := c.cc.Invoke(ctx, AKSBootstrapTokenRequest_GetNonce_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, SecureTLSBootstrapService_GetNonce_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *aKSBootstrapTokenRequestClient) GetToken(ctx context.Context, in *TokenRequest, opts ...grpc.CallOption) (*TokenResponse, error) {
+func (c *secureTLSBootstrapServiceClient) GetCredential(ctx context.Context, in *CredentialRequest, opts ...grpc.CallOption) (*CredentialResponse, error) {
+	out := new(CredentialResponse)
+	err := c.cc.Invoke(ctx, SecureTLSBootstrapService_GetCredential_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *secureTLSBootstrapServiceClient) GetToken(ctx context.Context, in *TokenRequest, opts ...grpc.CallOption) (*TokenResponse, error) {
 	out := new(TokenResponse)
-	err := c.cc.Invoke(ctx, AKSBootstrapTokenRequest_GetToken_FullMethodName, in, out, opts...)
+	err := c.cc.Invoke(ctx, SecureTLSBootstrapService_GetToken_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// AKSBootstrapTokenRequestServer is the server API for AKSBootstrapTokenRequest service.
-// All implementations must embed UnimplementedAKSBootstrapTokenRequestServer
+// SecureTLSBootstrapServiceServer is the server API for SecureTLSBootstrapService service.
+// All implementations must embed UnimplementedSecureTLSBootstrapServiceServer
 // for forward compatibility
-type AKSBootstrapTokenRequestServer interface {
-	// Step 1 of retrieving a bootstrap token; generates a nonce to be used by the
-	// client when requesting attested data.
+type SecureTLSBootstrapServiceServer interface {
+	// Step 1 of retrieving a kubelet client credential; generates a nonce to be used by the
+	// client when requesting attested data from IMDS.
 	GetNonce(context.Context, *NonceRequest) (*NonceResponse, error)
-	// Step 2 of retrieving a bootstrap token; validates the attested data and the
+	// Step 2 of retrieving a kubelet client credential; validates the attested data and the
+	// nonce, then generates and returns the bootstrap token to the client.
+	GetCredential(context.Context, *CredentialRequest) (*CredentialResponse, error)
+	// DEPRECATED: Step 2 of retrieving a bootstrap token; validates the attested data and the
 	// nonce, then generates and returns the bootstrap token to the client.
 	GetToken(context.Context, *TokenRequest) (*TokenResponse, error)
-	mustEmbedUnimplementedAKSBootstrapTokenRequestServer()
+	mustEmbedUnimplementedSecureTLSBootstrapServiceServer()
 }
 
-// UnimplementedAKSBootstrapTokenRequestServer must be embedded to have forward compatible implementations.
-type UnimplementedAKSBootstrapTokenRequestServer struct {
+// UnimplementedSecureTLSBootstrapServiceServer must be embedded to have forward compatible implementations.
+type UnimplementedSecureTLSBootstrapServiceServer struct {
 }
 
-func (UnimplementedAKSBootstrapTokenRequestServer) GetNonce(context.Context, *NonceRequest) (*NonceResponse, error) {
+func (UnimplementedSecureTLSBootstrapServiceServer) GetNonce(context.Context, *NonceRequest) (*NonceResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetNonce not implemented")
 }
-func (UnimplementedAKSBootstrapTokenRequestServer) GetToken(context.Context, *TokenRequest) (*TokenResponse, error) {
+func (UnimplementedSecureTLSBootstrapServiceServer) GetCredential(context.Context, *CredentialRequest) (*CredentialResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetCredential not implemented")
+}
+func (UnimplementedSecureTLSBootstrapServiceServer) GetToken(context.Context, *TokenRequest) (*TokenResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetToken not implemented")
 }
-func (UnimplementedAKSBootstrapTokenRequestServer) mustEmbedUnimplementedAKSBootstrapTokenRequestServer() {
+func (UnimplementedSecureTLSBootstrapServiceServer) mustEmbedUnimplementedSecureTLSBootstrapServiceServer() {
 }
 
-// UnsafeAKSBootstrapTokenRequestServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to AKSBootstrapTokenRequestServer will
+// UnsafeSecureTLSBootstrapServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to SecureTLSBootstrapServiceServer will
 // result in compilation errors.
-type UnsafeAKSBootstrapTokenRequestServer interface {
-	mustEmbedUnimplementedAKSBootstrapTokenRequestServer()
+type UnsafeSecureTLSBootstrapServiceServer interface {
+	mustEmbedUnimplementedSecureTLSBootstrapServiceServer()
 }
 
-func RegisterAKSBootstrapTokenRequestServer(s grpc.ServiceRegistrar, srv AKSBootstrapTokenRequestServer) {
-	s.RegisterService(&AKSBootstrapTokenRequest_ServiceDesc, srv)
+func RegisterSecureTLSBootstrapServiceServer(s grpc.ServiceRegistrar, srv SecureTLSBootstrapServiceServer) {
+	s.RegisterService(&SecureTLSBootstrapService_ServiceDesc, srv)
 }
 
-func _AKSBootstrapTokenRequest_GetNonce_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _SecureTLSBootstrapService_GetNonce_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(NonceRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(AKSBootstrapTokenRequestServer).GetNonce(ctx, in)
+		return srv.(SecureTLSBootstrapServiceServer).GetNonce(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: AKSBootstrapTokenRequest_GetNonce_FullMethodName,
+		FullMethod: SecureTLSBootstrapService_GetNonce_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AKSBootstrapTokenRequestServer).GetNonce(ctx, req.(*NonceRequest))
+		return srv.(SecureTLSBootstrapServiceServer).GetNonce(ctx, req.(*NonceRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _AKSBootstrapTokenRequest_GetToken_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _SecureTLSBootstrapService_GetCredential_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CredentialRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SecureTLSBootstrapServiceServer).GetCredential(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SecureTLSBootstrapService_GetCredential_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SecureTLSBootstrapServiceServer).GetCredential(ctx, req.(*CredentialRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SecureTLSBootstrapService_GetToken_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(TokenRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(AKSBootstrapTokenRequestServer).GetToken(ctx, in)
+		return srv.(SecureTLSBootstrapServiceServer).GetToken(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: AKSBootstrapTokenRequest_GetToken_FullMethodName,
+		FullMethod: SecureTLSBootstrapService_GetToken_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AKSBootstrapTokenRequestServer).GetToken(ctx, req.(*TokenRequest))
+		return srv.(SecureTLSBootstrapServiceServer).GetToken(ctx, req.(*TokenRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-// AKSBootstrapTokenRequest_ServiceDesc is the grpc.ServiceDesc for AKSBootstrapTokenRequest service.
+// SecureTLSBootstrapService_ServiceDesc is the grpc.ServiceDesc for SecureTLSBootstrapService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
-var AKSBootstrapTokenRequest_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "azure.aks.tlsbootstrap.AKSBootstrapTokenRequest",
-	HandlerType: (*AKSBootstrapTokenRequestServer)(nil),
+var SecureTLSBootstrapService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "azure.aks.tlsbootstrap.SecureTLSBootstrapService",
+	HandlerType: (*SecureTLSBootstrapServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "GetNonce",
-			Handler:    _AKSBootstrapTokenRequest_GetNonce_Handler,
+			Handler:    _SecureTLSBootstrapService_GetNonce_Handler,
+		},
+		{
+			MethodName: "GetCredential",
+			Handler:    _SecureTLSBootstrapService_GetCredential_Handler,
 		},
 		{
 			MethodName: "GetToken",
-			Handler:    _AKSBootstrapTokenRequest_GetToken_Handler,
+			Handler:    _SecureTLSBootstrapService_GetToken_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

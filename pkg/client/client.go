@@ -7,19 +7,14 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/url"
 	"os"
 
 	"github.com/Azure/aks-tls-bootstrap-client/pkg/datamodel"
-	pb "github.com/Azure/aks-tls-bootstrap-client/pkg/protos"
+	secureTLSBootstrapService "github.com/Azure/aks-tls-bootstrap-client/pkg/protos"
 	"go.uber.org/zap"
-	"golang.org/x/oauth2"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/credentials/oauth"
 )
 
 // TLSBootstrapClient retrieves tokens for performing node TLS bootstrapping.
@@ -27,84 +22,36 @@ type TLSBootstrapClient interface {
 	GetBootstrapToken(ctx context.Context) (string, error)
 }
 
-func NewTLSBootstrapClient(logger *zap.Logger, opts SecureTLSBootstrapClientOpts) TLSBootstrapClient {
-	reader := newOSFileReader()
-	imdsClient := NewImdsClient(logger)
-	aadClient := NewAadClient(reader, logger)
-	pbClient := pb.NewAKSBootstrapTokenRequestClient()
-
-	return &tlsBootstrapClientImpl{
-		reader:         reader,
-		logger:         logger,
-		imdsClient:     imdsClient,
-		pbClient:       pbClient,
-		aadClient:      aadClient,
-		customClientID: opts.CustomClientID,
-		nextProto:      opts.NextProto,
-		resource:       opts.AADResource,
-	}
-}
-
 type tlsBootstrapClientImpl struct {
-	logger         *zap.Logger
-	azureConfig    *datamodel.AzureConfig
-	imdsClient     ImdsClient
-	aadClient      AadClient
-	reader         fileReader
-	pbClient       pb.AKSBootstrapTokenRequestClient
+	reader fileReader
+	logger *zap.Logger
+
+	serviceClientFactory serviceClientFactory
+
+	imdsClient  ImdsClient
+	aadClient   AadClient
+	azureConfig *datamodel.AzureConfig
+
 	customClientID string
 	nextProto      string
 	resource       string
 }
 
-func (c *tlsBootstrapClientImpl) setupClientConnection(ctx context.Context, execCredential *datamodel.ExecCredential) (*grpc.ClientConn, error) {
-	c.logger.Info("setting up GRPC connection with bootstrap server...")
+func NewTLSBootstrapClient(logger *zap.Logger, opts SecureTLSBootstrapClientOpts) TLSBootstrapClient {
+	reader := newOSFileReader()
+	imdsClient := NewImdsClient(logger)
+	aadClient := NewAadClient(reader, logger)
 
-	c.logger.Debug("decoding cluster CA data...")
-	pemCAs, err := base64.StdEncoding.DecodeString(execCredential.Spec.Cluster.CertificateAuthorityData)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode base64 cluster certificates: %w", err)
+	return &tlsBootstrapClientImpl{
+		reader:               reader,
+		logger:               logger,
+		serviceClientFactory: secureTLSBootstrapServiceClientFactory,
+		imdsClient:           imdsClient,
+		aadClient:            aadClient,
+		customClientID:       opts.CustomClientID,
+		nextProto:            opts.NextProto,
+		resource:             opts.AADResource,
 	}
-	c.logger.Info("decoded cluster CA data")
-
-	c.logger.Debug("generating TLS config for GRPC client connection...")
-	tlsConfig, err := getTLSConfig(pemCAs, c.nextProto, execCredential.Spec.Cluster.InsecureSkipTLSVerify)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get TLS config: %w", err)
-	}
-	c.logger.Info("generated TLS config for GRPC client connection")
-
-	c.logger.Debug("generating JWT token for auth...")
-
-	token, err := c.getAuthToken(ctx, c.customClientID, c.resource, c.azureConfig)
-	if err != nil {
-		return nil, err
-	}
-	c.logger.Info("generated JWT token for auth")
-
-	c.logger.Debug("extracting server URL from exec credential...")
-	serverURL, err := getServerURL(execCredential)
-	if err != nil {
-		return nil, err
-	}
-	c.logger.Info("extracted server URL from exec credential")
-
-	c.logger.Debug("dialing TLS bootstrap server and creating GRPC connection...")
-	conn, err := grpc.DialContext(
-		ctx, serverURL,
-		grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)),
-		grpc.WithPerRPCCredentials(oauth.TokenSource{
-			TokenSource: oauth2.StaticTokenSource(&oauth2.Token{
-				AccessToken: token,
-			}),
-		}),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to dial client connection with context: %w", err)
-	}
-	c.logger.Info("dialed TLS bootstrap server and created GRPC connection")
-
-	return conn, nil
 }
 
 func (c *tlsBootstrapClientImpl) GetBootstrapToken(ctx context.Context) (string, error) {
@@ -121,12 +68,24 @@ func (c *tlsBootstrapClientImpl) GetBootstrapToken(ctx context.Context) (string,
 	}
 	c.logger.Info("loaded azure config")
 
-	conn, err := c.setupClientConnection(ctx, execCredential)
+	c.logger.Debug("generating JWT token for auth...")
+	authToken, err := c.getAuthToken(ctx, c.customClientID, c.resource, c.azureConfig)
 	if err != nil {
-		return "", fmt.Errorf("unable to setup GRPC client connection to TLS bootstrap server: %w", err)
+		return "", err
+	}
+	c.logger.Info("generated JWT token for auth")
+
+	c.logger.Debug("creating GRPC connection and bootstrap service client...")
+	serviceClient, conn, err := c.serviceClientFactory(ctx, c.logger, serviceClientFactoryOpts{
+		execCredential: execCredential,
+		nextProto:      c.nextProto,
+		authToken:      authToken,
+	})
+	if err != nil {
+		return "", err
 	}
 	defer conn.Close()
-	c.pbClient.SetGRPCConnection(conn)
+	c.logger.Info("created GRPC connection and bootstrap service client")
 
 	c.logger.Debug("retrieving IMDS instance data...")
 	instanceData, err := c.imdsClient.GetInstanceData(ctx, baseImdsURL)
@@ -136,9 +95,8 @@ func (c *tlsBootstrapClientImpl) GetBootstrapToken(ctx context.Context) (string,
 	c.logger.Info("retrieved IMDS instance data", zap.String("vmResourceId", instanceData.Compute.ResourceID))
 
 	c.logger.Debug("retrieving nonce from TLS bootstrap token server...")
-
-	nonceRequest := &pb.NonceRequest{ResourceId: instanceData.Compute.ResourceID}
-	nonceResponse, err := c.pbClient.GetNonce(ctx, nonceRequest)
+	nonceRequest := &secureTLSBootstrapService.NonceRequest{ResourceID: instanceData.Compute.ResourceID}
+	nonceResponse, err := serviceClient.GetNonce(ctx, nonceRequest)
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve a nonce from bootstrap server: %w", err)
 	}
@@ -154,12 +112,12 @@ func (c *tlsBootstrapClientImpl) GetBootstrapToken(ctx context.Context) (string,
 
 	c.logger.Debug("retrieving bootstrap token from TLS bootstrap server...")
 
-	tokenRequest := &pb.TokenRequest{
+	tokenRequest := &secureTLSBootstrapService.TokenRequest{
 		ResourceId:   instanceData.Compute.ResourceID,
 		Nonce:        nonce,
 		AttestedData: attestedData.Signature,
 	}
-	tokenResponse, err := c.pbClient.GetToken(ctx, tokenRequest)
+	tokenResponse, err := serviceClient.GetToken(ctx, tokenRequest)
 
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve a new TLS bootstrap token from the bootstrap server: %w", err)
