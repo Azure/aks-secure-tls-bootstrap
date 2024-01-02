@@ -4,6 +4,9 @@
 package client
 
 import (
+	"errors"
+	"syscall"
+
 	"go.uber.org/zap"
 )
 
@@ -31,7 +34,17 @@ func GetLogger(format string, debug bool) (*zap.Logger, error) {
 }
 
 func FlushBufferOnExit(logger *zap.Logger) {
-	if err := logger.Sync(); err != nil {
-		logger.Error("Error during logger synchronization", zap.Error(err))
+	syncErr := logger.Sync()
+	if syncErr == nil {
+		return
+	}
+
+	switch {
+	case errors.Is(syncErr, syscall.ENOTTY):
+		// This is a known issue with Zap when redirecting stdout/stderr to a console
+		// https://github.com/uber-go/zap/issues/880#issuecomment-1181854418
+		return
+	default:
+		logger.Error("Error during logger sync", zap.Error(syncErr))
 	}
 }
