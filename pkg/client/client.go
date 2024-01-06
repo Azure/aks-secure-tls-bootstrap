@@ -26,7 +26,6 @@ import (
 // TLSBootstrapClient retrieves tokens for performing node TLS bootstrapping.
 type TLSBootstrapClient interface {
 	GetBootstrapToken(ctx context.Context) (string, error)
-	isKubeConfigStillValid() (bool, error)
 }
 
 type tlsBootstrapClientImpl struct {
@@ -59,12 +58,12 @@ func NewTLSBootstrapClient(logger *zap.Logger, opts SecureTLSBootstrapClientOpts
 		customClientID:       opts.CustomClientID,
 		nextProto:            opts.NextProto,
 		resource:             opts.AADResource,
-		kubeConfigPath:       opts.KubeConfigPath,
+		kubeConfigPath:       opts.KubeconfigPath,
 	}
 }
 
 func (c *tlsBootstrapClientImpl) GetBootstrapToken(ctx context.Context) (string, error) {
-	isValid, err := c.isKubeConfigStillValid()
+	isValid, err := isKubeConfigStillValid(c.kubeConfigPath, c.logger)
 	if err != nil {
 		return "", err
 	}
@@ -158,28 +157,29 @@ func (c *tlsBootstrapClientImpl) GetBootstrapToken(ctx context.Context) (string,
 	return string(execCredentialBytes), nil
 }
 
-func (c *tlsBootstrapClientImpl) isKubeConfigStillValid() (bool, error) {
-	c.logger.Debug("checking if kubeconfig exists...")
+func isKubeConfigStillValid(kubeConfigPath string, logger *zap.Logger) (bool, error) {
+	logger.Debug("checking if kubeconfig exists...")
 
-	_, err := os.Stat(c.kubeConfigPath)
+	_, err := os.Stat(kubeConfigPath)
 	if os.IsNotExist(err) {
-		c.logger.Debug("kubeconfig does not exist. bootstrapping will continue")
+		logger.Debug("kubeconfig does not exist. bootstrapping will continue")
 		return false, nil
 	}
 	if err != nil {
-		return false, fmt.Errorf("error reading existing bootstrap kubeconfig %s: %v", c.kubeConfigPath, err)
+		logger.Debug("error reading existing bootstrap kubeconfig. bootstrapping will not continue", zap.Error(err))
+		return false, nil // not returning an error so bootstrap can continue
 	}
 
-	isValid, err := isClientConfigStillValid(c.kubeConfigPath)
+	isValid, err := isClientConfigStillValid(kubeConfigPath)
 	if err != nil {
 		return false, fmt.Errorf("unable to load kubeconfig: %v", err)
 	}
 	if isValid {
-		c.logger.Debug("kubeconfig is valid. bootstrapping will not continue")
+		logger.Debug("kubeconfig is valid. bootstrapping will not continue")
 		return true, nil
 	}
 
-	c.logger.Debug("kubeconfig is invalid. bootstrapping will continue")
+	logger.Debug("kubeconfig is invalid. bootstrapping will continue")
 	return false, nil
 }
 

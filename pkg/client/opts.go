@@ -10,7 +10,7 @@ type SecureTLSBootstrapClientOpts struct {
 	NextProto      string
 	AADResource    string
 	LogFormat      string
-	KubeConfigPath string
+	KubeconfigPath string
 	Verbose        bool
 }
 
