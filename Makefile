@@ -63,11 +63,11 @@ test-coverage:
 
 .PHONY: generate
 generate: mockgen ## Generate gomocks.
-	$(PROJECT_DIR)/bin/mockgen \
-		-copyright_file=$(PROJECT_DIR)/hack/copyright_header.txt \
-		-source=$(PROJECT_DIR)/pkg/protos/bootstrap_grpc.pb.go \
-		-destination=$(PROJECT_DIR)/pkg/protos/mocks/mock_client.go \
-		-package=mocks github.com/Azure/aks-tls-bootstrap-client/protos \
+	bin/mockgen \
+		-copyright_file=hack/copyright_header.txt \
+		-source=service/protos/bootstrap_grpc.pb.go \
+		-destination=service/protos/mocks/mock_client.go \
+		-package=mocks github.com/Azure/aks-tls-bootstrap-client/service/protos \
 		SecureTLSBootstrapServiceClient
 	go generate ./...
 
