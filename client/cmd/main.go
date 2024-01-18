@@ -10,7 +10,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/Azure/aks-tls-bootstrap-client/pkg/client"
+	"github.com/Azure/aks-tls-bootstrap-client/client"
 	"github.com/spf13/cobra"
 )
 
