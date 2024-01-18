@@ -70,6 +70,7 @@ func (c *tlsBootstrapClientImpl) GetBootstrapToken(ctx context.Context) (string,
 	if isValid {
 		return "", nil
 	}
+	// if it is not valid, continue bootstrapping put the contents of the private key and signed certificate in the kubeconfig
 
 	c.logger.Debug("loading exec credential...")
 	execCredential, err := loadExecCredential()
