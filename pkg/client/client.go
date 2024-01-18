@@ -13,7 +13,7 @@ import (
 	"os"
 
 	"github.com/Azure/aks-tls-bootstrap-client/pkg/datamodel"
-	secureTLSBootstrapService "github.com/Azure/aks-tls-bootstrap-client/pkg/protos"
+	secureTLSBootstrapService "github.com/Azure/aks-tls-bootstrap-client/service/protos"
 	"go.uber.org/zap"
 )
 

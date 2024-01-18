@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/Azure/aks-tls-bootstrap-client/pkg/datamodel"
-	secureTLSBootstrapService "github.com/Azure/aks-tls-bootstrap-client/pkg/protos"
+	secureTLSBootstrapService "github.com/Azure/aks-tls-bootstrap-client/service/protos"
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 	"google.golang.org/grpc"
