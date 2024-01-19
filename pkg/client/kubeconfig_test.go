@@ -8,6 +8,7 @@ import (
 	"encoding/pem"
 	"math/big"
 	"os"
+	"strings"
 	"time"
 
 	mocks "github.com/Azure/aks-tls-bootstrap-client/pkg/client/mocks"
@@ -90,6 +91,15 @@ var _ = Describe("TLS Bootstrap kubeconfig tests", func() {
 				Expect(isValid).To(Equal(false))
 				Expect(err).ToNot(BeNil())
 				Expect(err.Error()).To(ContainSubstring("unable to load kubeconfig"))
+			})
+		})
+
+		When("kubeconfigpath is malformed", func() {
+			It("should return false and not error", func() {
+				longPath := strings.Repeat("a", 1<<16) // a string with 65536 characters
+				isValid, err := isKubeConfigStillValid(longPath, tlsBootstrapClient.logger)
+				Expect(isValid).To(Equal(false))
+				Expect(err).To(BeNil())
 			})
 		})
 
