@@ -7,7 +7,6 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"go.uber.org/mock/gomock"
-	"k8s.io/client-go/rest"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -81,9 +80,9 @@ var _ = Describe("TLS Bootstrap kubeconfig tests", func() {
 				return
 			}
 
-			bootstrapClientConfig := &rest.Config{
+			bootstrapClientConfig := &restclient.Config{
 				Host: "https://your-k8s-cluster.com",
-				TLSClientConfig: rest.TLSClientConfig{
+				TLSClientConfig: restclient.TLSClientConfig{
 					CertData: []byte(dummyCertPem),
 					KeyData:  []byte(dummyKeyPem),
 				},
