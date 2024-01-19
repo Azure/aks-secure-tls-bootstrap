@@ -11,7 +11,7 @@ import (
 	context "context"
 	reflect "reflect"
 
-	protos "github.com/Azure/aks-tls-bootstrap-client/service/protos"
+	protos "github.com/Azure/aks-secure-tls-bootstrap/service/protos"
 	gomock "go.uber.org/mock/gomock"
 	grpc "google.golang.org/grpc"
 )

@@ -22,9 +22,9 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	SecureTLSBootstrapService_GetNonce_FullMethodName      = "/azure.aks.tlsbootstrap.SecureTLSBootstrapService/GetNonce"
-	SecureTLSBootstrapService_GetCredential_FullMethodName = "/azure.aks.tlsbootstrap.SecureTLSBootstrapService/GetCredential"
-	SecureTLSBootstrapService_GetToken_FullMethodName      = "/azure.aks.tlsbootstrap.SecureTLSBootstrapService/GetToken"
+	SecureTLSBootstrapService_GetNonce_FullMethodName      = "/azure.aks.securetlsbootstrap.SecureTLSBootstrapService/GetNonce"
+	SecureTLSBootstrapService_GetCredential_FullMethodName = "/azure.aks.securetlsbootstrap.SecureTLSBootstrapService/GetCredential"
+	SecureTLSBootstrapService_GetToken_FullMethodName      = "/azure.aks.securetlsbootstrap.SecureTLSBootstrapService/GetToken"
 )
 
 // SecureTLSBootstrapServiceClient is the client API for SecureTLSBootstrapService service.
@@ -178,7 +178,7 @@ func _SecureTLSBootstrapService_GetToken_Handler(srv interface{}, ctx context.Co
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var SecureTLSBootstrapService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "azure.aks.tlsbootstrap.SecureTLSBootstrapService",
+	ServiceName: "azure.aks.securetlsbootstrap.SecureTLSBootstrapService",
 	HandlerType: (*SecureTLSBootstrapServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
