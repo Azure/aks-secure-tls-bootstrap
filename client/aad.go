@@ -3,14 +3,14 @@
 
 package client
 
-//go:generate ../../bin/mockgen -copyright_file=../../hack/copyright_header.txt -destination=./mocks/mock_aad.go -package=mocks github.com/Azure/aks-tls-bootstrap-client/pkg/client AadClient
+//go:generate ../../bin/mockgen -copyright_file=../../hack/copyright_header.txt -destination=./mocks/mock_aad.go -package=mocks github.com/Azure/aks-secure-tls-bootstrap/client AadClient
 
 import (
 	"context"
 	"fmt"
 	"strings"
 
-	"github.com/Azure/aks-tls-bootstrap-client/client/pkg/datamodel"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/datamodel"
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/confidential"
 	"github.com/avast/retry-go/v4"
 	"go.uber.org/zap"

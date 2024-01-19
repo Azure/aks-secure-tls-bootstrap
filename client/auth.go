@@ -7,7 +7,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Azure/aks-tls-bootstrap-client/client/pkg/datamodel"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/datamodel"
 )
 
 // getAuthToken retrieves the auth token (JWT) from AAD used to validate the node's identity with the bootstrap server.

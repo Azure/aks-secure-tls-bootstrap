@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 
-	"github.com/Azure/aks-tls-bootstrap-client/client/pkg/datamodel"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/datamodel"
 	secureTLSBootstrapService "github.com/Azure/aks-tls-bootstrap-client/service/protos"
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"

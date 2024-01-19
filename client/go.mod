@@ -1,4 +1,4 @@
-module github.com/Azure/aks-tls-bootstrap-client/client
+module github.com/Azure/aks-secure-tls-bootstrap/client
 
 go 1.21.3
 
