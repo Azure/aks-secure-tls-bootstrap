@@ -22,22 +22,19 @@ import (
 
 var _ = Describe("TLS Bootstrap kubeconfig tests", func() {
 	var (
-		mockCtrl            *gomock.Controller
-		imdsClient          *mocks.MockImdsClient
-		aadClient           *mocks.MockAadClient
-		tlsBootstrapClient  *tlsBootstrapClientImpl
-		mockReader          *mocks.MockfileReader
-		validKubeConfigPath string
+		mockCtrl               *gomock.Controller
+		imdsClient             *mocks.MockImdsClient
+		aadClient              *mocks.MockAadClient
+		tlsBootstrapClient     *tlsBootstrapClientImpl
+		mockReader             *mocks.MockfileReader
+		tempKubeConfigName     string
+		tempKubeConfigLocation string
 	)
 
 	Context("isKubeConfigStillValid Tests", func() {
 		BeforeEach(func() {
-			validKubeConfigPath = "dummykubeconfig"
-			_, err := os.Create(validKubeConfigPath)
-
-			if err != nil {
-				return
-			}
+			tempKubeConfigName = "dummykubeconfig"
+			tempKubeConfigLocation = "."
 
 			mockCtrl = gomock.NewController(GinkgoT())
 			imdsClient = mocks.NewMockImdsClient(mockCtrl)
@@ -53,16 +50,15 @@ var _ = Describe("TLS Bootstrap kubeconfig tests", func() {
 		})
 
 		AfterEach(func() {
-			err := os.Remove(validKubeConfigPath)
-			if err != nil {
-				return
-			}
-
 			mockCtrl.Finish()
 		})
 
 		When("kubeconfig is valid", func() {
 			It("should return true and nil error", func() {
+				tempFile, err := os.CreateTemp(tempKubeConfigLocation, tempKubeConfigName)
+				Expect(err).To(BeNil())
+				defer os.Remove(tempFile.Name())
+
 				certPem, keyPem, err := generateMockCertPEMWithExpiration("test", "test", time.Now().AddDate(200, 0, 0))
 				Expect(err).To(BeNil())
 
@@ -73,10 +69,10 @@ var _ = Describe("TLS Bootstrap kubeconfig tests", func() {
 						KeyData:  keyPem,
 					},
 				}
-				err = writeKubeconfigFromBootstrapping(bootstrapClientConfig, validKubeConfigPath, false)
+				err = writeKubeconfigFromBootstrapping(bootstrapClientConfig, tempFile.Name(), false)
 				Expect(err).To(BeNil())
 
-				isValid, err := isKubeConfigStillValid(validKubeConfigPath, tlsBootstrapClient.logger)
+				isValid, err := isKubeConfigStillValid(tempFile.Name(), tlsBootstrapClient.logger)
 				Expect(isValid).To(Equal(true))
 				Expect(err).To(BeNil())
 			})
@@ -84,17 +80,18 @@ var _ = Describe("TLS Bootstrap kubeconfig tests", func() {
 
 		When("kubeconfg is empty", func() {
 			It("should return false and have error", func() {
-				_, err := os.Create(validKubeConfigPath) // overwrite the kubeconfig file with an empty file
+				tempFile, err := os.CreateTemp(tempKubeConfigLocation, tempKubeConfigName)
 				Expect(err).To(BeNil())
+				defer os.Remove(tempFile.Name())
 
-				isValid, err := isKubeConfigStillValid(validKubeConfigPath, tlsBootstrapClient.logger)
+				isValid, err := isKubeConfigStillValid(tempFile.Name(), tlsBootstrapClient.logger)
 				Expect(isValid).To(Equal(false))
 				Expect(err).ToNot(BeNil())
 				Expect(err.Error()).To(ContainSubstring("unable to load kubeconfig"))
 			})
 		})
 
-		When("kubeconfigpath is malformed", func() {
+		When("kubeconfig path is malformed", func() {
 			It("should return false and not error", func() {
 				longPath := strings.Repeat("a", 1<<16) // a string with 65536 characters
 				isValid, err := isKubeConfigStillValid(longPath, tlsBootstrapClient.logger)
@@ -105,6 +102,10 @@ var _ = Describe("TLS Bootstrap kubeconfig tests", func() {
 
 		When("keyPem does not belong to certPem", func() {
 			It("should return false and have error", func() {
+				tempFile, err := os.CreateTemp(tempKubeConfigLocation, tempKubeConfigName)
+				Expect(err).To(BeNil())
+				defer os.Remove(tempFile.Name())
+
 				certPem, _, err := generateMockCertPEMWithExpiration("test", "test", time.Now().AddDate(200, 0, 0))
 				Expect(err).To(BeNil())
 				_, differentKeyPem, err := generateMockCertPEMWithExpiration("test", "test", time.Now().AddDate(200, 0, 0))
@@ -117,11 +118,10 @@ var _ = Describe("TLS Bootstrap kubeconfig tests", func() {
 						KeyData:  differentKeyPem,
 					},
 				}
-
-				err = writeKubeconfigFromBootstrapping(bootstrapClientConfig, validKubeConfigPath, false)
+				err = writeKubeconfigFromBootstrapping(bootstrapClientConfig, tempFile.Name(), false)
 				Expect(err).To(BeNil())
 
-				isValid, err := isKubeConfigStillValid(validKubeConfigPath, tlsBootstrapClient.logger)
+				isValid, err := isKubeConfigStillValid(tempFile.Name(), tlsBootstrapClient.logger)
 				Expect(isValid).To(Equal(false))
 				Expect(err).ToNot(BeNil())
 				Expect(err.Error()).To(ContainSubstring("private key does not match public key"))
@@ -130,6 +130,10 @@ var _ = Describe("TLS Bootstrap kubeconfig tests", func() {
 
 		When("certPem is expired", func() {
 			It("should return false and not have an error", func() {
+				tempFile, err := os.CreateTemp(tempKubeConfigLocation, tempKubeConfigName)
+				Expect(err).To(BeNil())
+				defer os.Remove(tempFile.Name())
+
 				certPem, keyPem, err := generateMockCertPEMWithExpiration("test", "test", time.Now().AddDate(0, 0, -1))
 				Expect(err).To(BeNil())
 
@@ -140,17 +144,21 @@ var _ = Describe("TLS Bootstrap kubeconfig tests", func() {
 						KeyData:  keyPem,
 					},
 				}
-				err = writeKubeconfigFromBootstrapping(bootstrapClientConfig, validKubeConfigPath, false)
+				err = writeKubeconfigFromBootstrapping(bootstrapClientConfig, tempFile.Name(), false)
 				Expect(err).To(BeNil())
 
-				isValid, err := isKubeConfigStillValid(validKubeConfigPath, tlsBootstrapClient.logger)
+				isValid, err := isKubeConfigStillValid(tempFile.Name(), tlsBootstrapClient.logger)
 				Expect(isValid).To(Equal(false))
 				Expect(err).To(BeNil())
 			})
 		})
 
-		When("Some information in bootstrapClientConfig is incorrect", func() {
+		When("When kubeconfig contains incorrect Clusters information", func() {
 			It("should return false and have an error", func() {
+				tempFile, err := os.CreateTemp(tempKubeConfigLocation, tempKubeConfigName)
+				Expect(err).To(BeNil())
+				defer os.Remove(tempFile.Name())
+
 				certPem, keyPem, err := generateMockCertPEMWithExpiration("test", "test", time.Now().AddDate(200, 0, 0))
 				Expect(err).To(BeNil())
 
@@ -167,17 +175,17 @@ var _ = Describe("TLS Bootstrap kubeconfig tests", func() {
 						"key": "value",
 					}}
 
-				err = writeKubeconfigFromBootstrapping(bootstrapClientConfig, validKubeConfigPath, true)
+				err = writeKubeconfigFromBootstrapping(bootstrapClientConfig, tempFile.Name(), true)
 				Expect(err).To(BeNil())
 
-				isValid, err := isKubeConfigStillValid(validKubeConfigPath, tlsBootstrapClient.logger)
+				isValid, err := isKubeConfigStillValid(tempFile.Name(), tlsBootstrapClient.logger)
 				Expect(isValid).To(Equal(false))
 				Expect(err).ToNot(BeNil())
 				Expect(err.Error()).To(ContainSubstring("exec plugin: invalid apiVersion"))
 			})
 		})
 
-		When("File does not exist", func() {
+		When("kubeconfig does not exist", func() {
 			It("should return false and not have an error", func() {
 				isValid, err := isKubeConfigStillValid("dummy", tlsBootstrapClient.logger)
 				Expect(isValid).To(Equal(false))

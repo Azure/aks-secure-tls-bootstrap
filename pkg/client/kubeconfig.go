@@ -24,7 +24,7 @@ func isKubeConfigStillValid(kubeConfigPath string, logger *zap.Logger) (bool, er
 		return false, nil
 	}
 	if err != nil {
-		logger.Debug("error reading existing bootstrap kubeconfig. bootstrapping will continue", zap.Error(err))
+		logger.Error("error reading existing bootstrap kubeconfig. bootstrapping will continue", zap.Error(err))
 		return false, nil // not returning an error so bootstrap can continue
 	}
 
