@@ -59,6 +59,34 @@ d5IBAoGBALYKNPHZasv6D8z1HfubW3k/G3EzVXYrrNQ8mOnJjbGhuFh29/CGyodp
 LNSzVepEqDGARwkhMjpYMyXqUYlF+FpLo6WGmFxbhdTwD7uIAVf0vIfAhPzlaxeG
 9OT27Rx4qVWDEuy+wCdkYMfbnBbfreLCuPsHTkkl/kncbhpxGXIo
 -----END RSA PRIVATE KEY-----`
+
+	dummyBrokenKeyPem = `-----BEGIN RSA PRIVATE KEY-----
+MIIEowIBAAKCAQEAu288zFu1MPRLsOYiHMS8OkbnWnwCWKtd1ZGG91N76bY5qg1D
+h40YQFlxLyzhSTJFRqnvzG7ObpMBMPFZ86T88fgg/sWixLzP1+VKn4EgVitXFS90
+uXAaUpkvxKRIZAR83irD59KtT5gO36S4H1+HEt0XMkB5xK5VgowpN77HKlEwXRfC
+ODN/t4H/72OLsYldpWtH0n/JQQsLkTRt2cZRvchNXLUpsqrgl2jYh1PH5qVeK0fA
+JpfF+wtX2Rr51Fh9lbJC4sxp4y3eKEKpIIFaa/Xpuy2k6c9teY8o9hv5kwSAF/TZ
+sL91IjhcFBa8l79T9rkHMo6kMBrfbJVdtYo71QIDAQABAoIBAHUq7E6zZWjczhQf
+SGPDeAbWG/msW6siNN40wrIJNgS7LQDombY6tVZEk0RyQcKH8lZiFM0u10y4CJ6X
+wStVj+mSus2Irl9dyG+lnihnh9dV8HIF4GmrckkACaRbLgWX6JbZFO3t/PksjN+x
+EIhMJxvbqYx4UaZpdHrPM1TtpYMFe92hrfHlK+ND4O+3MOsTaGjfVjDUEA4apZak
+7YATTQcuHgPfbT5SDjlfOlhCi4ZDrgAKsuJzPUXoYjECKCCDF+clwbPPnq5A7jHL
+gIvlfRzwl5iGIOkiYgvWZo8Aa2wxfLlCfjBFXhGeio5p9LPu3Qz/23HWyiEUZfT2
+pojBdWECgYEA3PYXQGmNtf//qNtggSXN873HJCBomJcTniGNXLVutXGXUB6/pm1y
++Ny22GNaxtOJA0zsgwOuxCo1ZtBnv0MPr5KOdDJ5h/Sg8HKST/y8aj4PlBs+UMCx
+ofF+5onSvJlsgKZzQIaC3kHe+3tLOYRbxhA/c6Q+Ma8r0yLD2ZVOtr8CgYEA2Sgh
+Laa8ZbvPTIH9Vp3myI9CkHkwB5vAnXf8OXPr8x17F5/bHGeQ6M7B38zPI4NLOBoj
+7mtoYkotOU+ouUatyEyj4IaGDpYexbNUJs2l/OlgodpWcxvyyJfbjgZDLJlujNk9
+qj6Pe8m5iE7hlpXKhy1uLQPtZE6nHjnxVoncpmsCgYBS0ZpddjK7aLx2meNOBNFw
+7kzZ6ZvKtbWQq5rEiOx57Z19VkkXJCbXyEJwUK0RoO/V4Ns1MAgtVnS1mJ+KPKSA
+djoWq2SJ5NL9zLOyb1RfretA5AUzV0Y9ILsjxbzLG+ZjQgAoy0H59E6Ti97iLA4J
+6sUdnw4AqVuPw5QM1b2vGQKBgQCBaysq294X+3A2NppXTs/F46tWEwOO5UJMFsAZ
+NX7/ayh7Eegx638vYFmnGZaxoYPosZuMcjLJsU92goUZtofHgfWA0GuAsfMw/AlA
+/vrX2fafP1KaU6PD7M0Kvay3HdIG20mm9pXovnZ2SByl9Cu5mFe7OEX4q+9pUjsE
+yjDYdQKBgD2Vt9Xrb3u+V1GZhYo7pU/S7IWIPaXgIMKn/RGzgDhnx6P7tDZlLpTB
+kHsV7yS9ezgEFZ2ojpFX+GO2+3/lur/8YYEzNJhxxf1lcIbYAyo3zcR12StjRzIF
+GnvpuOWMW0vIOAFhX7dZwILeFBid6jPDL+F2cEOV1Lvya2T4w5t2
+-----END RSA PRIVATE KEY-----`
 )
 
 var _ = Describe("TLS Bootstrap kubeconfig tests", func() {
@@ -136,6 +164,27 @@ var _ = Describe("TLS Bootstrap kubeconfig tests", func() {
 			})
 		})
 
+		When("keyPem does not belong to certPem", func() {
+			It("should return false and have error", func() {
+				bootstrapClientConfig := &restclient.Config{
+					Host: "https://your-k8s-cluster.com",
+					TLSClientConfig: restclient.TLSClientConfig{
+						CertData: []byte(dummyCertPem),
+						KeyData:  []byte(dummyBrokenKeyPem),
+					},
+					BearerToken: "your-token",
+				}
+				err := writeKubeconfigFromBootstrapping(bootstrapClientConfig, validKubeConfigPath)
+				if err != nil {
+					return
+				}
+
+				isValid, err := isKubeConfigStillValid(validKubeConfigPath, tlsBootstrapClient.logger)
+				Expect(isValid).To(Equal(false))
+				Expect(err).ToNot(BeNil())
+				Expect(err.Error()).To(ContainSubstring("private key does not match public key"))
+			})
+		})
 	})
 })
 
