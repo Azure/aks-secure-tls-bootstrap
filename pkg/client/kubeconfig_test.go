@@ -72,7 +72,7 @@ var _ = Describe("TLS Bootstrap kubeconfig tests", func() {
 						KeyData:  keyPem,
 					},
 				}
-				err = writeKubeconfigFromBootstrapping(bootstrapClientConfig, validKubeConfigPath)
+				err = writeKubeconfigFromBootstrapping(bootstrapClientConfig, validKubeConfigPath, false)
 				Expect(err).To(BeNil())
 
 				isValid, err := isKubeConfigStillValid(validKubeConfigPath, tlsBootstrapClient.logger)
@@ -108,7 +108,7 @@ var _ = Describe("TLS Bootstrap kubeconfig tests", func() {
 					},
 				}
 
-				err = writeKubeconfigFromBootstrapping(bootstrapClientConfig, validKubeConfigPath)
+				err = writeKubeconfigFromBootstrapping(bootstrapClientConfig, validKubeConfigPath, false)
 				Expect(err).To(BeNil())
 
 				isValid, err := isKubeConfigStillValid(validKubeConfigPath, tlsBootstrapClient.logger)
@@ -130,7 +130,7 @@ var _ = Describe("TLS Bootstrap kubeconfig tests", func() {
 						KeyData:  keyPem,
 					},
 				}
-				err = writeKubeconfigFromBootstrapping(bootstrapClientConfig, validKubeConfigPath)
+				err = writeKubeconfigFromBootstrapping(bootstrapClientConfig, validKubeConfigPath, false)
 				Expect(err).To(BeNil())
 
 				isValid, err := isKubeConfigStillValid(validKubeConfigPath, tlsBootstrapClient.logger)
@@ -138,12 +138,40 @@ var _ = Describe("TLS Bootstrap kubeconfig tests", func() {
 				Expect(err).To(BeNil())
 			})
 		})
+
+		When("Some information in bootstrapClientConfig is incorrect", func() {
+			It("should return false and have an error", func() {
+				certPem, keyPem, err := generateMockCertPEMWithExpiration("test", "test", time.Now().AddDate(200, 0, 0))
+				Expect(err).To(BeNil())
+
+				bootstrapClientConfig := &restclient.Config{
+					Host: "https://your-k8s-cluster.com",
+					TLSClientConfig: restclient.TLSClientConfig{
+						CertData: certPem,
+						KeyData:  keyPem,
+					},
+				}
+				bootstrapClientConfig.ExecProvider = &clientcmdapi.ExecConfig{Command: "dummy"}
+				bootstrapClientConfig.AuthProvider = &clientcmdapi.AuthProviderConfig{Name: "dummy",
+					Config: map[string]string{
+						"key": "value",
+					}}
+
+				err = writeKubeconfigFromBootstrapping(bootstrapClientConfig, validKubeConfigPath, true)
+				Expect(err).To(BeNil())
+
+				isValid, err := isKubeConfigStillValid(validKubeConfigPath, tlsBootstrapClient.logger)
+				Expect(isValid).To(Equal(false))
+				Expect(err).ToNot(BeNil())
+				Expect(err.Error()).To(ContainSubstring("invalid configuration:"))
+			})
+		})
 	})
 })
 
 // taken and modified from
 // https://github.com/kubernetes/kubernetes/blob/master/pkg/kubelet/certificate/bootstrap/bootstrap.go#L178-L210
-func writeKubeconfigFromBootstrapping(bootstrapClientConfig *restclient.Config, kubeconfigPath string) error {
+func writeKubeconfigFromBootstrapping(bootstrapClientConfig *restclient.Config, kubeconfigPath string, brokenAuthInfo bool) error {
 	// Get the CA data from the bootstrap client config.
 	caFile, caData := bootstrapClientConfig.CAFile, []byte{}
 
@@ -168,6 +196,21 @@ func writeKubeconfigFromBootstrapping(bootstrapClientConfig *restclient.Config, 
 			Namespace: "default",
 		}},
 		CurrentContext: "default-context",
+	}
+
+	if brokenAuthInfo {
+		kubeconfigData.AuthInfos = map[string]*clientcmdapi.AuthInfo{"default-auth": {
+			ClientCertificateData: bootstrapClientConfig.TLSClientConfig.CertData,
+			ClientKeyData:         bootstrapClientConfig.TLSClientConfig.KeyData,
+			AuthProvider: &clientcmdapi.AuthProviderConfig{
+				Config: map[string]string{
+					"key": "value",
+				},
+			},
+			Exec: &clientcmdapi.ExecConfig{
+				Command: "dummy",
+			},
+		}}
 	}
 
 	// Marshal to disk
