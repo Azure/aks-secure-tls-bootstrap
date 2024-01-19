@@ -166,6 +166,14 @@ var _ = Describe("TLS Bootstrap kubeconfig tests", func() {
 				Expect(err.Error()).To(ContainSubstring("invalid configuration:"))
 			})
 		})
+
+		When("File does not exist", func() {
+			It("should return false and not have an error", func() {
+				isValid, err := isKubeConfigStillValid("dummy", tlsBootstrapClient.logger)
+				Expect(isValid).To(Equal(false))
+				Expect(err).To(BeNil())
+			})
+		})
 	})
 })
 

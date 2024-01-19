@@ -46,13 +46,6 @@ func isKubeConfigStillValid(kubeConfigPath string, logger *zap.Logger) (bool, er
 // client certificate. It returns true if the kubeconfig is valid, or an error if bootstrapping
 // should stop immediately.
 func isClientConfigStillValid(kubeconfigPath string, logger *zap.Logger) (bool, error) {
-	_, err := os.Stat(kubeconfigPath)
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	if err != nil {
-		return false, fmt.Errorf("error reading existing bootstrap kubeconfig %s: %v", kubeconfigPath, err)
-	}
 	bootstrapClientConfig, err := loadRESTClientConfig(kubeconfigPath)
 	if err != nil {
 		logger.Error("unable to read existing bootstrap client config from ",
