@@ -71,7 +71,6 @@ var _ = Describe("TLS Bootstrap kubeconfig tests", func() {
 						CertData: certPem,
 						KeyData:  keyPem,
 					},
-					BearerToken: "your-token",
 				}
 				err = writeKubeconfigFromBootstrapping(bootstrapClientConfig, validKubeConfigPath)
 				Expect(err).To(BeNil())
@@ -107,7 +106,6 @@ var _ = Describe("TLS Bootstrap kubeconfig tests", func() {
 						CertData: certPem,
 						KeyData:  differentKeyPem,
 					},
-					BearerToken: "your-token",
 				}
 
 				err = writeKubeconfigFromBootstrapping(bootstrapClientConfig, validKubeConfigPath)
@@ -131,7 +129,6 @@ var _ = Describe("TLS Bootstrap kubeconfig tests", func() {
 						CertData: certPem,
 						KeyData:  keyPem,
 					},
-					BearerToken: "your-token",
 				}
 				err = writeKubeconfigFromBootstrapping(bootstrapClientConfig, validKubeConfigPath)
 				Expect(err).To(BeNil())
