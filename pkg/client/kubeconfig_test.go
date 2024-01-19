@@ -20,8 +20,10 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
-const tempKubeConfigName = "dummykubeconfig"
-const tempKubeConfigLocation = "."
+const (
+	tempKubeConfigName     = "dummykubeconfig"
+	tempKubeConfigLocation = "."
+)
 
 var _ = Describe("TLS Bootstrap kubeconfig tests", func() {
 	var (
