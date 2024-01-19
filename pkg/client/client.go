@@ -35,6 +35,7 @@ type tlsBootstrapClientImpl struct {
 	customClientID string
 	nextProto      string
 	resource       string
+	kubeConfigPath string
 }
 
 func NewTLSBootstrapClient(logger *zap.Logger, opts SecureTLSBootstrapClientOpts) TLSBootstrapClient {
@@ -51,10 +52,19 @@ func NewTLSBootstrapClient(logger *zap.Logger, opts SecureTLSBootstrapClientOpts
 		customClientID:       opts.CustomClientID,
 		nextProto:            opts.NextProto,
 		resource:             opts.AADResource,
+		kubeConfigPath:       opts.KubeconfigPath,
 	}
 }
 
 func (c *tlsBootstrapClientImpl) GetBootstrapToken(ctx context.Context) (string, error) {
+	isValid, err := isKubeConfigStillValid(c.kubeConfigPath, c.logger)
+	if err != nil {
+		return "", err
+	}
+	if isValid {
+		return "", nil
+	}
+
 	c.logger.Debug("loading exec credential...")
 	execCredential, err := loadExecCredential()
 	if err != nil {
