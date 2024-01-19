@@ -3,9 +3,9 @@
 
 syntax = "proto3";
 
-option go_package = "github.com/Azure/aks-tls-bootstrap-client/service/protos";
+option go_package = "github.com/Azure/aks-secure-tls-bootstrap/service/protos";
 
-package azure.aks.tlsbootstrap;
+package azure.aks.securetlsbootstrap;
 
 service SecureTLSBootstrapService {
     // Step 1 of retrieving a kubelet client credential; generates a nonce to be used by the
