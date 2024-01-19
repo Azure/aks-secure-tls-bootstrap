@@ -1,7 +1,14 @@
 package client
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
+	"math/big"
 	"os"
+	"time"
 
 	mocks "github.com/Azure/aks-tls-bootstrap-client/pkg/client/mocks"
 	. "github.com/onsi/ginkgo"
@@ -10,83 +17,6 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-)
-
-const (
-	dummyCertPem = `-----BEGIN CERTIFICATE-----
-MIIC7jCCAdagAwIBAgIBATANBgkqhkiG9w0BAQsFADAeMQ0wCwYDVQQKEwR0ZXN0
-MQ0wCwYDVQQDEwR0ZXN0MCAXDTI0MDExOTAwNDYyMloYDzIyMjQwMTE5MDA0NjIy
-WjAeMQ0wCwYDVQQKEwR0ZXN0MQ0wCwYDVQQDEwR0ZXN0MIIBIjANBgkqhkiG9w0B
-AQEFAAOCAQ8AMIIBCgKCAQEAnevpBEsn6CWxT6DkD9RjJnqSAjducV+FAkWwxZAt
-GpwKJ2zVaD9x7zkKCpMmJi6kGD+sLZxhBu3hYEsJPzM0dEQbRPrChqhJbkSMm+AC
-JVIeb2Dhy30scMl3/JGcrEejK79iWfY77VYE5grTrS4RM7/VUGZEahlKKSHEWqLg
-xoNFeg8u3Im1+QwtJ4zYUNSTEIlyUmO1E6bvYaX7IibqEe2MszR4fV9BdzwisvWz
-Xg+5t61Dj0lXATgRGpkRul5gsglTjYNyWdJfY4enqlPPDiaF8WUggLnmzsBBUB3s
-Py4TuAI+yWa1riJRUIS39a/yzbsYODfGztsuvsFaoDlHQwIDAQABozUwMzAOBgNV
-HQ8BAf8EBAMCBaAwEwYDVR0lBAwwCgYIKwYBBQUHAwEwDAYDVR0TAQH/BAIwADAN
-BgkqhkiG9w0BAQsFAAOCAQEAiCmY9+ZDupvejgEyIwQ0T5q014yEdx5yeIfAOpuO
-phHGI9BG3jxGXsTRE2yAwE+8jdgnbBCM5Ro38J96pk+OmnYyWjgm8f76BnUG7hcL
-deI2t4uPx3i8HB76a+aYJr5FhNLFjkVELpxjZd87LTWEH3GAUOXROiBH30OJH9A9
-StST8iIcfS0CODYjxMg99IJaam8JqomSCgE8C4G9PJhgLiabVkvw91GxSuPMVZOd
-UrmxAqLW0KZr4p8Un11V5qxBUG3W1Rpr+lg9ZgzBb8NFm/Te5PgsTs+XZGhwX1TP
-IcLUdsNaYM20dfj3jO0+5K3qn/tCabm9y1k6vMJPwpC/eQ==
------END CERTIFICATE-----`
-
-	dummyKeyPem = `-----BEGIN RSA PRIVATE KEY-----
-MIIEowIBAAKCAQEAnevpBEsn6CWxT6DkD9RjJnqSAjducV+FAkWwxZAtGpwKJ2zV
-aD9x7zkKCpMmJi6kGD+sLZxhBu3hYEsJPzM0dEQbRPrChqhJbkSMm+ACJVIeb2Dh
-y30scMl3/JGcrEejK79iWfY77VYE5grTrS4RM7/VUGZEahlKKSHEWqLgxoNFeg8u
-3Im1+QwtJ4zYUNSTEIlyUmO1E6bvYaX7IibqEe2MszR4fV9BdzwisvWzXg+5t61D
-j0lXATgRGpkRul5gsglTjYNyWdJfY4enqlPPDiaF8WUggLnmzsBBUB3sPy4TuAI+
-yWa1riJRUIS39a/yzbsYODfGztsuvsFaoDlHQwIDAQABAoIBAF9AUK7XSf265mS6
-DXUCzL8DxRdzKblWPNqvAD1Zher73SAEg/+57NW2mLjiImt7TFyX4xkrrlZImtzC
-xZQKJYRPJAeKHFSuIoRQ8mJ+Ta0HB/Z0AB0Fpg1tZ2K+zToYh3G2oPLUEzdG3/OE
-6kIVfCizd01kMbWxBUsj49QrU9pHlqSZx6UNi8k+nGtpIjX9HARIZhCNqAeQyAwe
-HMPD8Jc569iAbDtp1dq2YELXWDssL7t5gqRa56dutxKFCIJvt2xDx8e0KQBeq+j4
-18ERVf8sf1DkuV9AdV5mQef1J8htexvjTUu36AFtYRwQuBWs8e9891WUqrag1Y8j
-gg73RgECgYEAweBMdX8WjdzfufV3l8I1Q3bnDI7DNifmP37nJJJRRfz1qWvXcPmz
-7dY4MgGdwOopJA3LfsyE3zCq7IEe+3LK6ZQV29QkheExXEGj9s3e1AHnpCEeqKOK
-qDMtxgOLpuh6hUZbSf069Fq7jpqo1c3lluIc9UStD2z3x+ApqDsJpkMCgYEA0IY+
-tDet1s73s/o9uzJ9LleN7ieLYSDxg5oKvZpn3A4c9Rrr7Fj1OBNOkPjlUsVRSb6f
-sMn1gz45cMc5eSSimen/R7MThcYUpN3EazWnZDS9DKN3PTwObONRj8g439AmIYLK
-y279PO3yxhg3B4BfXgkKPUe/BEXoRVDxg8n+SwECgYBwfb6fZjAl/ARsF7teeLcD
-ABirtqIZ6Ci2quFe3O7/VvkLZqFI0fnOhD9y9HEeID/ixYZPekeWYNysAXeCmmaW
-BPBx7rOKYtGLICMM7wLdrIVFPFpXqxym35sti50aKUX90obhdWchpQuygJZ6B8+x
-Ll1zCngHvUg/1xcUn7zHlQKBgG2F9S1HCWGH94Zqaz4FeMZ8aimqT4TGftO2dum7
-Tc3BA+ihKUVMPBAl4+A1Oo3M4bMwEkQS74btidH4cfF1Eopw4wpPvnNG5NTrPh1p
-YvA42wrmWNyqzJDYnKA+c9DqTPzQ658KPqxf9mGhmlWwUWbcrKofIu8loKe3qgKk
-d5IBAoGBALYKNPHZasv6D8z1HfubW3k/G3EzVXYrrNQ8mOnJjbGhuFh29/CGyodp
-LNSzVepEqDGARwkhMjpYMyXqUYlF+FpLo6WGmFxbhdTwD7uIAVf0vIfAhPzlaxeG
-9OT27Rx4qVWDEuy+wCdkYMfbnBbfreLCuPsHTkkl/kncbhpxGXIo
------END RSA PRIVATE KEY-----`
-
-	dummyBrokenKeyPem = `-----BEGIN RSA PRIVATE KEY-----
-MIIEowIBAAKCAQEAu288zFu1MPRLsOYiHMS8OkbnWnwCWKtd1ZGG91N76bY5qg1D
-h40YQFlxLyzhSTJFRqnvzG7ObpMBMPFZ86T88fgg/sWixLzP1+VKn4EgVitXFS90
-uXAaUpkvxKRIZAR83irD59KtT5gO36S4H1+HEt0XMkB5xK5VgowpN77HKlEwXRfC
-ODN/t4H/72OLsYldpWtH0n/JQQsLkTRt2cZRvchNXLUpsqrgl2jYh1PH5qVeK0fA
-JpfF+wtX2Rr51Fh9lbJC4sxp4y3eKEKpIIFaa/Xpuy2k6c9teY8o9hv5kwSAF/TZ
-sL91IjhcFBa8l79T9rkHMo6kMBrfbJVdtYo71QIDAQABAoIBAHUq7E6zZWjczhQf
-SGPDeAbWG/msW6siNN40wrIJNgS7LQDombY6tVZEk0RyQcKH8lZiFM0u10y4CJ6X
-wStVj+mSus2Irl9dyG+lnihnh9dV8HIF4GmrckkACaRbLgWX6JbZFO3t/PksjN+x
-EIhMJxvbqYx4UaZpdHrPM1TtpYMFe92hrfHlK+ND4O+3MOsTaGjfVjDUEA4apZak
-7YATTQcuHgPfbT5SDjlfOlhCi4ZDrgAKsuJzPUXoYjECKCCDF+clwbPPnq5A7jHL
-gIvlfRzwl5iGIOkiYgvWZo8Aa2wxfLlCfjBFXhGeio5p9LPu3Qz/23HWyiEUZfT2
-pojBdWECgYEA3PYXQGmNtf//qNtggSXN873HJCBomJcTniGNXLVutXGXUB6/pm1y
-+Ny22GNaxtOJA0zsgwOuxCo1ZtBnv0MPr5KOdDJ5h/Sg8HKST/y8aj4PlBs+UMCx
-ofF+5onSvJlsgKZzQIaC3kHe+3tLOYRbxhA/c6Q+Ma8r0yLD2ZVOtr8CgYEA2Sgh
-Laa8ZbvPTIH9Vp3myI9CkHkwB5vAnXf8OXPr8x17F5/bHGeQ6M7B38zPI4NLOBoj
-7mtoYkotOU+ouUatyEyj4IaGDpYexbNUJs2l/OlgodpWcxvyyJfbjgZDLJlujNk9
-qj6Pe8m5iE7hlpXKhy1uLQPtZE6nHjnxVoncpmsCgYBS0ZpddjK7aLx2meNOBNFw
-7kzZ6ZvKtbWQq5rEiOx57Z19VkkXJCbXyEJwUK0RoO/V4Ns1MAgtVnS1mJ+KPKSA
-djoWq2SJ5NL9zLOyb1RfretA5AUzV0Y9ILsjxbzLG+ZjQgAoy0H59E6Ti97iLA4J
-6sUdnw4AqVuPw5QM1b2vGQKBgQCBaysq294X+3A2NppXTs/F46tWEwOO5UJMFsAZ
-NX7/ayh7Eegx638vYFmnGZaxoYPosZuMcjLJsU92goUZtofHgfWA0GuAsfMw/AlA
-/vrX2fafP1KaU6PD7M0Kvay3HdIG20mm9pXovnZ2SByl9Cu5mFe7OEX4q+9pUjsE
-yjDYdQKBgD2Vt9Xrb3u+V1GZhYo7pU/S7IWIPaXgIMKn/RGzgDhnx6P7tDZlLpTB
-kHsV7yS9ezgEFZ2ojpFX+GO2+3/lur/8YYEzNJhxxf1lcIbYAyo3zcR12StjRzIF
-GnvpuOWMW0vIOAFhX7dZwILeFBid6jPDL+F2cEOV1Lvya2T4w5t2
------END RSA PRIVATE KEY-----`
 )
 
 var _ = Describe("TLS Bootstrap kubeconfig tests", func() {
@@ -104,19 +34,6 @@ var _ = Describe("TLS Bootstrap kubeconfig tests", func() {
 			validKubeConfigPath = "dummykubeconfig"
 			_, err := os.Create(validKubeConfigPath)
 
-			if err != nil {
-				return
-			}
-
-			bootstrapClientConfig := &restclient.Config{
-				Host: "https://your-k8s-cluster.com",
-				TLSClientConfig: restclient.TLSClientConfig{
-					CertData: []byte(dummyCertPem),
-					KeyData:  []byte(dummyKeyPem),
-				},
-				BearerToken: "your-token",
-			}
-			err = writeKubeconfigFromBootstrapping(bootstrapClientConfig, validKubeConfigPath)
 			if err != nil {
 				return
 			}
@@ -145,10 +62,23 @@ var _ = Describe("TLS Bootstrap kubeconfig tests", func() {
 
 		When("kubeconfig is valid", func() {
 			It("should return true and nil error", func() {
+				certPem, keyPem, err := generateMockCertPEMWithExpiration("test", "test", time.Now().AddDate(200, 0, 0))
+				Expect(err).To(BeNil())
+
+				bootstrapClientConfig := &restclient.Config{
+					Host: "https://your-k8s-cluster.com",
+					TLSClientConfig: restclient.TLSClientConfig{
+						CertData: certPem,
+						KeyData:  keyPem,
+					},
+					BearerToken: "your-token",
+				}
+				err = writeKubeconfigFromBootstrapping(bootstrapClientConfig, validKubeConfigPath)
+				Expect(err).To(BeNil())
+
 				isValid, err := isKubeConfigStillValid(validKubeConfigPath, tlsBootstrapClient.logger)
 				Expect(isValid).To(Equal(true))
 				Expect(err).To(BeNil())
-
 			})
 		})
 
@@ -166,23 +96,49 @@ var _ = Describe("TLS Bootstrap kubeconfig tests", func() {
 
 		When("keyPem does not belong to certPem", func() {
 			It("should return false and have error", func() {
+				certPem, _, err := generateMockCertPEMWithExpiration("test", "test", time.Now().AddDate(200, 0, 0))
+				Expect(err).To(BeNil())
+				_, differentKeyPem, err := generateMockCertPEMWithExpiration("test", "test", time.Now().AddDate(200, 0, 0))
+				Expect(err).To(BeNil())
+
 				bootstrapClientConfig := &restclient.Config{
 					Host: "https://your-k8s-cluster.com",
 					TLSClientConfig: restclient.TLSClientConfig{
-						CertData: []byte(dummyCertPem),
-						KeyData:  []byte(dummyBrokenKeyPem),
+						CertData: certPem,
+						KeyData:  differentKeyPem,
 					},
 					BearerToken: "your-token",
 				}
-				err := writeKubeconfigFromBootstrapping(bootstrapClientConfig, validKubeConfigPath)
-				if err != nil {
-					return
-				}
+
+				err = writeKubeconfigFromBootstrapping(bootstrapClientConfig, validKubeConfigPath)
+				Expect(err).To(BeNil())
 
 				isValid, err := isKubeConfigStillValid(validKubeConfigPath, tlsBootstrapClient.logger)
 				Expect(isValid).To(Equal(false))
 				Expect(err).ToNot(BeNil())
 				Expect(err.Error()).To(ContainSubstring("private key does not match public key"))
+			})
+		})
+
+		When("certPem is expired", func() {
+			It("should return false and not have an error", func() {
+				certPem, keyPem, err := generateMockCertPEMWithExpiration("test", "test", time.Now().AddDate(0, 0, -1))
+				Expect(err).To(BeNil())
+
+				bootstrapClientConfig := &restclient.Config{
+					Host: "https://your-k8s-cluster.com",
+					TLSClientConfig: restclient.TLSClientConfig{
+						CertData: certPem,
+						KeyData:  keyPem,
+					},
+					BearerToken: "your-token",
+				}
+				err = writeKubeconfigFromBootstrapping(bootstrapClientConfig, validKubeConfigPath)
+				Expect(err).To(BeNil())
+
+				isValid, err := isKubeConfigStillValid(validKubeConfigPath, tlsBootstrapClient.logger)
+				Expect(isValid).To(Equal(false))
+				Expect(err).To(BeNil())
 			})
 		})
 	})
@@ -219,4 +175,41 @@ func writeKubeconfigFromBootstrapping(bootstrapClientConfig *restclient.Config, 
 
 	// Marshal to disk
 	return clientcmd.WriteToFile(kubeconfigData, kubeconfigPath)
+}
+
+func generateMockCertPEMWithExpiration(cn string, org string, expiration time.Time) ([]byte, []byte, error) {
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return nil, nil, err
+	}
+	template := x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject: pkix.Name{
+			CommonName:   cn,
+			Organization: []string{org},
+		},
+		NotBefore: time.Now(),
+		NotAfter:  expiration,
+
+		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		BasicConstraintsValid: true,
+	}
+
+	certBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &privateKey.PublicKey, privateKey)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	certPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: certBytes,
+	})
+
+	keyPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
+	})
+
+	return certPEM, keyPEM, nil
 }

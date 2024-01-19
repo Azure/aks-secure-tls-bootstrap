@@ -72,7 +72,7 @@ func createBootstrapCommand() *cobra.Command {
 	cmd.Flags().StringVar(&opts.AADResource, flagAADResource, "", "The resource (audience) used to request JWT tokens from AAD for authentication")
 	cmd.Flags().StringVar(&opts.NextProto, flagNextProto, "", "The ALPN Next Protocol value to send within requests to the bootstrap server.")
 	cmd.Flags().StringVar(&opts.LogFormat, flagLogFormat, "json", "Log format: json or text.")
-	cmd.Flags().StringVar(&opts.KubeconfigPath, flagKubeconfigPath, "", "Path to the kubeconfig file to use for the bootstrap token request.")
+	cmd.Flags().StringVar(&opts.KubeconfigPath, flagKubeconfigPath, "", "Path to kubeconfig file containing the generated kubelet client certificate")
 	cmd.Flags().BoolVar(&opts.Verbose, flagVerbose, false, "Enable verbose logging.")
 	return cmd
 }
