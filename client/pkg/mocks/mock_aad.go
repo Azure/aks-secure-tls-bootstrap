@@ -11,7 +11,7 @@ import (
 	context "context"
 	reflect "reflect"
 
-	datamodel "github.com/Azure/aks-tls-bootstrap-client/client/pkg/datamodel"
+	datamodel "github.com/Azure/aks-secure-tls-bootstrap/client/pkg/datamodel"
 	gomock "go.uber.org/mock/gomock"
 )
 

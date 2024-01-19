@@ -11,8 +11,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/Azure/aks-tls-bootstrap-client/client/pkg/datamodel"
-	mocks "github.com/Azure/aks-tls-bootstrap-client/client/pkg/mocks"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/datamodel"
+	mocks "github.com/Azure/aks-secure-tls-bootstrap/client/pkg/mocks"
 	secureTLSBootstrapService "github.com/Azure/aks-tls-bootstrap-client/service/protos"
 	mocks_secureTLSBootstrapService "github.com/Azure/aks-tls-bootstrap-client/service/protos/mocks"
 	. "github.com/onsi/ginkgo"

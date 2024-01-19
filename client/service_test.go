@@ -3,7 +3,7 @@ package client
 import (
 	"context"
 
-	"github.com/Azure/aks-tls-bootstrap-client/client/pkg/datamodel"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/datamodel"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"google.golang.org/grpc/test/bufconn"
