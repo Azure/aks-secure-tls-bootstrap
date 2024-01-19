@@ -11,16 +11,12 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"time"
 
 	"github.com/Azure/aks-tls-bootstrap-client/pkg/datamodel"
 	secureTLSBootstrapService "github.com/Azure/aks-tls-bootstrap-client/pkg/protos"
 	"go.uber.org/zap"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/transport"
-	certutil "k8s.io/client-go/util/cert"
 )
 
 // TLSBootstrapClient retrieves tokens for performing node TLS bootstrapping.
@@ -70,7 +66,6 @@ func (c *tlsBootstrapClientImpl) GetBootstrapToken(ctx context.Context) (string,
 	if isValid {
 		return "", nil
 	}
-	// if it is not valid, continue bootstrapping put the contents of the private key and signed certificate in the kubeconfig
 
 	c.logger.Debug("loading exec credential...")
 	execCredential, err := loadExecCredential()
@@ -148,86 +143,12 @@ func (c *tlsBootstrapClientImpl) GetBootstrapToken(ctx context.Context) (string,
 	}
 	c.logger.Info("generated new exec credential with bootstrap token")
 
-	// load kube config with new exec credential
-
 	execCredentialBytes, err := json.Marshal(execCredentialWithToken)
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal execCredential")
 	}
 
 	return string(execCredentialBytes), nil
-}
-
-func isKubeConfigStillValid(kubeConfigPath string, logger *zap.Logger) (bool, error) {
-	logger.Debug("checking if kubeconfig exists...")
-
-	_, err := os.Stat(kubeConfigPath)
-	if os.IsNotExist(err) {
-		logger.Debug("kubeconfig does not exist. bootstrapping will continue")
-		return false, nil
-	}
-	if err != nil {
-		logger.Debug("error reading existing bootstrap kubeconfig. bootstrapping will not continue", zap.Error(err))
-		return false, nil // not returning an error so bootstrap can continue
-	}
-
-	isValid, err := isClientConfigStillValid(kubeConfigPath)
-	if err != nil {
-		return false, fmt.Errorf("unable to load kubeconfig: %v", err)
-	}
-	if isValid {
-		logger.Debug("kubeconfig is valid. bootstrapping will not continue")
-		return true, nil
-	}
-
-	logger.Debug("kubeconfig is invalid. bootstrapping will continue")
-	return false, nil
-}
-
-// copied from https://github.com/kubernetes/kubernetes/blob/e45f5b089f770b1c8a1583f2792176bfe450bb47/pkg/kubelet/certificate/bootstrap/bootstrap.go#L231
-// isClientConfigStillValid checks the provided kubeconfig to see if it has a valid
-// client certificate. It returns true if the kubeconfig is valid, or an error if bootstrapping
-// should stop immediately.
-func isClientConfigStillValid(kubeconfigPath string) (bool, error) {
-	_, err := os.Stat(kubeconfigPath)
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	if err != nil {
-		return false, fmt.Errorf("error reading existing bootstrap kubeconfig %s: %v", kubeconfigPath, err)
-	}
-	bootstrapClientConfig, err := loadRESTClientConfig(kubeconfigPath)
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to read existing bootstrap client config from %s: %v", kubeconfigPath, err))
-		return false, nil
-	}
-	transportConfig, err := bootstrapClientConfig.TransportConfig()
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to load transport configuration from existing bootstrap client config read from %s: %v", kubeconfigPath, err))
-		return false, nil
-	}
-	// has side effect of populating transport config data fields
-	if _, err := transport.TLSConfigFor(transportConfig); err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to load TLS configuration from existing bootstrap client config read from %s: %v", kubeconfigPath, err))
-		return false, nil
-	}
-	certs, err := certutil.ParseCertsPEM(transportConfig.TLS.CertData)
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to load TLS certificates from existing bootstrap client config read from %s: %v", kubeconfigPath, err))
-		return false, nil
-	}
-	if len(certs) == 0 {
-		utilruntime.HandleError(fmt.Errorf("unable to read TLS certificates from existing bootstrap client config read from %s: %v", kubeconfigPath, err))
-		return false, nil
-	}
-	now := time.Now()
-	for _, cert := range certs {
-		if now.After(cert.NotAfter) {
-			utilruntime.HandleError(fmt.Errorf("part of the existing bootstrap client certificate in %s is expired: %v", kubeconfigPath, cert.NotAfter))
-			return false, nil
-		}
-	}
-	return true, nil
 }
 
 // copied from https://github.com/kubernetes/kubernetes/blob/e45f5b089f770b1c8a1583f2792176bfe450bb47/pkg/kubelet/certificate/bootstrap/bootstrap.go#L212
