@@ -48,44 +48,32 @@ func isKubeConfigStillValid(kubeConfigPath string, logger *zap.Logger) (bool, er
 func isClientConfigStillValid(kubeconfigPath string, logger *zap.Logger) (bool, error) {
 	bootstrapClientConfig, err := loadRESTClientConfig(kubeconfigPath)
 	if err != nil {
-		logger.Error("unable to read existing bootstrap client config from ",
-			zap.String("kubeconfigPath", kubeconfigPath),
-			zap.Error(err))
+		logger.Error("unable to read existing kubeconfig.")
 		return false, err
 	}
 	transportConfig, err := bootstrapClientConfig.TransportConfig()
 	if err != nil {
-		logger.Error("unable to load transport configuration from existing bootstrap client config read from ",
-			zap.String("kubeconfigPath", kubeconfigPath),
-			zap.Error(err))
+		logger.Error("unable to load transport configuration from existing kubeconfig.")
 		return false, err
 	}
 	// has side effect of populating transport config data fields
 	if _, err := transport.TLSConfigFor(transportConfig); err != nil {
-		logger.Error("unable to load TLS configuration from existing bootstrap client config read from ",
-			zap.String("kubeconfigPath", kubeconfigPath),
-			zap.Error(err))
+		logger.Error("unable to load TLS configuration from existing kubeconfig.")
 		return false, err
 	}
 	certs, err := certutil.ParseCertsPEM(transportConfig.TLS.CertData)
 	if err != nil {
-		logger.Error("unable to load TLS certificates from existing bootstrap client config read from ",
-			zap.String("kubeconfigPath", kubeconfigPath),
-			zap.Error(err))
+		logger.Error("unable to load TLS certificates from existing kubeconfig.")
 		return false, err
 	}
 	if len(certs) == 0 {
-		logger.Error("unable to read TLS certificates from existing bootstrap client config read from ",
-			zap.String("kubeconfigPath", kubeconfigPath),
-			zap.Error(err))
+		logger.Error("unable to read TLS certificates from existing kubeconfig.")
 		return false, err
 	}
 	now := time.Now()
 	for _, cert := range certs {
 		if now.After(cert.NotAfter) {
-			logger.Error("part of the existing bootstrap client certificate in %s is expired: %v",
-				zap.String("kubeconfigPath", kubeconfigPath),
-				zap.String("expirationTime", cert.NotAfter.String()))
+			logger.Error("part of the existing kubeconfig certificate is expire.")
 			return false, err
 		}
 	}
