@@ -73,7 +73,7 @@ var _ = Describe("TLS Bootstrap kubeconfig tests", func() {
 
 	Context("isKubeConfigStillValid Tests", func() {
 		BeforeEach(func() {
-			validKubeConfigPath = "../../bin/dummykubeconfig"
+			validKubeConfigPath = "dummykubeconfig"
 			_, err := os.Create(validKubeConfigPath)
 
 			if err != nil {
