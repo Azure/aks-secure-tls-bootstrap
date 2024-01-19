@@ -20,21 +20,20 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
+const tempKubeConfigName = "dummykubeconfig"
+const tempKubeConfigLocation = "."
+
 var _ = Describe("TLS Bootstrap kubeconfig tests", func() {
 	var (
-		mockCtrl               *gomock.Controller
-		imdsClient             *mocks.MockImdsClient
-		aadClient              *mocks.MockAadClient
-		tlsBootstrapClient     *tlsBootstrapClientImpl
-		mockReader             *mocks.MockfileReader
-		tempKubeConfigName     string
-		tempKubeConfigLocation string
+		mockCtrl           *gomock.Controller
+		imdsClient         *mocks.MockImdsClient
+		aadClient          *mocks.MockAadClient
+		tlsBootstrapClient *tlsBootstrapClientImpl
+		mockReader         *mocks.MockfileReader
 	)
 
 	Context("isKubeConfigStillValid Tests", func() {
 		BeforeEach(func() {
-			tempKubeConfigName = "dummykubeconfig"
-			tempKubeConfigLocation = "."
 
 			mockCtrl = gomock.NewController(GinkgoT())
 			imdsClient = mocks.NewMockImdsClient(mockCtrl)
