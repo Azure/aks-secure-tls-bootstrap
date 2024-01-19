@@ -75,7 +75,7 @@ func isClientConfigStillValid(kubeconfigPath string, logger *zap.Logger) (bool, 
 		return false, err
 	}
 	if len(certs) == 0 {
-		logger.Error("unable to read TLS certificates from existing bootstrap client config read fro ",
+		logger.Error("unable to read TLS certificates from existing bootstrap client config read from ",
 			zap.String("kubeconfigPath", kubeconfigPath),
 			zap.Error(err))
 		return false, err

@@ -163,7 +163,7 @@ var _ = Describe("TLS Bootstrap kubeconfig tests", func() {
 				isValid, err := isKubeConfigStillValid(validKubeConfigPath, tlsBootstrapClient.logger)
 				Expect(isValid).To(Equal(false))
 				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("invalid configuration:"))
+				Expect(err.Error()).To(ContainSubstring("exec plugin: invalid apiVersion"))
 			})
 		})
 
@@ -210,13 +210,10 @@ func writeKubeconfigFromBootstrapping(bootstrapClientConfig *restclient.Config, 
 		kubeconfigData.AuthInfos = map[string]*clientcmdapi.AuthInfo{"default-auth": {
 			ClientCertificateData: bootstrapClientConfig.TLSClientConfig.CertData,
 			ClientKeyData:         bootstrapClientConfig.TLSClientConfig.KeyData,
-			AuthProvider: &clientcmdapi.AuthProviderConfig{
-				Config: map[string]string{
-					"key": "value",
-				},
-			},
 			Exec: &clientcmdapi.ExecConfig{
-				Command: "dummy",
+				Command:         "dummy",
+				APIVersion:      "dummyVersion",
+				InteractiveMode: clientcmdapi.AlwaysExecInteractiveMode,
 			},
 		}}
 	}
