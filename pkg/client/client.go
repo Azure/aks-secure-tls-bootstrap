@@ -15,8 +15,6 @@ import (
 	"github.com/Azure/aks-tls-bootstrap-client/pkg/datamodel"
 	secureTLSBootstrapService "github.com/Azure/aks-tls-bootstrap-client/pkg/protos"
 	"go.uber.org/zap"
-	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
 // TLSBootstrapClient retrieves tokens for performing node TLS bootstrapping.
@@ -149,23 +147,6 @@ func (c *tlsBootstrapClientImpl) GetBootstrapToken(ctx context.Context) (string,
 	}
 
 	return string(execCredentialBytes), nil
-}
-
-// copied from https://github.com/kubernetes/kubernetes/blob/e45f5b089f770b1c8a1583f2792176bfe450bb47/pkg/kubelet/certificate/bootstrap/bootstrap.go#L212
-func loadRESTClientConfig(kubeconfig string) (*restclient.Config, error) {
-	// Load structured kubeconfig data from the given path.
-	loader := &clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeconfig}
-	loadedConfig, err := loader.Load()
-	if err != nil {
-		return nil, err
-	}
-	// Flatten the loaded data to a particular restclient.Config based on the current context.
-	return clientcmd.NewNonInteractiveClientConfig(
-		*loadedConfig,
-		loadedConfig.CurrentContext,
-		&clientcmd.ConfigOverrides{},
-		loader,
-	).ClientConfig()
 }
 
 func getExecCredentialWithToken(token, expirationTimestamp string) (*datamodel.ExecCredential, error) {
