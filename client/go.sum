@@ -2,8 +2,8 @@ cloud.google.com/go/compute v1.23.0 h1:tP41Zoavr8ptEqaW6j+LQOnyBBhO7OkOMAGrgLopT
 cloud.google.com/go/compute v1.23.0/go.mod h1:4tCnrn48xsqlwSAiLf1HXMQk8CONslYbdiEZc9FEIbM=
 cloud.google.com/go/compute/metadata v0.2.3 h1:mg4jlk7mCAj6xXp9UJ4fjI9VUI5rubuGBW5aJ7UnBMY=
 cloud.google.com/go/compute/metadata v0.2.3/go.mod h1:VAV5nSsACxMJvgaAuX6Pk2AawlZn8kiOGuCv6gTkwuA=
-github.com/Azure/aks-tls-bootstrap-client/service v0.0.0-20240118193521-784e2cb18432 h1:n7i3nK3h56ZOOxCPFQNhSlsESjCnKWDB8KKM6v3O6Xg=
-github.com/Azure/aks-tls-bootstrap-client/service v0.0.0-20240118193521-784e2cb18432/go.mod h1:RpTV2yv6ypeMnm/kbPyKpJg93EHMZnOfVtdwITMf0jE=
+github.com/Azure/aks-secure-tls-bootstrap/service v0.0.0-20240120000347-fb98fd5c2c50 h1:SnP8vj1rVA+EK/zUQJU5iun03dp2A7h07AY0TDkVYfk=
+github.com/Azure/aks-secure-tls-bootstrap/service v0.0.0-20240120000347-fb98fd5c2c50/go.mod h1:Q5qtXogTFBE/annwy4ZNOoMDKroU7JL2a+UF+60ATbc=
 github.com/Azure/go-autorest v14.2.0+incompatible h1:V5VMDjClD3GiElqLWO7mz2MxNAK/vTfRHdAubSIPRgs=
 github.com/Azure/go-autorest v14.2.0+incompatible/go.mod h1:r+4oMnoxhatjLLJ6zxSWATqVooLgysK6ZNox3g/xq24=
 github.com/Azure/go-autorest/autorest v0.11.29 h1:I4+HL/JDvErx2LjyzaVxllw2lRDB5/BT2Bm4g20iqYw=
