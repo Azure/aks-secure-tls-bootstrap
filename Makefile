@@ -67,7 +67,7 @@ generate: mockgen ## Generate gomocks.
 		-copyright_file=hack/copyright_header.txt \
 		-source=service/protos/bootstrap_grpc.pb.go \
 		-destination=service/protos/mocks/mock_client.go \
-		-package=mocks github.com/Azure/aks-tls-bootstrap-client/service/protos \
+		-package=mocks github.com/Azure/aks-secure-tls-bootstrap/service/protos \
 		SecureTLSBootstrapServiceClient
 	go generate ./...
 

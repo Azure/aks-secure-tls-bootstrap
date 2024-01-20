@@ -3,14 +3,14 @@ module github.com/Azure/aks-secure-tls-bootstrap/client
 go 1.21.3
 
 require (
-	github.com/Azure/aks-secure-tls-bootstrap/service v0.0.0-20240120000347-fb98fd5c2c50
+	github.com/Azure/aks-secure-tls-bootstrap/service v0.1.0-alpha.0
 	github.com/Azure/go-autorest/autorest v0.11.29
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.2.1
 	github.com/avast/retry-go/v4 v4.5.1
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.31.0
 	github.com/spf13/cobra v1.8.0
-	go.uber.org/mock v0.4.0
+	go.uber.org/mock v0.2.0
 	go.uber.org/zap v1.26.0
 	golang.org/x/oauth2 v0.16.0
 	google.golang.org/grpc v1.60.1
