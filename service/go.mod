@@ -3,7 +3,7 @@ module github.com/Azure/aks-secure-tls-bootstrap/service
 go 1.21
 
 require (
-	go.uber.org/mock v0.4.0
+	go.uber.org/mock v0.2.0
 	google.golang.org/grpc v1.60.1
 	google.golang.org/protobuf v1.32.0
 )
