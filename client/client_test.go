@@ -13,8 +13,8 @@ import (
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/datamodel"
 	mocks "github.com/Azure/aks-secure-tls-bootstrap/client/pkg/mocks"
-	secureTLSBootstrapService "github.com/Azure/aks-tls-bootstrap-client/service/protos"
-	mocks_secureTLSBootstrapService "github.com/Azure/aks-tls-bootstrap-client/service/protos/mocks"
+	secureTLSBootstrapService "github.com/Azure/aks-secure-tls-bootstrap/service/protos"
+	mocks_secureTLSBootstrapService "github.com/Azure/aks-secure-tls-bootstrap/service/protos/mocks"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"go.uber.org/mock/gomock"

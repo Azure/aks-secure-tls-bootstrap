@@ -3,7 +3,7 @@ module github.com/Azure/aks-secure-tls-bootstrap/client
 go 1.21.3
 
 require (
-	github.com/Azure/aks-tls-bootstrap-client/service v0.0.0-20240118193521-784e2cb18432
+	github.com/Azure/aks-secure-tls-bootstrap/service v0.0.0-20240120000347-fb98fd5c2c50
 	github.com/Azure/go-autorest/autorest v0.11.29
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.2.1
 	github.com/avast/retry-go/v4 v4.5.1
