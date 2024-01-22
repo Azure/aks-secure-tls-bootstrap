@@ -92,11 +92,11 @@ build-client-all: fmt vet ## Builds the client binary for all platforms/architec
 
 .PHONY: build-client-linux
 build-client-linux: ## Builds the client binary for the specified linux architecture.
-	CGO_ENABLED=0 GOOS=linux GOARCH=$(ARCH) go build -o bin/tls-bootstrap-client-$(ARCH) client/cmd/main.go
+	pushd $(PROJECT_DIR)/client && CGO_ENABLED=0 GOOS=linux GOARCH=$(ARCH) go build -o bin/tls-bootstrap-client-$(ARCH) cmd/main.go && popd
 
 .PHONY: build-client-windows
 build-client-windows: ## Builds the client binary for the specified windows architecture.
-	CGO_ENABLED=0 GOOS=windows GOARCH=$(ARCH) go build -o bin/tls-bootstrap-client-$(ARCH).exe client/cmd/main.go
+	pushd $(PROJECT_DIR)/client && CGO_ENABLED=0 GOOS=windows GOARCH=$(ARCH) go build -o bin/tls-bootstrap-client-$(ARCH).exe cmd/main.go && popd
 
 ifndef ignore-not-found
   ignore-not-found = false
