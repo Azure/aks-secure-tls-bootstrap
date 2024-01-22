@@ -3,7 +3,7 @@
 
 package client
 
-//go:generate ../../bin/mockgen -source=file.go -copyright_file=../../hack/copyright_header.txt -destination=./mocks/mock_file.go -package=mocks github.com/Azure/aks-secure-tls-bootstrap/client FileReader
+//go:generate ../bin/mockgen -source=file.go -copyright_file=../hack/copyright_header.txt -destination=./mocks/mock_file.go -package=mocks github.com/Azure/aks-secure-tls-bootstrap/client FileReader
 
 import "os"
 

@@ -8,6 +8,7 @@ else
 GOBIN=$(shell go env GOBIN)
 endif
 
+# Default arch is amd64.
 ARCH=amd64
 
 # Setting SHELL to bash allows bash commands to be executed by recipes.
@@ -15,9 +16,6 @@ ARCH=amd64
 # Options are set to exit when a recipe line exits non-zero or a piped command fails.
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
-
-.PHONY: all
-all: build
 
 ##@ General
 
@@ -39,67 +37,72 @@ help: ## Display this help.
 ##@ Development
 
 .PHONY: fmt
-fmt: ## Run go fmt against code.
-	go fmt ./...
+fmt: fmt-client
 
 .PHONY: vet
-vet: ## Run go vet against code.
-	go vet ./...
+vet: vet-client
 
-.PHONY: fmt-vet
-fmt-vet:
-	@$(MAKE) fmt
-	@$(MAKE) vet
+.PHONY: fmt-client
+fmt-client:
+	pushd $(PROJECT_DIR)/client && go fmt ./... && popd
+
+.PHONY: vet-client
+vet-client:
+	pushd $(PROJECT_DIR)/client && go vet ./... && popd
 
 .PHONY: test
-test: ## Test all applicable go packages.
-	go test $(shell go list ./pkg... | grep -v proto | grep -v vendor | grep -v mock)
+test: test-client
 
-.PHONY: test-coverage
-test-coverage:
-	go test $(shell go list ./pkg... | grep -v proto | grep -v vendor | grep -v mock) -coverprofile coverage_raw.out -covermode count
+.PHONY: coverage
+coverage: test-coverage-client
 
-##@ Build
+.PHONY: test-client
+test-client: ## Test all applicable go packages within the client module.
+	pushd $(PROJECT_DIR)/client && go test $(shell go list ./... | grep -v proto | grep -v vendor | grep -v mock) && popd
+
+.PHONY: test-coverage-client
+test-coverage-client: ## Test all applicable go packages within the client module and calculate coverage.
+	pushd $(PROJECT_DIR)/client && go test $(shell go list ./... | grep -v proto | grep -v vendor | grep -v mock) -coverprofile $(PROJECT_DIR)/coverage_raw.out -covermode count && popd
+
+.PHONY: protobuf
+protobuf: # Generates protobuf implementation files within the service module.
+	protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative pkg/protos/bootstrap.proto
 
 .PHONY: generate
-generate: mockgen ## Generate gomocks.
+generate: mockgen ## Generates gomocks in both the service and client modules.
 	bin/mockgen \
 		-copyright_file=hack/copyright_header.txt \
 		-source=service/protos/bootstrap_grpc.pb.go \
 		-destination=service/protos/mocks/mock_client.go \
 		-package=mocks github.com/Azure/aks-secure-tls-bootstrap/service/protos \
 		SecureTLSBootstrapServiceClient
-	go generate ./...
+	pushd $(PROJECT_DIR)/client && go generate ./... && popd
 
-.PHONY: protobuf
-protobuf:
-	protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative pkg/protos/bootstrap.proto
+mockgen:
+	$(call go-install-tool,$(PROJECT_DIR)/bin/mockgen,go.uber.org/mock/mockgen@v0.2.0)
+
+##@ Build
 
 .PHONY: build-client-all
-build-client-all: fmt vet ## Builds the client binary for all platforms
+build-client-all: fmt vet ## Builds the client binary for all platforms/architectures.
 	@$(MAKE) build-client-linux ARCH=amd64
 	@$(MAKE) build-client-linux ARCH=arm64
 	@$(MAKE) build-client-windows ARCH=amd64
 	@$(MAKE) build-client-windows ARCH=arm64
 
 .PHONY: build-client-linux
-build-client-linux: ## Builds a linux binary for the specified architecture
-	CGO_ENABLED=0 GOOS=linux GOARCH=$(ARCH) go build -o bin/tls-bootstrap-client-$(ARCH) cmd/client/main.go
+build-client-linux: ## Builds the client binary for the specified linux architecture.
+	CGO_ENABLED=0 GOOS=linux GOARCH=$(ARCH) go build -o bin/tls-bootstrap-client-$(ARCH) client/cmd/main.go
 
 .PHONY: build-client-windows
-build-client-windows: ## Builds a windows binary for the specified architecture
-	CGO_ENABLED=0 GOOS=windows GOARCH=$(ARCH) go build -o bin/tls-bootstrap-client-$(ARCH).exe cmd/client/main.go
-
-.PHONY: build
-build: fmt vet # Build client binary
-	go build -o bin/tls-bootstrap-client cmd/client/main.go
-
-mockgen:
-	$(call go-install-tool,$(PROJECT_DIR)/bin/mockgen,go.uber.org/mock/mockgen@v0.2.0)
+build-client-windows: ## Builds the client binary for the specified windows architecture.
+	CGO_ENABLED=0 GOOS=windows GOARCH=$(ARCH) go build -o bin/tls-bootstrap-client-$(ARCH).exe client/cmd/main.go
 
 ifndef ignore-not-found
   ignore-not-found = false
 endif
+
+##@ Util
 
 # go-get-tool will 'go get' any package $2 and install it to $1.
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
