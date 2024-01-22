@@ -6,7 +6,7 @@ on:
     branches: ["main"]
     
 jobs:
-  unit_tests:
+  client_coverage:
     runs-on: ubuntu-latest
     steps:
       - name: Install Go
