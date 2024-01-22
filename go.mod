@@ -1,6 +1,8 @@
 module github.com/Azure/aks-tls-bootstrap-client
 
-go 1.20
+go 1.21
+
+toolchain go1.21.3
 
 require (
 	github.com/Azure/go-autorest/autorest v0.11.29
@@ -36,6 +38,7 @@ require (
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
 	github.com/golang-jwt/jwt/v5 v5.0.0 // indirect
+	github.com/golang/mock v1.6.0 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/gnostic-models v0.6.8 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect

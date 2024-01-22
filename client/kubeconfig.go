@@ -3,7 +3,7 @@
 
 package client
 
-//go:generate ../../bin/mockgen -copyright_file=../../hack/copyright_header.txt -destination=./mocks/mock_kubeconfig.go -package=mocks github.com/Azure/aks-tls-bootstrap-client/pkg/client KubeConfigClient
+//go:generate ../../bin/mockgen -copyright_file=../../hack/copyright_header.txt -destination=./mocks/mock_kubeclient.go -package=mocks github.com/Azure/aks-secure-tls-bootstrap/client KubeClient
 
 import (
 	"fmt"
