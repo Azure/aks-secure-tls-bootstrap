@@ -20,7 +20,7 @@ jobs:
         run: make test-coverage-client
       - name: Remove mocks.go lines from coverage_raw.out
         run: |
-          pushd client/
+          pushd client
           sed '/mocks.go/d' coverage_raw.out > coverage.out
           popd
       - name: Convert coverage to lcov
