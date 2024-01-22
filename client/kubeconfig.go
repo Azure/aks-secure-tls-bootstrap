@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"go.uber.org/zap"
+	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/transport"
@@ -19,6 +20,7 @@ import (
 
 type KubeClient interface {
 	IsKubeConfigStillValid(kubeConfigPath string) (bool, error)
+	EnsureClusterConnectivity(kubeConfigPath string) error
 }
 
 func NewKubeClient(logger *zap.Logger) KubeClient {
@@ -55,6 +57,26 @@ func (c *kubeClientImpl) IsKubeConfigStillValid(kubeConfigPath string) (bool, er
 
 	c.logger.Debug("kubeconfig is invalid. bootstrapping will continue")
 	return false, nil
+}
+
+func (c *kubeClientImpl) EnsureClusterConnectivity(kubeConfigPath string) error {
+	c.logger.Debug("ensuring cluster connectivity...")
+	config, err := clientcmd.BuildConfigFromFlags("", kubeConfigPath)
+	if err != nil {
+		return fmt.Errorf("unable to build config: %v", err)
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return fmt.Errorf("unable to create clientset: %v", err)
+	}
+
+	_, err = clientset.Discovery().ServerVersion()
+	if err != nil {
+		return fmt.Errorf("unable to check server version: %v", err)
+	}
+	c.logger.Debug("cluster connectivity is confirmed")
+	return nil
 }
 
 // copied from https://github.com/kubernetes/kubernetes/blob/e45f5b089f770b1c8a1583f2792176bfe450bb47/pkg/kubelet/certificate/bootstrap/bootstrap.go#L231
