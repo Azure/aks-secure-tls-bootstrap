@@ -23,7 +23,6 @@ jobs:
           pushd client
           sed '/mocks.go/d' coverage_raw.out > coverage.out
           popd
-          ls -la client
       - name: Convert coverage to lcov
         uses: jandelgado/gcov2lcov-action@v1
         with:
@@ -31,5 +30,5 @@ jobs:
       - name: Coveralls
         uses: coverallsapp/github-action@v2
         with:
-          path-to-lcov: coverage.lcov
+          path-to-lcov: client/coverage.lcov
           github-token: ${{ secrets.GITHUB_TOKEN }}
