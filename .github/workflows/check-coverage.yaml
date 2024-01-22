@@ -1,4 +1,4 @@
-name: "Test coverage"
+name: "Test Client Module Coverage"
 on:
   push:
     branches: ["main"]
