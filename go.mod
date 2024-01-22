@@ -2,8 +2,6 @@ module github.com/Azure/aks-tls-bootstrap-client
 
 go 1.21
 
-toolchain go1.21.3
-
 require (
 	github.com/Azure/go-autorest/autorest v0.11.29
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.1.0
