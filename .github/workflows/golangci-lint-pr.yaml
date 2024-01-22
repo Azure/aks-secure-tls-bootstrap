@@ -18,8 +18,15 @@ jobs:
         with:
           go-version: '1.21'
       - uses: actions/checkout@v3
-      - name: golangci-lint
+      - name: golangci-lint-client
         uses: golangci/golangci-lint-action@v3
         with:
           version: v1.54
+          working-directory: client
+          only-new-issues: true
+      - name: golangci-lint-service
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: v1.54
+          working-directory: service
           only-new-issues: true
