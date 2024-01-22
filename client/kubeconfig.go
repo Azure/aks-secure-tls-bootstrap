@@ -3,6 +3,8 @@
 
 package client
 
+//go:generate ../bin/mockgen -source=kubeconfig.go -copyright_file=../hack/copyright_header.txt -destination=pkg/mocks/mock_kube.go -package=mocks github.com/Azure/aks-secure-tls-bootstrap/client KubeClient
+
 import (
 	"fmt"
 	"os"
@@ -15,29 +17,43 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 )
 
-func isKubeConfigStillValid(kubeConfigPath string, logger *zap.Logger) (bool, error) {
-	logger.Debug("checking if kubeconfig exists...")
+type KubeClient interface {
+	IsKubeConfigStillValid(kubeConfigPath string) (bool, error)
+}
+
+func NewKubeClient(logger *zap.Logger) KubeClient {
+	return &kubeClientImpl{
+		logger: logger,
+	}
+}
+
+type kubeClientImpl struct {
+	logger *zap.Logger
+}
+
+func (c *kubeClientImpl) IsKubeConfigStillValid(kubeConfigPath string) (bool, error) {
+	c.logger.Debug("checking if kubeconfig exists...")
 
 	_, err := os.Stat(kubeConfigPath)
 	if os.IsNotExist(err) {
-		logger.Debug("kubeconfig does not exist. bootstrapping will continue")
+		c.logger.Debug("kubeconfig does not exist. bootstrapping will continue")
 		return false, nil
 	}
 	if err != nil {
-		logger.Error("error reading existing bootstrap kubeconfig. bootstrapping will continue", zap.Error(err))
+		c.logger.Error("error reading existing bootstrap kubeconfig. bootstrapping will continue", zap.Error(err))
 		return false, nil // not returning an error so bootstrap can continue
 	}
 
-	isValid, err := isClientConfigStillValid(kubeConfigPath, logger)
+	isValid, err := isClientConfigStillValid(kubeConfigPath, c.logger)
 	if err != nil {
 		return false, fmt.Errorf("unable to load kubeconfig: %v", err)
 	}
 	if isValid {
-		logger.Debug("kubeconfig is valid. bootstrapping will not continue")
+		c.logger.Debug("kubeconfig is valid. bootstrapping will not continue")
 		return true, nil
 	}
 
-	logger.Debug("kubeconfig is invalid. bootstrapping will continue")
+	c.logger.Debug("kubeconfig is invalid. bootstrapping will continue")
 	return false, nil
 }
 
