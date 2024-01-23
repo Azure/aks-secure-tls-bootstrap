@@ -3,7 +3,7 @@
 
 package client
 
-//go:generate ../../bin/mockgen -copyright_file=../../hack/copyright_header.txt -destination=./mocks/mock_aad.go -package=mocks github.com/Azure/aks-secure-tls-bootstrap/client AadClient
+//go:generate ../bin/mockgen -copyright_file=../hack/copyright_header.txt -destination=./pkg/mocks/mock_aad.go -package=mocks github.com/Azure/aks-secure-tls-bootstrap/client AadClient
 
 import (
 	"context"
