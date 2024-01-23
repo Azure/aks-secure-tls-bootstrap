@@ -1,4 +1,4 @@
-# aks-tls-bootstrap-client
+# aks-secure-tls-bootstrap
 
 [![Test coverage](https://github.com/Azure/aks-tls-bootstrap-client/actions/workflows/check-coverage.yaml/badge.svg)](https://github.com/Azure/aks-tls-bootstrap-client/actions/workflows/check-coverage.yaml)
 [![Coverage Status](https://coveralls.io/repos/github/Azure/aks-tls-bootstrap-client/badge.svg?branch=main)](https://coveralls.io/github/Azure/aks-tls-bootstrap-client?branch=main)
@@ -7,8 +7,8 @@
 
 This repo contains the following:
 
-- Implementation of the AKS secure TLS bootstrapping protocol client
-- The supporting protobuf definitions and datamodel
+- The [client](client/) module, which makes up the implementation of the AKS secure TLS bootstrap client.
+- The [service](service/) module, which holds and makes available the proto definitions used by the client to communicate with the bootstrap server.
 
 ## Contributing
 
