@@ -1,4 +1,4 @@
-name: "Test coverage"
+name: "Test Client Module Coverage"
 on:
   push:
     branches: ["main"]
@@ -17,15 +17,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Run unit tests with coverage
-        run: make test-coverage
+        run: make test-coverage-client
       - name: Remove mocks.go lines from coverage_raw.out
         run: |
+          pushd client
           sed '/mocks.go/d' coverage_raw.out > coverage.out
+          popd
       - name: Convert coverage to lcov
         uses: jandelgado/gcov2lcov-action@v1
+        with:
+          working-directory: client
       - name: Coveralls
         uses: coverallsapp/github-action@v2
         with:
-          path-to-lcov: coverage.lcov
+          path-to-lcov: client/coverage.lcov
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          
