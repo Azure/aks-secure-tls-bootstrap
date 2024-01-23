@@ -33,11 +33,11 @@ type tlsBootstrapClientImpl struct {
 	kubeClient  KubeClient
 	azureConfig *datamodel.AzureConfig
 
-	customClientID            string
-	nextProto                 string
-	resource                  string
-	kubeConfigPath            string
-	ensureClusterConnectivity bool
+	customClientID                 string
+	nextProto                      string
+	resource                       string
+	kubeConfigPath                 string
+	ensureKubeClientAuthentication bool
 }
 
 func NewTLSBootstrapClient(logger *zap.Logger, opts SecureTLSBootstrapClientOpts) TLSBootstrapClient {
@@ -47,28 +47,28 @@ func NewTLSBootstrapClient(logger *zap.Logger, opts SecureTLSBootstrapClientOpts
 	kubeClient := NewKubeClient(logger)
 
 	return &tlsBootstrapClientImpl{
-		reader:                    reader,
-		logger:                    logger,
-		serviceClientFactory:      secureTLSBootstrapServiceClientFactory,
-		imdsClient:                imdsClient,
-		aadClient:                 aadClient,
-		kubeClient:                kubeClient,
-		customClientID:            opts.CustomClientID,
-		nextProto:                 opts.NextProto,
-		resource:                  opts.AADResource,
-		kubeConfigPath:            opts.KubeconfigPath,
-		ensureClusterConnectivity: opts.EnsureClusterConnectivity,
+		reader:                         reader,
+		logger:                         logger,
+		serviceClientFactory:           secureTLSBootstrapServiceClientFactory,
+		imdsClient:                     imdsClient,
+		aadClient:                      aadClient,
+		kubeClient:                     kubeClient,
+		customClientID:                 opts.CustomClientID,
+		nextProto:                      opts.NextProto,
+		resource:                       opts.AADResource,
+		kubeConfigPath:                 opts.KubeconfigPath,
+		ensureKubeClientAuthentication: opts.EnsureKubeClientAuthentication,
 	}
 }
 
 func (c *tlsBootstrapClientImpl) GetBootstrapToken(ctx context.Context) (string, error) {
 	isValid, err := c.kubeClient.IsKubeConfigStillValid(c.kubeConfigPath)
 	if err != nil || isValid {
-		return "", err // error will ne nil if kubeconfig is valid
+		return "", err // error will be nil if kubeconfig is valid
 	}
 
-	if c.ensureClusterConnectivity {
-		err := c.kubeClient.EnsureClusterConnectivity(c.kubeConfigPath)
+	if c.ensureKubeClientAuthentication {
+		err := c.kubeClient.EnsureKubeClientAuthentication(c.kubeConfigPath)
 		if err != nil {
 			return "", err
 		}

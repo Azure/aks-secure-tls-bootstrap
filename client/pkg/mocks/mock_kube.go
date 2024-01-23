@@ -36,18 +36,18 @@ func (m *MockKubeClient) EXPECT() *MockKubeClientMockRecorder {
 	return m.recorder
 }
 
-// EnsureClusterConnectivity mocks base method.
-func (m *MockKubeClient) EnsureClusterConnectivity(kubeConfigPath string) error {
+// EnsureKubeClientAuthentication mocks base method.
+func (m *MockKubeClient) EnsureKubeClientAuthentication(kubeConfigPath string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "EnsureClusterConnectivity", kubeConfigPath)
+	ret := m.ctrl.Call(m, "EnsureKubeClientAuthentication", kubeConfigPath)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// EnsureClusterConnectivity indicates an expected call of EnsureClusterConnectivity.
-func (mr *MockKubeClientMockRecorder) EnsureClusterConnectivity(kubeConfigPath interface{}) *gomock.Call {
+// EnsureKubeClientAuthentication indicates an expected call of EnsureKubeClientAuthentication.
+func (mr *MockKubeClientMockRecorder) EnsureKubeClientAuthentication(kubeConfigPath interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureClusterConnectivity", reflect.TypeOf((*MockKubeClient)(nil).EnsureClusterConnectivity), kubeConfigPath)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureKubeClientAuthentication", reflect.TypeOf((*MockKubeClient)(nil).EnsureKubeClientAuthentication), kubeConfigPath)
 }
 
 // IsKubeConfigStillValid mocks base method.

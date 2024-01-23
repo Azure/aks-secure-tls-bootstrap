@@ -20,7 +20,7 @@ import (
 
 type KubeClient interface {
 	IsKubeConfigStillValid(kubeConfigPath string) (bool, error)
-	EnsureClusterConnectivity(kubeConfigPath string) error
+	EnsureKubeClientAuthentication(kubeConfigPath string) error
 }
 
 func NewKubeClient(logger *zap.Logger) KubeClient {
@@ -59,7 +59,7 @@ func (c *kubeClientImpl) IsKubeConfigStillValid(kubeConfigPath string) (bool, er
 	return false, nil
 }
 
-func (c *kubeClientImpl) EnsureClusterConnectivity(kubeConfigPath string) error {
+func (c *kubeClientImpl) EnsureKubeClientAuthentication(kubeConfigPath string) error {
 	c.logger.Debug("ensuring cluster connectivity...")
 	config, err := clientcmd.BuildConfigFromFlags("", kubeConfigPath)
 	if err != nil {
