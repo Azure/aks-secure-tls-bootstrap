@@ -15,12 +15,12 @@ import (
 )
 
 const (
-	flagCustomClientID        = "custom-client-id"
-	flagLogFormat             = "log-format"
-	flagNextProto             = "next-proto"
-	flagAADResource           = "aad-resource"
-	flagVerbose               = "verbose"
-	flagKubeconfigPath        = "kubeconfig"
+	flagCustomClientID             = "custom-client-id"
+	flagLogFormat                  = "log-format"
+	flagNextProto                  = "next-proto"
+	flagAADResource                = "aad-resource"
+	flagVerbose                    = "verbose"
+	flagKubeconfigPath             = "kubeconfig"
 	ensureKubeClientAuthentication = "ensure-cluster-connectivity"
 )
 
@@ -75,6 +75,6 @@ func createBootstrapCommand() *cobra.Command {
 	cmd.Flags().StringVar(&opts.LogFormat, flagLogFormat, "json", "Log format: json or text.")
 	cmd.Flags().StringVar(&opts.KubeconfigPath, flagKubeconfigPath, "", "Path to kubeconfig file containing the generated kubelet client certificate.")
 	cmd.Flags().BoolVar(&opts.Verbose, flagVerbose, false, "Enable verbose logging.")
-	cmd.Flags().BoolVar(&opts.EnsureKubeClientAuthentication, ensureKubeClientAuthentication, false, "Ensure cluster connectivity before generating the bootstrap token.")
+	cmd.Flags().BoolVar(&opts.EnsureKubeClientAuthentication, ensureKubeClientAuthentication, false, "Ensure cluster authentication before generating the bootstrap token.")
 	return cmd
 }
