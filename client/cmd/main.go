@@ -10,16 +10,18 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/Azure/aks-secure-tls-bootstrap/client"
+	"github.com/Azure/aks-tls-bootstrap-client/pkg/client"
 	"github.com/spf13/cobra"
 )
 
 const (
-	flagCustomClientID = "custom-client-id"
-	flagLogFormat      = "log-format"
-	flagNextProto      = "next-proto"
-	flagAADResource    = "aad-resource"
-	flagVerbose        = "verbose"
+	flagCustomClientID        = "custom-client-id"
+	flagLogFormat             = "log-format"
+	flagNextProto             = "next-proto"
+	flagAADResource           = "aad-resource"
+	flagVerbose               = "verbose"
+	flagKubeconfigPath        = "kubeconfig"
+	ensureClusterConnectivity = "ensure-cluster-connectivity"
 )
 
 var rootCmd = &cobra.Command{
@@ -71,6 +73,8 @@ func createBootstrapCommand() *cobra.Command {
 	cmd.Flags().StringVar(&opts.AADResource, flagAADResource, "", "The resource (audience) used to request JWT tokens from AAD for authentication")
 	cmd.Flags().StringVar(&opts.NextProto, flagNextProto, "", "The ALPN Next Protocol value to send within requests to the bootstrap server.")
 	cmd.Flags().StringVar(&opts.LogFormat, flagLogFormat, "json", "Log format: json or text.")
+	cmd.Flags().StringVar(&opts.KubeconfigPath, flagKubeconfigPath, "", "Path to kubeconfig file containing the generated kubelet client certificate.")
 	cmd.Flags().BoolVar(&opts.Verbose, flagVerbose, false, "Enable verbose logging.")
+	cmd.Flags().BoolVar(&opts.EnsureClusterConnectivity, ensureClusterConnectivity, false, "Ensure cluster connectivity before generating the bootstrap token.")
 	return cmd
 }
