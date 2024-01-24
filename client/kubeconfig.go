@@ -73,6 +73,7 @@ func (c *kubeClientImpl) EnsureKubeClientAuthentication(kubeConfigPath string) e
 
 	_, err = clientset.Discovery().ServerVersion()
 	if err != nil {
+		// TODO 26554858: see if we can detect the exact clientset error so that we can retry on specific errors or return
 		return fmt.Errorf("unable to check server version: %v", err)
 	}
 	c.logger.Debug("cluster connectivity is confirmed")
