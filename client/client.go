@@ -30,31 +30,50 @@ type tlsBootstrapClientImpl struct {
 
 	imdsClient  ImdsClient
 	aadClient   AadClient
+	kubeClient  KubeClient
 	azureConfig *datamodel.AzureConfig
 
-	customClientID string
-	nextProto      string
-	resource       string
+	customClientID                 string
+	nextProto                      string
+	resource                       string
+	kubeConfigPath                 string
+	ensureKubeClientAuthentication bool
 }
 
 func NewTLSBootstrapClient(logger *zap.Logger, opts SecureTLSBootstrapClientOpts) TLSBootstrapClient {
 	reader := newOSFileReader()
 	imdsClient := NewImdsClient(logger)
 	aadClient := NewAadClient(reader, logger)
+	kubeClient := NewKubeClient(logger)
 
 	return &tlsBootstrapClientImpl{
-		reader:               reader,
-		logger:               logger,
-		serviceClientFactory: secureTLSBootstrapServiceClientFactory,
-		imdsClient:           imdsClient,
-		aadClient:            aadClient,
-		customClientID:       opts.CustomClientID,
-		nextProto:            opts.NextProto,
-		resource:             opts.AADResource,
+		reader:                         reader,
+		logger:                         logger,
+		serviceClientFactory:           secureTLSBootstrapServiceClientFactory,
+		imdsClient:                     imdsClient,
+		aadClient:                      aadClient,
+		kubeClient:                     kubeClient,
+		customClientID:                 opts.CustomClientID,
+		nextProto:                      opts.NextProto,
+		resource:                       opts.AADResource,
+		kubeConfigPath:                 opts.KubeconfigPath,
+		ensureKubeClientAuthentication: opts.EnsureKubeClientAuthentication,
 	}
 }
 
 func (c *tlsBootstrapClientImpl) GetBootstrapToken(ctx context.Context) (string, error) {
+	isValid, err := c.kubeClient.IsKubeConfigStillValid(c.kubeConfigPath)
+	if err != nil || isValid {
+		return "", err // error will be nil if kubeconfig is valid
+	}
+
+	if c.ensureKubeClientAuthentication {
+		err := c.kubeClient.EnsureKubeClientAuthentication(c.kubeConfigPath)
+		if err != nil {
+			return "", err
+		}
+	}
+
 	c.logger.Debug("loading exec credential...")
 	execCredential, err := loadExecCredential()
 	if err != nil {

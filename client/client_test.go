@@ -153,6 +153,7 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 		mockCtrl           *gomock.Controller
 		imdsClient         *mocks.MockImdsClient
 		aadClient          *mocks.MockAadClient
+		kubeClient         *mocks.MockKubeClient
 		serviceClient      *mocks_secureTLSBootstrapService.MockSecureTLSBootstrapServiceClient
 		tlsBootstrapClient *tlsBootstrapClientImpl
 		mockReader         *mocks.MockfileReader
@@ -175,12 +176,14 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 			imdsClient = mocks.NewMockImdsClient(mockCtrl)
 			aadClient = mocks.NewMockAadClient(mockCtrl)
 			mockReader = mocks.NewMockfileReader(mockCtrl)
+			kubeClient = mocks.NewMockKubeClient(mockCtrl)
 			serviceClient = mocks_secureTLSBootstrapService.NewMockSecureTLSBootstrapServiceClient(mockCtrl)
 
 			tlsBootstrapClient = &tlsBootstrapClientImpl{
 				logger:     testLogger,
 				imdsClient: imdsClient,
 				aadClient:  aadClient,
+				kubeClient: kubeClient,
 				reader:     mockReader,
 			}
 			tlsBootstrapClient.serviceClientFactory = func(
@@ -201,6 +204,8 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 
+				kubeClient.EXPECT().IsKubeConfigStillValid(gomock.Any()).Return(false, nil).Times(1)
+
 				token, err := tlsBootstrapClient.GetBootstrapToken(ctx)
 				Expect(token).To(BeEmpty())
 				Expect(err).ToNot(BeNil())
@@ -213,6 +218,8 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 				setDefaultMockExecCredential()
+
+				kubeClient.EXPECT().IsKubeConfigStillValid(gomock.Any()).Return(false, nil).Times(1)
 				mockReader.EXPECT().ReadFile(gomock.Any()).
 					Return([]byte(emptyJSON), nil).
 					Times(1)
@@ -229,6 +236,7 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 				setDefaultMockExecCredential()
+				kubeClient.EXPECT().IsKubeConfigStillValid(gomock.Any()).Return(false, nil).Times(1)
 				mockReader.EXPECT().ReadFile(gomock.Any()).
 					Return(defaultMockAzureConfigBytes, nil).
 					Times(1)
@@ -249,6 +257,7 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 				setDefaultMockExecCredential()
+				kubeClient.EXPECT().IsKubeConfigStillValid(gomock.Any()).Return(false, nil).Times(1)
 				mockReader.EXPECT().ReadFile(gomock.Any()).
 					Return(defaultMockAzureConfigBytes, nil).
 					Times(1)
@@ -275,6 +284,7 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 				mockReader.EXPECT().ReadFile(gomock.Any()).
 					Return(defaultMockAzureConfigBytes, nil).
 					Times(1)
+				kubeClient.EXPECT().IsKubeConfigStillValid(gomock.Any()).Return(false, nil).Times(1)
 				aadClient.EXPECT().GetAadToken(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return("spToken", nil).
 					Times(1)
@@ -298,6 +308,7 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 				setDefaultMockExecCredential()
+				kubeClient.EXPECT().IsKubeConfigStillValid(gomock.Any()).Return(false, nil).Times(1)
 				mockReader.EXPECT().ReadFile(gomock.Any()).
 					Return(defaultMockAzureConfigBytes, nil).
 					Times(1)
@@ -327,6 +338,7 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 				setDefaultMockExecCredential()
+				kubeClient.EXPECT().IsKubeConfigStillValid(gomock.Any()).Return(false, nil).Times(1)
 				mockReader.EXPECT().ReadFile(gomock.Any()).
 					Return(defaultMockAzureConfigBytes, nil).
 					Times(1)
@@ -359,6 +371,7 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 				setDefaultMockExecCredential()
+				kubeClient.EXPECT().IsKubeConfigStillValid(gomock.Any()).Return(false, nil).Times(1)
 				mockReader.EXPECT().ReadFile(gomock.Any()).
 					Return(defaultMockAzureConfigBytes, nil).
 					Times(1)
@@ -391,6 +404,7 @@ var _ = Describe("TLS Bootstrap client tests", func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 				setDefaultMockExecCredential()
+				kubeClient.EXPECT().IsKubeConfigStillValid(gomock.Any()).Return(false, nil).Times(1)
 				mockReader.EXPECT().ReadFile(gomock.Any()).
 					Return(defaultMockAzureConfigBytes, nil).
 					Times(1)

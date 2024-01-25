@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	mocks "github.com/Azure/aks-secure-tls-bootstrap/client/pkg/mocks"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"go.uber.org/mock/gomock"
@@ -27,26 +26,17 @@ const (
 
 var _ = Describe("TLS Bootstrap kubeconfig tests", func() {
 	var (
-		mockCtrl           *gomock.Controller
-		imdsClient         *mocks.MockImdsClient
-		aadClient          *mocks.MockAadClient
-		tlsBootstrapClient *tlsBootstrapClientImpl
-		mockReader         *mocks.MockfileReader
+		mockCtrl   *gomock.Controller
+		kubeClient KubeClient
 	)
 
 	Context("isKubeConfigStillValid Tests", func() {
 		BeforeEach(func() {
 
 			mockCtrl = gomock.NewController(GinkgoT())
-			imdsClient = mocks.NewMockImdsClient(mockCtrl)
-			aadClient = mocks.NewMockAadClient(mockCtrl)
-			mockReader = mocks.NewMockfileReader(mockCtrl)
 
-			tlsBootstrapClient = &tlsBootstrapClientImpl{
-				logger:     testLogger,
-				imdsClient: imdsClient,
-				aadClient:  aadClient,
-				reader:     mockReader,
+			kubeClient = &kubeClientImpl{
+				logger: testLogger,
 			}
 		})
 
@@ -73,7 +63,7 @@ var _ = Describe("TLS Bootstrap kubeconfig tests", func() {
 				err = writeKubeconfigFromBootstrapping(bootstrapClientConfig, tempFile.Name(), false)
 				Expect(err).To(BeNil())
 
-				isValid, err := isKubeConfigStillValid(tempFile.Name(), tlsBootstrapClient.logger)
+				isValid, err := kubeClient.IsKubeConfigStillValid(tempFile.Name())
 				Expect(isValid).To(Equal(true))
 				Expect(err).To(BeNil())
 			})
@@ -85,7 +75,7 @@ var _ = Describe("TLS Bootstrap kubeconfig tests", func() {
 				Expect(err).To(BeNil())
 				defer os.Remove(tempFile.Name())
 
-				isValid, err := isKubeConfigStillValid(tempFile.Name(), tlsBootstrapClient.logger)
+				isValid, err := kubeClient.IsKubeConfigStillValid(tempFile.Name())
 				Expect(isValid).To(Equal(false))
 				Expect(err).ToNot(BeNil())
 				Expect(err.Error()).To(ContainSubstring("unable to load kubeconfig"))
@@ -95,7 +85,7 @@ var _ = Describe("TLS Bootstrap kubeconfig tests", func() {
 		When("kubeconfig path is malformed", func() {
 			It("should return false and not error", func() {
 				longPath := strings.Repeat("a", 1<<16) // a string with 65536 characters
-				isValid, err := isKubeConfigStillValid(longPath, tlsBootstrapClient.logger)
+				isValid, err := kubeClient.IsKubeConfigStillValid(longPath)
 				Expect(isValid).To(Equal(false))
 				Expect(err).To(BeNil())
 			})
@@ -122,7 +112,7 @@ var _ = Describe("TLS Bootstrap kubeconfig tests", func() {
 				err = writeKubeconfigFromBootstrapping(bootstrapClientConfig, tempFile.Name(), false)
 				Expect(err).To(BeNil())
 
-				isValid, err := isKubeConfigStillValid(tempFile.Name(), tlsBootstrapClient.logger)
+				isValid, err := kubeClient.IsKubeConfigStillValid(tempFile.Name())
 				Expect(isValid).To(Equal(false))
 				Expect(err).ToNot(BeNil())
 				Expect(err.Error()).To(ContainSubstring("private key does not match public key"))
@@ -148,7 +138,7 @@ var _ = Describe("TLS Bootstrap kubeconfig tests", func() {
 				err = writeKubeconfigFromBootstrapping(bootstrapClientConfig, tempFile.Name(), false)
 				Expect(err).To(BeNil())
 
-				isValid, err := isKubeConfigStillValid(tempFile.Name(), tlsBootstrapClient.logger)
+				isValid, err := kubeClient.IsKubeConfigStillValid(tempFile.Name())
 				Expect(isValid).To(Equal(false))
 				Expect(err).To(BeNil())
 			})
@@ -179,7 +169,7 @@ var _ = Describe("TLS Bootstrap kubeconfig tests", func() {
 				err = writeKubeconfigFromBootstrapping(bootstrapClientConfig, tempFile.Name(), true)
 				Expect(err).To(BeNil())
 
-				isValid, err := isKubeConfigStillValid(tempFile.Name(), tlsBootstrapClient.logger)
+				isValid, err := kubeClient.IsKubeConfigStillValid(tempFile.Name())
 				Expect(isValid).To(Equal(false))
 				Expect(err).ToNot(BeNil())
 				Expect(err.Error()).To(ContainSubstring("exec plugin: invalid apiVersion"))
@@ -188,7 +178,7 @@ var _ = Describe("TLS Bootstrap kubeconfig tests", func() {
 
 		When("kubeconfig does not exist", func() {
 			It("should return false and not have an error", func() {
-				isValid, err := isKubeConfigStillValid("dummy", tlsBootstrapClient.logger)
+				isValid, err := kubeClient.IsKubeConfigStillValid("dummy")
 				Expect(isValid).To(Equal(false))
 				Expect(err).To(BeNil())
 			})

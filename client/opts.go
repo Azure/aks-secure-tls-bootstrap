@@ -6,11 +6,13 @@ package client
 import "fmt"
 
 type SecureTLSBootstrapClientOpts struct {
-	CustomClientID string
-	NextProto      string
-	AADResource    string
-	LogFormat      string
-	Verbose        bool
+	CustomClientID                 string
+	NextProto                      string
+	AADResource                    string
+	LogFormat                      string
+	KubeconfigPath                 string
+	Verbose                        bool
+	EnsureKubeClientAuthentication bool
 }
 
 func (o SecureTLSBootstrapClientOpts) Validate() error {
