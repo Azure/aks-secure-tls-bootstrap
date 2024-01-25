@@ -21,7 +21,7 @@ const (
 	flagAADResource                = "aad-resource"
 	flagVerbose                    = "verbose"
 	flagKubeconfigPath             = "kubeconfig"
-	ensureKubeClientAuthentication = "ensure-cluster-connectivity"
+	ensureKubeClientAuthentication = "ensure-kube-client-authentication"
 )
 
 var rootCmd = &cobra.Command{
@@ -75,6 +75,6 @@ func createBootstrapCommand() *cobra.Command {
 	cmd.Flags().StringVar(&opts.LogFormat, flagLogFormat, "json", "Log format: json or text.")
 	cmd.Flags().StringVar(&opts.KubeconfigPath, flagKubeconfigPath, "", "Path to kubeconfig file containing the generated kubelet client certificate.")
 	cmd.Flags().BoolVar(&opts.Verbose, flagVerbose, false, "Enable verbose logging.")
-	cmd.Flags().BoolVar(&opts.EnsureKubeClientAuthentication, ensureKubeClientAuthentication, false, "Ensure kubernetes client authentication before generating the bootstrap token.")
+	cmd.Flags().BoolVar(&opts.EnsureKubeClientAuthentication, ensureKubeClientAuthentication, false, "Ensure kubernetes client authentication before generating a new certificate.")
 	return cmd
 }
