@@ -46,7 +46,7 @@ func main() {
 
 func createBootstrapCommand() *cobra.Command {
 	var (
-		opts    *client.GetKubeletClientCredentialOpts
+		opts    = new(client.GetKubeletClientCredentialOpts)
 		logFile string
 		format  string
 		verbose bool
