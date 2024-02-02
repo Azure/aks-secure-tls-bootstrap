@@ -28,3 +28,4 @@ jobs:
         with:
           version: v1.54
           working-directory: service
+          args: --timeout=10m
