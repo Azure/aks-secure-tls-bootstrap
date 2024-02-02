@@ -4,13 +4,7 @@
 package kubeconfig
 
 import (
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/x509"
-	"crypto/x509/pkix"
-	"encoding/pem"
 	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/testutil"
@@ -198,47 +192,3 @@ var _ = Describe("Validator", func() {
 		})
 	})
 })
-
-func generateMockCertPEMWithExpiration(cn string, org string, expiration time.Time) ([]byte, []byte) {
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	Expect(err).To(BeNil())
-
-	template := x509.Certificate{
-		SerialNumber: big.NewInt(1),
-		Subject: pkix.Name{
-			CommonName:   cn,
-			Organization: []string{org},
-		},
-		NotBefore: time.Now(),
-		NotAfter:  expiration,
-
-		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		BasicConstraintsValid: true,
-	}
-
-	certBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &privateKey.PublicKey, privateKey)
-	Expect(err).To(BeNil())
-
-	certPEM := pem.EncodeToMemory(&pem.Block{
-		Type:  "CERTIFICATE",
-		Bytes: certBytes,
-	})
-
-	keyPEM := pem.EncodeToMemory(&pem.Block{
-		Type:  "RSA PRIVATE KEY",
-		Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
-	})
-
-	return certPEM, keyPEM
-}
-
-func generatePrivateKeyPEM() []byte {
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	Expect(err).To(BeNil())
-	keyPEM := pem.EncodeToMemory(&pem.Block{
-		Type:  "RSA PRIVATE KEY",
-		Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
-	})
-	return keyPEM
-}
