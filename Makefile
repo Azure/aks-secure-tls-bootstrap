@@ -58,11 +58,11 @@ coverage: test-coverage-client
 
 .PHONY: test-client
 test-client: ## Test all applicable go packages within the client module.
-	pushd $(PROJECT_DIR)/client && go test $(shell go list ./... | grep -v proto | grep -v vendor | grep -v mock) && popd
+	pushd $(PROJECT_DIR)/client && go test $(shell cd client && go list ./... | grep -v proto | grep -v vendor | grep -v mock) && popd
 
 .PHONY: test-coverage-client
 test-coverage-client: ## Test all applicable go packages within the client module and calculate coverage.
-	pushd $(PROJECT_DIR)/client && go test $(shell go list ./... | grep -v proto | grep -v vendor | grep -v mock) -coverprofile coverage_raw.out -covermode count && popd
+	pushd $(PROJECT_DIR)/client && go test $(shell cd client && go list ./... | grep -v proto | grep -v vendor | grep -v mock) -coverprofile coverage_raw.out -covermode count && popd
 
 .PHONY: protobuf
 protobuf: # Generates protobuf implementation files within the service module.
@@ -92,11 +92,11 @@ build-client-all: fmt vet ## Builds the client binary for all platforms/architec
 
 .PHONY: build-client-linux
 build-client-linux: ## Builds the client binary for the specified linux architecture.
-	pushd $(PROJECT_DIR)/client && CGO_ENABLED=0 GOOS=linux GOARCH=$(ARCH) go build -o bin/tls-bootstrap-client-$(ARCH) cmd/main.go && popd
+	pushd $(PROJECT_DIR)/client && CGO_ENABLED=0 GOOS=linux GOARCH=$(ARCH) go build -o bin/tls-bootstrap-client-$(ARCH) cmd/client/main.go && popd
 
 .PHONY: build-client-windows
 build-client-windows: ## Builds the client binary for the specified windows architecture.
-	pushd $(PROJECT_DIR)/client && CGO_ENABLED=0 GOOS=windows GOARCH=$(ARCH) go build -o bin/tls-bootstrap-client-$(ARCH).exe cmd/main.go && popd
+	pushd $(PROJECT_DIR)/client && CGO_ENABLED=0 GOOS=windows GOARCH=$(ARCH) go build -o bin/tls-bootstrap-client-$(ARCH).exe cmd/client/main.go && popd
 
 ifndef ignore-not-found
   ignore-not-found = false
