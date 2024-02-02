@@ -8,6 +8,11 @@ import (
 	"fmt"
 )
 
+const (
+	// The clientId used to denote Managed Service Identities (MSI).
+	managedServiceIdentity = "msi"
+)
+
 // getAuthToken retrieves the auth token (JWT) from AAD used to validate the node's identity with the bootstrap server.
 // If the user specifies their own client ID, meaning they've brought their own node, we assume that they're specifying
 // a user-assigned managed identity and thus fetch the corresponding MSI token from IMDS. Otherwise, the information specified
