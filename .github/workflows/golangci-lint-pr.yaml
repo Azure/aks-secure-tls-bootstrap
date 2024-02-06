@@ -24,9 +24,11 @@ jobs:
           version: v1.54
           working-directory: client
           only-new-issues: true
+          args: --timeout=10m
       - name: golangci-lint-service
         uses: golangci/golangci-lint-action@v3
         with:
           version: v1.54
           working-directory: service
           only-new-issues: true
+          args: --timeout=10m
