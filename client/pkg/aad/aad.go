@@ -47,6 +47,7 @@ func (c *ClientImpl) GetToken(ctx context.Context, azureConfig *datamodel.AzureC
 		return "", fmt.Errorf("failed to create confidential secret credential from azure.json: %w", err)
 	}
 
+	// confirmed that this value will be AzureStackCloud in AGC environments
 	env, err := azure.EnvironmentFromName(azureConfig.Cloud)
 	if err != nil {
 		return "", fmt.Errorf("getting azure environment from name %q: %w", azureConfig.Cloud, err)
