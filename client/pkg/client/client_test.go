@@ -447,7 +447,7 @@ var _ = Describe("SecureTLSBootstrapClient tests", func() {
 			})
 
 			When("client opts are valid", func() {
-				It("should validagte without error", func() {
+				It("should validate without error", func() {
 					tempDir := GinkgoT().TempDir()
 					clusterCAFilePath := filepath.Join(tempDir, "ca.crt")
 					err := os.WriteFile(clusterCAFilePath, clusterCACertPEM, os.ModePerm)
