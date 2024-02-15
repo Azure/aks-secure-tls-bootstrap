@@ -10,7 +10,7 @@ import (
 	"net/http/httptest"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/datamodel"
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 

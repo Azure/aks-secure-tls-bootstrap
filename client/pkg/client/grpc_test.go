@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/testutil"
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"google.golang.org/grpc/test/bufconn"
 )

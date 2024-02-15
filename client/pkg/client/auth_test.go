@@ -9,7 +9,7 @@ import (
 	aadmocks "github.com/Azure/aks-secure-tls-bootstrap/client/pkg/aad/mocks"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/datamodel"
 	imdsmocks "github.com/Azure/aks-secure-tls-bootstrap/client/pkg/imds/mocks"
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"go.uber.org/mock/gomock"
 )
@@ -49,9 +49,8 @@ var _ = Describe("Auth", func() {
 					var azureConfig *datamodel.AzureConfig
 					ctx, cancel := context.WithCancel(context.Background())
 					defer cancel()
-					bootstrapClient.azureConfig = azureConfig
 
-					token, err := bootstrapClient.getAuthToken(ctx, emptyClientID, resource)
+					token, err := bootstrapClient.getAuthToken(ctx, emptyClientID, resource, azureConfig)
 					Expect(token).To(BeEmpty())
 					Expect(err).ToNot(BeNil())
 					Expect(err.Error()).To(ContainSubstring("unable to get auth token: azure config is nil"))
@@ -76,9 +75,8 @@ var _ = Describe("Auth", func() {
 					}
 					ctx, cancel := context.WithCancel(context.Background())
 					defer cancel()
-					bootstrapClient.azureConfig = azureConfig
 
-					token, err := bootstrapClient.getAuthToken(ctx, emptyClientID, resource)
+					token, err := bootstrapClient.getAuthToken(ctx, emptyClientID, resource, azureConfig)
 					Expect(token).To(BeEmpty())
 					Expect(err).ToNot(BeNil())
 					Expect(err.Error()).To(ContainSubstring("unable to infer node identity type: client ID in azure.json is empty"))
@@ -103,9 +101,8 @@ var _ = Describe("Auth", func() {
 					}
 					ctx, cancel := context.WithCancel(context.Background())
 					defer cancel()
-					bootstrapClient.azureConfig = azureConfig
 
-					token, err := bootstrapClient.getAuthToken(ctx, emptyClientID, resource)
+					token, err := bootstrapClient.getAuthToken(ctx, emptyClientID, resource, azureConfig)
 					Expect(token).To(BeEmpty())
 					Expect(err).ToNot(BeNil())
 					Expect(err.Error()).To(ContainSubstring("cannot retrieve SP token from AAD: azure.json missing clientSecret"))
@@ -130,9 +127,8 @@ var _ = Describe("Auth", func() {
 					}
 					ctx, cancel := context.WithCancel(context.Background())
 					defer cancel()
-					bootstrapClient.azureConfig = azureConfig
 
-					token, err := bootstrapClient.getAuthToken(ctx, emptyClientID, resource)
+					token, err := bootstrapClient.getAuthToken(ctx, emptyClientID, resource, azureConfig)
 					Expect(token).To(BeEmpty())
 					Expect(err).ToNot(BeNil())
 					Expect(err.Error()).To(ContainSubstring("cannot retrieve SP token from AAD: azure.json missing tenantId"))
@@ -156,9 +152,8 @@ var _ = Describe("Auth", func() {
 					}
 					ctx, cancel := context.WithCancel(context.Background())
 					defer cancel()
-					bootstrapClient.azureConfig = azureConfigWithMSI
 
-					msiToken, err := bootstrapClient.getAuthToken(ctx, emptyClientID, resource)
+					msiToken, err := bootstrapClient.getAuthToken(ctx, emptyClientID, resource, azureConfigWithMSI)
 					Expect(err).To(BeNil())
 					Expect(msiToken).To(Equal("mockMSIToken"))
 				})
@@ -179,9 +174,8 @@ var _ = Describe("Auth", func() {
 					}
 					ctx, cancel := context.WithCancel(context.Background())
 					defer cancel()
-					bootstrapClient.azureConfig = azureConfigWithMSI
 
-					msiToken, err := bootstrapClient.getAuthToken(ctx, emptyClientID, resource)
+					msiToken, err := bootstrapClient.getAuthToken(ctx, emptyClientID, resource, azureConfigWithMSI)
 					Expect(err).To(BeNil())
 					Expect(msiToken).To(Equal("mockMSIToken"))
 				})
@@ -204,9 +198,8 @@ var _ = Describe("Auth", func() {
 					).Times(0)
 					ctx, cancel := context.WithCancel(context.Background())
 					defer cancel()
-					bootstrapClient.azureConfig = azureConfigSPN
 
-					spToken, err := bootstrapClient.getAuthToken(ctx, emptyClientID, resource)
+					spToken, err := bootstrapClient.getAuthToken(ctx, emptyClientID, resource, azureConfigSPN)
 					Expect(err).To(BeNil())
 					Expect(spToken).To(Equal("spToken"))
 				})
@@ -225,11 +218,10 @@ var _ = Describe("Auth", func() {
 					gomock.Any(),
 					gomock.Any(),
 				).Times(0)
-
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 
-				token, err := bootstrapClient.getAuthToken(ctx, nonEmptyClientID, resource)
+				token, err := bootstrapClient.getAuthToken(ctx, nonEmptyClientID, resource, nil)
 				Expect(err).To(BeNil())
 				Expect(token).To(Equal("mockMSIToken"))
 			})
