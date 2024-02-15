@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/testutil"
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
@@ -24,16 +24,16 @@ var _ = Describe("kubeconfig tests", func() {
 			Expect(err).To(BeNil())
 
 			opts := &GenerateOpts{
-				APIServerFQDN:     "host",
-				ClusterCAFilePath: "path/to/ca.crt",
+				APIServerFQDN: "host",
+				ClusterCAData: certPEM,
 			}
 
-			kubeconfigData, err := GenerateKubeconfigForCertAndKey(certPEM, privateKey, opts)
+			kubeconfigData, err := GenerateForCertAndKey(certPEM, privateKey, opts)
 			Expect(err).To(BeNil())
 			Expect(kubeconfigData.Clusters).To(HaveKey("default-cluster"))
 			defaultCluster := kubeconfigData.Clusters["default-cluster"]
 			Expect(defaultCluster.Server).To(Equal(opts.APIServerFQDN))
-			Expect(defaultCluster.CertificateAuthority).To(Equal(opts.ClusterCAFilePath))
+			Expect(defaultCluster.CertificateAuthorityData).To(Equal(opts.ClusterCAData))
 
 			Expect(kubeconfigData.AuthInfos).To(HaveKey("default-auth"))
 			defaultAuth := kubeconfigData.AuthInfos["default-auth"]

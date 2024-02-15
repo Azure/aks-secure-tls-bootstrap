@@ -8,10 +8,9 @@ package aad
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/datamodel"
-	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/util"
+	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/confidential"
 	"github.com/hashicorp/go-retryablehttp"
 	"go.uber.org/zap"
@@ -21,22 +20,20 @@ type Client interface {
 	GetToken(ctx context.Context, azureConfig *datamodel.AzureConfig, resource string) (string, error)
 }
 
-var _ Client = &ClientImpl{}
+var _ Client = (*ClientImpl)(nil)
 
 type ClientImpl struct {
 	httpClient *retryablehttp.Client
 	logger     *zap.Logger
-	fs         util.FS
 }
 
-func NewClient(fs util.FS, logger *zap.Logger) *ClientImpl {
+func NewClient(logger *zap.Logger) *ClientImpl {
 	httpClient := retryablehttp.NewClient()
 	httpClient.RetryMax = maxGetTokenRetries
 	httpClient.RetryWaitMax = maxGetTokenDelay
 	return &ClientImpl{
 		httpClient: httpClient,
 		logger:     logger,
-		fs:         fs,
 	}
 }
 
@@ -47,25 +44,35 @@ func (c *ClientImpl) GetToken(ctx context.Context, azureConfig *datamodel.AzureC
 
 	credential, err := confidential.NewCredFromSecret(azureConfig.ClientSecret)
 	if err != nil {
-		return "", fmt.Errorf("failed to create secret credential from azure.json: %w", err)
+		return "", fmt.Errorf("failed to create confidential secret credential from azure.json: %w", err)
 	}
 
-	authority, err := getAADAuthorityURL(c.fs, azureConfig)
+	// confirmed that this value will be AzureStackCloud in AGC environments
+	env, err := azure.EnvironmentFromName(azureConfig.Cloud)
 	if err != nil {
-		return "", fmt.Errorf("unable to get AAD authority URL: %w", err)
+		return "", fmt.Errorf("getting azure environment from name %q: %w", azureConfig.Cloud, err)
 	}
 
-	client, err := confidential.New(authority, azureConfig.ClientID, credential, confidential.WithHTTPClient(c.httpClient.StandardClient()))
+	client, err := confidential.New(
+		env.ActiveDirectoryEndpoint,
+		azureConfig.ClientID,
+		credential,
+		confidential.WithHTTPClient(c.httpClient.StandardClient()))
 	if err != nil {
-		return "", fmt.Errorf("failed to create client from azure.json sp/secret: %w", err)
+		return "", fmt.Errorf("failed to create confidential client from azure.json sp/secret: %w", err)
 	}
 
-	c.logger.Debug("requesting new AAD token", zap.String("scopes", strings.Join(scopes, ",")), zap.String("authority", authority))
+	logger := c.logger.With(
+		zap.Strings("scopes", scopes),
+		zap.String("aadEndpoint", env.ActiveDirectoryEndpoint),
+		zap.String("clientID", azureConfig.ClientID),
+		zap.String("tenantID", azureConfig.TenantID))
+	logger.Debug("requesting new AAD token")
 	authResult, err := client.AcquireTokenByCredential(ctx, scopes, confidential.WithTenantID(azureConfig.TenantID))
 	if err != nil {
 		return "", fmt.Errorf("failed to acquire token via service principal credential: %w", err)
 	}
-	c.logger.Info("retrierved new AAD token", zap.String("scopes", strings.Join(scopes, ",")), zap.String("authority", authority))
+	logger.Info("retrieved new AAD token")
 
 	return authResult.AccessToken, nil
 }

@@ -9,6 +9,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	aadmocks "github.com/Azure/aks-secure-tls-bootstrap/client/pkg/aad/mocks"
@@ -16,10 +18,9 @@ import (
 	imdsmocks "github.com/Azure/aks-secure-tls-bootstrap/client/pkg/imds/mocks"
 	kubeconfigmocks "github.com/Azure/aks-secure-tls-bootstrap/client/pkg/kubeconfig/mocks"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/testutil"
-	utilmocks "github.com/Azure/aks-secure-tls-bootstrap/client/pkg/util/mocks"
 	secureTLSBootstrapService "github.com/Azure/aks-secure-tls-bootstrap/service/protos"
 	servicemocks "github.com/Azure/aks-secure-tls-bootstrap/service/protos/mocks"
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"go.uber.org/mock/gomock"
 	"go.uber.org/zap"
@@ -32,6 +33,7 @@ var _ = Describe("SecureTLSBootstrapClient tests", func() {
 		defaultAPIServerFQDN     = "https://controlplane.azmk8s.io"
 		defaultClusterCAFilePath = "path/to/ca.crt"
 		defaultKubeconfigPath    = "path/to/kubeconfig"
+		defaultAzureConfigPath   = "path/to/azure.json"
 	)
 	var (
 		mockCtrl            *gomock.Controller
@@ -40,63 +42,29 @@ var _ = Describe("SecureTLSBootstrapClient tests", func() {
 		kubeconfigValidator *kubeconfigmocks.MockValidator
 		serviceClient       *servicemocks.MockSecureTLSBootstrapServiceClient
 		bootstrapClient     *SecureTLSBootstrapClient
-		fs                  *utilmocks.MockFS
 	)
-
-	clusterCACertPEM, _, err := testutil.GenerateCertPEMWithExpiration("hcp", "aks", time.Now().Add(time.Hour))
-	Expect(err).To(BeNil())
-
-	defaultAzureConfig := &datamodel.AzureConfig{
-		ClientID:     "clientId",
-		ClientSecret: "clientSecret",
-		TenantID:     "tenantId",
-	}
-
 	defaultOpts := &GetKubeletClientCredentialOpts{
-		ClusterCAFilePath: defaultClusterCAFilePath,
-		APIServerFQDN:     defaultAPIServerFQDN,
-		KubeconfigPath:    defaultKubeconfigPath,
+		NextProto:      "bootstrap",
+		ClusterCAData:  clusterCACertPEM,
+		APIServerFQDN:  defaultAPIServerFQDN,
+		KubeconfigPath: defaultKubeconfigPath,
+		AzureConfig: &datamodel.AzureConfig{
+			ClientID:     "clientId",
+			ClientSecret: "clientSecret",
+			TenantID:     "tenantId",
+		},
 	}
 
 	Context("NewSecureTLSBootstrapClient", func() {
-		BeforeEach(func() {
-			mockCtrl = gomock.NewController(GinkgoT())
-			fs = utilmocks.NewMockFS(mockCtrl)
-		})
-
-		AfterEach(func() {
-			mockCtrl.Finish()
-		})
-
-		When("azure config cannot be loaded", func() {
-			It("should return an error", func() {
-				fs.EXPECT().ReadFile(gomock.Any()).
-					Return(nil, fmt.Errorf("azure config does not exist")).
-					Times(1)
-
-				newClient, err := NewSecureTLSBootstrapClient(fs, logger)
-				Expect(newClient).To(BeNil())
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("failed to load azure config"))
-				Expect(err.Error()).To(ContainSubstring("azure config does not exist"))
-			})
-		})
-
-		When("azure config exists and can be loaded", func() {
-			It("should return a new bootstrap client", func() {
-				azureConfigBytes, err := json.Marshal(defaultAzureConfig)
-				Expect(err).To(BeNil())
-				fs.EXPECT().ReadFile(gomock.Any()).
-					Return(azureConfigBytes, nil).
-					Times(1)
-
-				newClient, err := NewSecureTLSBootstrapClient(fs, logger)
-				Expect(err).To(BeNil())
-				Expect(newClient).ToNot(BeNil())
-				Expect(newClient.azureConfig.ClientID).To(Equal("clientId"))
-				Expect(newClient.azureConfig.ClientSecret).To(Equal("clientSecret"))
-				Expect(newClient.azureConfig.TenantID).To(Equal("tenantId"))
-			})
+		It("should return a new bootstrap client", func() {
+			newClient, err := NewSecureTLSBootstrapClient(logger)
+			Expect(err).To(BeNil())
+			Expect(newClient).ToNot(BeNil())
+			Expect(newClient.logger).ToNot(BeNil())
+			Expect(newClient.serviceClientFactory).ToNot(BeNil())
+			Expect(newClient.aadClient).ToNot(BeNil())
+			Expect(newClient.imdsClient).ToNot(BeNil())
+			Expect(newClient.kubeconfigValidator).ToNot(BeNil())
 		})
 	})
 
@@ -107,15 +75,12 @@ var _ = Describe("SecureTLSBootstrapClient tests", func() {
 			aadClient = aadmocks.NewMockClient(mockCtrl)
 			kubeconfigValidator = kubeconfigmocks.NewMockValidator(mockCtrl)
 			serviceClient = servicemocks.NewMockSecureTLSBootstrapServiceClient(mockCtrl)
-			fs = utilmocks.NewMockFS(mockCtrl)
 
 			bootstrapClient = &SecureTLSBootstrapClient{
 				logger:              logger,
 				imdsClient:          imdsClient,
 				aadClient:           aadClient,
 				kubeconfigValidator: kubeconfigValidator,
-				azureConfig:         defaultAzureConfig,
-				fs:                  fs,
 			}
 			bootstrapClient.serviceClientFactory = func(
 				ctx context.Context,
@@ -136,7 +101,6 @@ var _ = Describe("SecureTLSBootstrapClient tests", func() {
 				kubeconfigValidator.EXPECT().Validate(defaultKubeconfigPath, false).
 					Return(nil).
 					Times(1)
-				fs.EXPECT().ReadFile(gomock.Any()).Times(0)
 				serviceClient.EXPECT().GetCredential(gomock.Any(), gomock.Any()).Times(0)
 				serviceClient.EXPECT().GetNonce(gomock.Any(), gomock.Any()).Times(0)
 				imdsClient.EXPECT().GetAttestedData(gomock.Any(), gomock.Any()).Times(0)
@@ -157,11 +121,8 @@ var _ = Describe("SecureTLSBootstrapClient tests", func() {
 				kubeconfigValidator.EXPECT().Validate(defaultKubeconfigPath, false).
 					Return(fmt.Errorf("invalid kubeconfig")).
 					Times(1)
-				fs.EXPECT().ReadFile(defaultOpts.ClusterCAFilePath).
-					Return(clusterCACertPEM, nil).
-					Times(1)
 				aadClient.EXPECT().GetToken(ctx, gomock.Any(), defaultOpts.AADResource).
-					Return("", errors.New("cannot retrieve AAD token")).
+					Return("", fmt.Errorf("cannot retrieve AAD token")).
 					Times(1)
 
 				kubeconfigData, err := bootstrapClient.GetKubeletClientCredential(ctx, defaultOpts)
@@ -178,9 +139,6 @@ var _ = Describe("SecureTLSBootstrapClient tests", func() {
 				defer cancel()
 				kubeconfigValidator.EXPECT().Validate(defaultKubeconfigPath, false).
 					Return(fmt.Errorf("invalid kubeconfig")).
-					Times(1)
-				fs.EXPECT().ReadFile(defaultOpts.ClusterCAFilePath).
-					Return(clusterCACertPEM, nil).
 					Times(1)
 				aadClient.EXPECT().GetToken(ctx, gomock.Any(), defaultOpts.AADResource).
 					Return("spToken", nil).
@@ -203,9 +161,6 @@ var _ = Describe("SecureTLSBootstrapClient tests", func() {
 				defer cancel()
 				kubeconfigValidator.EXPECT().Validate(defaultKubeconfigPath, false).
 					Return(fmt.Errorf("invalid kubeconfig")).
-					Times(1)
-				fs.EXPECT().ReadFile(defaultOpts.ClusterCAFilePath).
-					Return(clusterCACertPEM, nil).
 					Times(1)
 				aadClient.EXPECT().GetToken(ctx, gomock.Any(), defaultOpts.AADResource).
 					Return("spToken", nil).
@@ -231,9 +186,6 @@ var _ = Describe("SecureTLSBootstrapClient tests", func() {
 				defer cancel()
 				kubeconfigValidator.EXPECT().Validate(defaultKubeconfigPath, false).
 					Return(fmt.Errorf("invalid kubeconfig")).
-					Times(1)
-				fs.EXPECT().ReadFile(defaultOpts.ClusterCAFilePath).
-					Return(clusterCACertPEM, nil).
 					Times(1)
 				aadClient.EXPECT().GetToken(ctx, gomock.Any(), defaultOpts.AADResource).
 					Return("spToken", nil).
@@ -264,9 +216,6 @@ var _ = Describe("SecureTLSBootstrapClient tests", func() {
 				defer cancel()
 				kubeconfigValidator.EXPECT().Validate(defaultKubeconfigPath, false).
 					Return(fmt.Errorf("invalid kubeconfig")).
-					Times(1)
-				fs.EXPECT().ReadFile(defaultOpts.ClusterCAFilePath).
-					Return(clusterCACertPEM, nil).
 					Times(1)
 				aadClient.EXPECT().GetToken(ctx, gomock.Any(), defaultOpts.AADResource).
 					Return("spToken", nil).
@@ -302,9 +251,6 @@ var _ = Describe("SecureTLSBootstrapClient tests", func() {
 				defer cancel()
 				kubeconfigValidator.EXPECT().Validate(defaultKubeconfigPath, false).
 					Return(fmt.Errorf("invalid kubeconfig")).
-					Times(1)
-				fs.EXPECT().ReadFile(defaultOpts.ClusterCAFilePath).
-					Return(clusterCACertPEM, nil).
 					Times(1)
 				aadClient.EXPECT().GetToken(ctx, gomock.Any(), defaultOpts.AADResource).
 					Return("spToken", nil).
@@ -342,9 +288,6 @@ var _ = Describe("SecureTLSBootstrapClient tests", func() {
 				kubeconfigValidator.EXPECT().Validate(defaultKubeconfigPath, false).
 					Return(fmt.Errorf("invalid kubeconfig")).
 					Times(1)
-				fs.EXPECT().ReadFile(defaultOpts.ClusterCAFilePath).
-					Return(clusterCACertPEM, nil).
-					Times(1)
 				aadClient.EXPECT().GetToken(ctx, gomock.Any(), defaultOpts.AADResource).
 					Return("spToken", nil).
 					Times(1)
@@ -378,13 +321,10 @@ var _ = Describe("SecureTLSBootstrapClient tests", func() {
 			It("should return a new kubeconfig object with the credential embedded", func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
-				clientCertPEM, _, err := testutil.GenerateCertPEMWithExpiration("system:nodes:node", "system:nodes", time.Now().Add(time.Hour))
+				clientCertPEM, _, err := testutil.GenerateCertPEMWithExpiration("system:node:node", "system:nodes", time.Now().Add(time.Hour))
 				Expect(err).To(BeNil())
 				kubeconfigValidator.EXPECT().Validate(defaultKubeconfigPath, false).
 					Return(fmt.Errorf("invalid kubeconfig")).
-					Times(1)
-				fs.EXPECT().ReadFile(defaultOpts.ClusterCAFilePath).
-					Return(clusterCACertPEM, nil).
 					Times(1)
 				aadClient.EXPECT().GetToken(ctx, gomock.Any(), defaultOpts.AADResource).
 					Return("spToken", nil).
@@ -419,7 +359,7 @@ var _ = Describe("SecureTLSBootstrapClient tests", func() {
 				Expect(kubeconfigData.Clusters).To(HaveKey("default-cluster"))
 				defaultCluster := kubeconfigData.Clusters["default-cluster"]
 				Expect(defaultCluster.Server).To(Equal(defaultOpts.APIServerFQDN))
-				Expect(defaultCluster.CertificateAuthority).To(Equal(defaultOpts.ClusterCAFilePath))
+				Expect(defaultCluster.CertificateAuthorityData).To(Equal(defaultOpts.ClusterCAData))
 
 				Expect(kubeconfigData.AuthInfos).To(HaveKey("default-auth"))
 				defaultAuth := kubeconfigData.AuthInfos["default-auth"]
@@ -437,33 +377,43 @@ var _ = Describe("SecureTLSBootstrapClient tests", func() {
 	})
 
 	Context("GetKubeletClientCredentialOpts tests", func() {
-		Context("Validate", func() {
+		Context("ValidateAndSet", func() {
 			var opts *GetKubeletClientCredentialOpts
+			defaultAzureConfigPath := "path/to/azure.json"
+			defaultClusterCAFilePath := "path/to/ca.crt"
 
 			BeforeEach(func() {
 				opts = &GetKubeletClientCredentialOpts{
-					ClusterCAFilePath: "path",
-					APIServerFQDN:     "fqdn",
-					CustomClientID:    "clientId",
-					NextProto:         "alpn",
-					AADResource:       "appID",
-					KubeconfigPath:    "path",
+					APIServerFQDN:  "fqdn",
+					CustomClientID: "clientId",
+					NextProto:      "alpn",
+					AADResource:    "appID",
+					KubeconfigPath: "path",
 				}
 			})
 
-			When("ClusterCAFile is empty", func() {
+			When("clusterCAFilePath is empty", func() {
 				It("should return an error", func() {
-					opts.ClusterCAFilePath = ""
-					err := opts.Validate()
+					emptyClusterCAFilePath := ""
+					err := opts.ValidateAndSet(defaultAzureConfigPath, emptyClusterCAFilePath)
 					Expect(err).ToNot(BeNil())
-					Expect(err.Error()).To(ContainSubstring("cluster CA file must be specified"))
+					Expect(err.Error()).To(ContainSubstring("cluster CA file path must be specified"))
+				})
+			})
+
+			When("azureConfigPath is empty", func() {
+				It("should return an error", func() {
+					emptyAzureConfigPath := ""
+					err := opts.ValidateAndSet(emptyAzureConfigPath, defaultClusterCAFilePath)
+					Expect(err).ToNot(BeNil())
+					Expect(err.Error()).To(ContainSubstring("azure config path must be specified"))
 				})
 			})
 
 			When("APIServerFQDN is empty", func() {
 				It("should return an error", func() {
 					opts.APIServerFQDN = ""
-					err := opts.Validate()
+					err := opts.ValidateAndSet(defaultAzureConfigPath, defaultClusterCAFilePath)
 					Expect(err).ToNot(BeNil())
 					Expect(err.Error()).To(ContainSubstring("apiserver FQDN must be specified"))
 				})
@@ -472,7 +422,7 @@ var _ = Describe("SecureTLSBootstrapClient tests", func() {
 			When("NextProto is empty", func() {
 				It("should return an error", func() {
 					opts.NextProto = ""
-					err := opts.Validate()
+					err := opts.ValidateAndSet(defaultAzureConfigPath, defaultClusterCAFilePath)
 					Expect(err).ToNot(BeNil())
 					Expect(err.Error()).To(ContainSubstring("next proto header value must be specified"))
 				})
@@ -481,7 +431,7 @@ var _ = Describe("SecureTLSBootstrapClient tests", func() {
 			When("AADResource is empty", func() {
 				It("should return an error", func() {
 					opts.AADResource = ""
-					err := opts.Validate()
+					err := opts.ValidateAndSet(defaultAzureConfigPath, defaultClusterCAFilePath)
 					Expect(err).ToNot(BeNil())
 					Expect(err.Error()).To(ContainSubstring("AAD resource must be specified"))
 				})
@@ -490,15 +440,25 @@ var _ = Describe("SecureTLSBootstrapClient tests", func() {
 			When("KubeconfigPath is empty", func() {
 				It("should return an error", func() {
 					opts.KubeconfigPath = ""
-					err := opts.Validate()
+					err := opts.ValidateAndSet(defaultAzureConfigPath, defaultClusterCAFilePath)
 					Expect(err).ToNot(BeNil())
 					Expect(err.Error()).To(ContainSubstring("kubeconfig must be specified"))
 				})
 			})
 
 			When("client opts are valid", func() {
-				It("should validagte without error", func() {
-					err := opts.Validate()
+				It("should validate without error", func() {
+					tempDir := GinkgoT().TempDir()
+					clusterCAFilePath := filepath.Join(tempDir, "ca.crt")
+					err := os.WriteFile(clusterCAFilePath, clusterCACertPEM, os.ModePerm)
+					Expect(err).To(BeNil())
+					azureConfigPath := filepath.Join(tempDir, "azure.json")
+					azureConfigBytes, err := json.Marshal(defaultOpts.AzureConfig)
+					Expect(err).To(BeNil())
+					err = os.WriteFile(azureConfigPath, azureConfigBytes, os.ModePerm)
+					Expect(err).To(BeNil())
+
+					err = opts.ValidateAndSet(azureConfigPath, clusterCAFilePath)
 					Expect(err).To(BeNil())
 				})
 			})

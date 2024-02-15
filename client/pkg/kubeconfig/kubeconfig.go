@@ -17,11 +17,11 @@ const (
 )
 
 type GenerateOpts struct {
-	APIServerFQDN     string
-	ClusterCAFilePath string
+	APIServerFQDN string
+	ClusterCAData []byte
 }
 
-func GenerateKubeconfigForCertAndKey(certPEM []byte, privateKey *ecdsa.PrivateKey, opts *GenerateOpts) (*clientcmdapi.Config, error) {
+func GenerateForCertAndKey(certPEM []byte, privateKey *ecdsa.PrivateKey, opts *GenerateOpts) (*clientcmdapi.Config, error) {
 	keyDER, err := x509.MarshalECPrivateKey(privateKey)
 	if err != nil {
 		return nil, fmt.Errorf("unable to marshal EC private key during kubeconfig generation: %w", err)
@@ -34,8 +34,8 @@ func GenerateKubeconfigForCertAndKey(certPEM []byte, privateKey *ecdsa.PrivateKe
 
 	kubeconfigData := &clientcmdapi.Config{
 		Clusters: map[string]*clientcmdapi.Cluster{"default-cluster": {
-			Server:               opts.APIServerFQDN,
-			CertificateAuthority: opts.ClusterCAFilePath,
+			Server:                   opts.APIServerFQDN,
+			CertificateAuthorityData: opts.ClusterCAData,
 		}},
 		// Define auth based on the obtained client cert.
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{"default-auth": {

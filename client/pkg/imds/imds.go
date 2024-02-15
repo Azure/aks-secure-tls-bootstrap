@@ -29,7 +29,7 @@ type ClientImpl struct {
 	logger     *zap.Logger
 }
 
-var _ Client = &ClientImpl{}
+var _ Client = (*ClientImpl)(nil)
 
 func NewClient(logger *zap.Logger) *ClientImpl {
 	httpClient := retryablehttp.NewClient()

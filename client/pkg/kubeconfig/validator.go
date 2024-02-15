@@ -35,7 +35,7 @@ type ValidatorImpl struct {
 	clientsetLoader    clientsetLoaderFunc
 }
 
-var _ Validator = &ValidatorImpl{}
+var _ Validator = (*ValidatorImpl)(nil)
 
 func NewValidator() *ValidatorImpl {
 	return &ValidatorImpl{
@@ -118,7 +118,7 @@ func ensureAuthorizedClientset(clientset kubernetes.Interface) error {
 	case errors.IsUnauthorized(err):
 		return fmt.Errorf("cannot make authorized request to list server version: %w", err)
 	default:
-		// can later potentially retry in these cases
+		// can potentially retry in these cases
 		return fmt.Errorf("encountered an unexpected error when attempting to request server version info: %w", err)
 	}
 }
