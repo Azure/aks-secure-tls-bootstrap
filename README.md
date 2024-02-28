@@ -36,7 +36,7 @@ Any use of third-party trademarks or logos are subject to those third-party's po
 
 Ginkgo is used for unit tests.
 
-### setting up goproxy
+### Setting up goproxy
 ado token: https://dev.azure.com/msazure/_usersSettings/tokens
 ```
 vim ~./zshrc # bashrc 
