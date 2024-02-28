@@ -34,7 +34,7 @@ Any use of third-party trademarks or logos are subject to those third-party's po
 
 ## Testing
 
-ginko is used for unit tests.
+Ginkgo is used for unit tests.
 
 ### setting up goproxy
 ado token: https://dev.azure.com/msazure/_usersSettings/tokens
@@ -47,9 +47,19 @@ soruce ~./zshrc
 
 
 Unit tests are available inside client/pkgs/
-### To run the full suite
+### Make your targets
+```
+aks-secure-tls-bootstrap % make target
+aks-secure-tls-bootstrap % make test coverage
+```
+
+### Run the test suite
 ```
 tls_bootstrapping/aks-secure-tls-bootstrap/client/pkg % go test ./... -coverprofile cover.out 
 # To see the unit test coverage
 go tool cover -html=cover.out
+```
+You can also run individual test packages 
+```
+tls_bootstrapping/aks-secure-tls-bootstrap/client/pkg/aad % go test
 ```
