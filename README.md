@@ -46,7 +46,6 @@ soruce ~./zshrc
 ```
 
 
-Unit tests are available inside client/pkgs/
 ### Make your targets
 ```
 aks-secure-tls-bootstrap % make test
@@ -54,6 +53,7 @@ aks-secure-tls-bootstrap % make coverage
 ```
 
 ### Run the test suite
+Unit tests are available inside client/pkgs/
 ```
 aks-secure-tls-bootstrap/client/pkg % go test ./... -coverprofile cover.out 
 
