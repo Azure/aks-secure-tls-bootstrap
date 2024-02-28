@@ -49,17 +49,18 @@ soruce ~./zshrc
 Unit tests are available inside client/pkgs/
 ### Make your targets
 ```
-aks-secure-tls-bootstrap % make target
-aks-secure-tls-bootstrap % make test coverage
+aks-secure-tls-bootstrap % make test
+aks-secure-tls-bootstrap % make coverage
 ```
 
 ### Run the test suite
 ```
-tls_bootstrapping/aks-secure-tls-bootstrap/client/pkg % go test ./... -coverprofile cover.out 
+aks-secure-tls-bootstrap/client/pkg % go test ./... -coverprofile cover.out 
+
 # To see the unit test coverage
-go tool cover -html=cover.out
+aks-secure-tls-bootstrap/client/pkg % go tool cover -html=cover.out
 ```
 You can also run individual test packages 
 ```
-tls_bootstrapping/aks-secure-tls-bootstrap/client/pkg/aad % go test
+aks-secure-tls-bootstrap/client/pkg/aad % go test
 ```
