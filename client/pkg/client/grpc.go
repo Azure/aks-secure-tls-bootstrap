@@ -9,8 +9,12 @@ import (
 	"crypto/x509"
 	"fmt"
 
+	"log/slog"
+
+	"github.com/Azure/aks-middleware/interceptor"
 	secureTLSBootstrapService "github.com/Azure/aks-secure-tls-bootstrap/service/protos"
 	"go.uber.org/zap"
+	"go.uber.org/zap/exp/zapslog"
 	"golang.org/x/oauth2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -43,6 +47,8 @@ func secureTLSBootstrapServiceClientFactory(
 		zap.String("fqdn", opts.fqdn),
 		zap.Strings("tlsConfig.NextProtos", tlsConfig.NextProtos),
 		zap.Bool("tlsConfig.InsecureSkipVerify", tlsConfig.InsecureSkipVerify))
+
+	slogLogger := slog.New(zapslog.NewHandler(logger.Core(), nil))
 	conn, err := grpc.DialContext(
 		ctx,
 		fmt.Sprintf("%s:443", opts.fqdn),
@@ -52,6 +58,9 @@ func secureTLSBootstrapServiceClientFactory(
 				AccessToken: opts.authToken,
 			}),
 		}),
+		grpc.WithChainUnaryInterceptor(
+			interceptor.DefaultClientInterceptors(*slogLogger)...,
+		),
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to dial client connection with context: %w", err)
