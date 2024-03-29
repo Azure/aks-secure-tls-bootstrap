@@ -13,18 +13,20 @@ import (
 	"path/filepath"
 	"time"
 
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
 	aadmocks "github.com/Azure/aks-secure-tls-bootstrap/client/pkg/aad/mocks"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/datamodel"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/events"
 	imdsmocks "github.com/Azure/aks-secure-tls-bootstrap/client/pkg/imds/mocks"
 	kubeconfigmocks "github.com/Azure/aks-secure-tls-bootstrap/client/pkg/kubeconfig/mocks"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/testutil"
 	secureTLSBootstrapService "github.com/Azure/aks-secure-tls-bootstrap/service/protos"
 	servicemocks "github.com/Azure/aks-secure-tls-bootstrap/service/protos/mocks"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+
 	"go.uber.org/mock/gomock"
 	"go.uber.org/zap"
-	"google.golang.org/grpc"
 )
 
 var _ = Describe("SecureTLSBootstrapClient tests", func() {
@@ -54,14 +56,17 @@ var _ = Describe("SecureTLSBootstrapClient tests", func() {
 			TenantID:     "tenantId",
 		},
 	}
+	eventsConfig := &events.Config{
+		Logger: logger,
+	}
 
 	Context("NewSecureTLSBootstrapClient", func() {
 		It("should return a new bootstrap client", func() {
-			newClient, err := NewSecureTLSBootstrapClient(logger)
+			newClient, err := NewSecureTLSBootstrapClient(logger, eventsConfig)
 			Expect(err).To(BeNil())
 			Expect(newClient).ToNot(BeNil())
 			Expect(newClient.logger).ToNot(BeNil())
-			Expect(newClient.serviceClientFactory).ToNot(BeNil())
+			Expect(newClient.serviceDialer).ToNot(BeNil())
 			Expect(newClient.aadClient).ToNot(BeNil())
 			Expect(newClient.imdsClient).ToNot(BeNil())
 			Expect(newClient.kubeconfigValidator).ToNot(BeNil())
@@ -81,12 +86,15 @@ var _ = Describe("SecureTLSBootstrapClient tests", func() {
 				imdsClient:          imdsClient,
 				aadClient:           aadClient,
 				kubeconfigValidator: kubeconfigValidator,
+				eventsConfig:        eventsConfig,
 			}
-			bootstrapClient.serviceClientFactory = func(
+			bootstrapClient.serviceDialer = func(
 				ctx context.Context,
 				logger *zap.Logger,
-				opts serviceClientFactoryOpts) (secureTLSBootstrapService.SecureTLSBootstrapServiceClient, *grpc.ClientConn, error) {
-				return serviceClient, nil, nil
+				cfg *dialerConfig) (*dialResult, error) {
+				return &dialResult{
+					serviceClient: serviceClient,
+				}, nil
 			}
 		})
 

@@ -17,13 +17,18 @@ const (
 	blockTypeCertificateRequest = "CERTIFICATE REQUEST"
 )
 
-func makeKubeletClientCSR(hostname string) (csrPEM []byte, privateKey *ecdsa.PrivateKey, err error) {
-	privateKey, err = ecdsa.GenerateKey(elliptic.P256(), cryptorand.Reader)
+type csrKeyBundle struct {
+	csrPEM     []byte
+	privateKey *ecdsa.PrivateKey
+}
+
+func makeKubeletClientCSR(hostname string) (bundle *csrKeyBundle, err error) {
+	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), cryptorand.Reader)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to generate ECDSA 256 private key for kubelet client CSR: %w", err)
+		return nil, fmt.Errorf("failed to generate ECDSA 256 private key for kubelet client CSR: %w", err)
 	}
 
-	template := x509.CertificateRequest{
+	template := &x509.CertificateRequest{
 		Subject: pkix.Name{
 			Organization: []string{"system:nodes"},
 			CommonName:   fmt.Sprintf("system:node:%s", hostname),
@@ -31,9 +36,9 @@ func makeKubeletClientCSR(hostname string) (csrPEM []byte, privateKey *ecdsa.Pri
 		SignatureAlgorithm: x509.ECDSAWithSHA256,
 	}
 
-	csrDER, err := x509.CreateCertificateRequest(cryptorand.Reader, &template, privateKey)
+	csrDER, err := x509.CreateCertificateRequest(cryptorand.Reader, template, privateKey)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to create kubelet client certificate request from template: %w", err)
+		return nil, fmt.Errorf("unable to create kubelet client certificate request from template: %w", err)
 	}
 
 	pemBlock := &pem.Block{
@@ -41,5 +46,8 @@ func makeKubeletClientCSR(hostname string) (csrPEM []byte, privateKey *ecdsa.Pri
 		Bytes: csrDER,
 	}
 
-	return pem.EncodeToMemory(pemBlock), privateKey, nil
+	return &csrKeyBundle{
+		csrPEM:     pem.EncodeToMemory(pemBlock),
+		privateKey: privateKey,
+	}, nil
 }
