@@ -8,8 +8,8 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-
 	"log/slog"
+	"os"
 
 	"github.com/Azure/aks-middleware/interceptor"
 	secureTLSBootstrapService "github.com/Azure/aks-secure-tls-bootstrap/service/protos"
@@ -59,7 +59,7 @@ func secureTLSBootstrapServiceClientFactory(
 			}),
 		}),
 		grpc.WithChainUnaryInterceptor(
-			interceptor.DefaultClientInterceptors(*slogLogger)...,
+			interceptor.DefaultClientInterceptors(*slogLogger, os.Stdout)...,
 		),
 	)
 	if err != nil {
