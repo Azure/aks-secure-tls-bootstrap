@@ -15,12 +15,12 @@ import (
 var _ = Describe("CSR tests", func() {
 	Context("makeKubeletClientCSR tests", func() {
 		It("should generate and return a new kubelet client CSR for the provided hostname", func() {
-			csrPEM, privateKey, err := makeKubeletClientCSR("node")
+			bundle, err := makeKubeletClientCSR("node")
 			Expect(err).To(BeNil())
-			Expect(csrPEM).ToNot(BeEmpty())
-			Expect(privateKey.Curve).To(Equal(elliptic.P256()))
+			Expect(bundle.csrPEM).ToNot(BeEmpty())
+			Expect(bundle.privateKey.Curve).To(Equal(elliptic.P256()))
 
-			block, rest := pem.Decode(csrPEM)
+			block, rest := pem.Decode(bundle.csrPEM)
 			Expect(rest).To(BeEmpty())
 			Expect(block).ToNot(BeNil())
 

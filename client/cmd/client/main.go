@@ -13,6 +13,7 @@ import (
 	"syscall"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/client"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/events"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 	"k8s.io/client-go/tools/clientcmd"
@@ -27,6 +28,7 @@ const (
 	flagLogFormat                  = "log-format"
 	flagNextProto                  = "next-proto"
 	flagAADResource                = "aad-resource"
+	flagEventsDir                  = "events-dir"
 	flagVerbose                    = "verbose"
 	flagKubeconfigPath             = "kubeconfig"
 	flagInsecureSkipTLSVerify      = "insecure-skip-tls-verify"
@@ -69,7 +71,11 @@ func createBootstrapCommand() *cobra.Command {
 			}
 			defer flush(logger)
 
-			bootstrapClient, err := client.NewSecureTLSBootstrapClient(logger)
+			eventsConfig := &events.Config{
+				Logger:    logger,
+				TargetDir: opts.EventsDir,
+			}
+			bootstrapClient, err := client.NewSecureTLSBootstrapClient(logger, eventsConfig)
 			if err != nil {
 				return err
 			}
@@ -104,6 +110,7 @@ func createBootstrapCommand() *cobra.Command {
 	cmd.Flags().StringVar(&opts.APIServerFQDN, flagAPIServerFQDN, "", "FQDN of the apiserver.")
 	cmd.Flags().StringVar(&opts.CustomClientID, flagCustomClientID, "", "Client ID of the user-assigned managed identity to use. Will default to kubelet identity on MSI-enabled clusters if this is not specified.")
 	cmd.Flags().StringVar(&opts.AADResource, flagAADResource, "", "Resource (audience) used to request JWT tokens from AAD for authentication.")
+	cmd.Flags().StringVar(&opts.EventsDir, flagEventsDir, "", "path do the VM agent's event collection directory.")
 	cmd.Flags().StringVar(&opts.NextProto, flagNextProto, "", "ALPN Next Protocol value to send within requests to the bootstrap server.")
 	cmd.Flags().StringVar(&opts.KubeconfigPath, flagKubeconfigPath, "", "Path to the kubeconfig file containing the generated kubelet client certificate.")
 	return cmd

@@ -17,10 +17,15 @@ import (
 	"google.golang.org/grpc/credentials/oauth"
 )
 
-// serviceClientFactory provides an interface to produce and return a new SecureTLSBootstrapServiceClient over a GRPC connection
-type serviceClientFactoryFunc func(ctx context.Context, logger *zap.Logger, opts serviceClientFactoryOpts) (secureTLSBootstrapService.SecureTLSBootstrapServiceClient, *grpc.ClientConn, error)
+// serviceDialerFunc provides an interface to produce and return a new SecureTLSBootstrapServiceClient over a GRPC connection
+type serviceDialerFunc func(ctx context.Context, logger *zap.Logger, cfg *dialerConfig) (*dialResult, error)
 
-type serviceClientFactoryOpts struct {
+type dialResult struct {
+	serviceClient secureTLSBootstrapService.SecureTLSBootstrapServiceClient
+	grpcConn      *grpc.ClientConn
+}
+
+type dialerConfig struct {
 	clusterCAData         []byte
 	insecureSkipTLSVerify bool
 	fqdn                  string
@@ -28,37 +33,37 @@ type serviceClientFactoryOpts struct {
 	authToken             string
 }
 
-func secureTLSBootstrapServiceClientFactory(
-	ctx context.Context,
-	logger *zap.Logger,
-	opts serviceClientFactoryOpts) (secureTLSBootstrapService.SecureTLSBootstrapServiceClient, *grpc.ClientConn, error) {
+func secureTLSBootstrapServiceDialer(ctx context.Context, logger *zap.Logger, cfg *dialerConfig) (*dialResult, error) {
 	logger.Debug("generating TLS config for GRPC client connection...")
-	tlsConfig, err := getTLSConfig(opts.clusterCAData, opts.nextProto, opts.insecureSkipTLSVerify)
+	tlsConfig, err := getTLSConfig(cfg.clusterCAData, cfg.nextProto, cfg.insecureSkipTLSVerify)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get TLS config: %w", err)
+		return nil, fmt.Errorf("failed to get TLS config: %w", err)
 	}
 	logger.Info("generated TLS config for GRPC client connection")
 
 	logger.Debug("dialing TLS bootstrap server and creating GRPC connection...",
-		zap.String("fqdn", opts.fqdn),
+		zap.String("fqdn", cfg.fqdn),
 		zap.Strings("tlsConfig.NextProtos", tlsConfig.NextProtos),
 		zap.Bool("tlsConfig.InsecureSkipVerify", tlsConfig.InsecureSkipVerify))
 	conn, err := grpc.DialContext(
 		ctx,
-		opts.fqdn,
+		cfg.fqdn,
 		grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)),
 		grpc.WithPerRPCCredentials(oauth.TokenSource{
 			TokenSource: oauth2.StaticTokenSource(&oauth2.Token{
-				AccessToken: opts.authToken,
+				AccessToken: cfg.authToken,
 			}),
 		}),
 	)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to dial client connection with context: %w", err)
+		return nil, fmt.Errorf("failed to dial client connection with context: %w", err)
 	}
 	logger.Info("dialed TLS bootstrap server and created GRPC connection")
 
-	return secureTLSBootstrapService.NewSecureTLSBootstrapServiceClient(conn), conn, nil
+	return &dialResult{
+		serviceClient: secureTLSBootstrapService.NewSecureTLSBootstrapServiceClient(conn),
+		grpcConn:      conn,
+	}, nil
 }
 
 func getTLSConfig(caPEM []byte, nextProto string, insecureSkipVerify bool) (*tls.Config, error) {

@@ -27,14 +27,13 @@ var _ = Describe("grpc", func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 
-				serviceClient, conn, err := secureTLSBootstrapServiceClientFactory(ctx, logger, serviceClientFactoryOpts{
+				res, err := secureTLSBootstrapServiceDialer(ctx, logger, &dialerConfig{
 					clusterCAData: []byte("SGVsbG8gV29ybGQh"),
 					nextProto:     nextProto,
 					authToken:     "token",
 					fqdn:          "fqdn",
 				})
-				Expect(serviceClient).To(BeNil())
-				Expect(conn).To(BeNil())
+				Expect(res).To(BeNil())
 				Expect(err).ToNot(BeNil())
 				Expect(err.Error()).To(ContainSubstring("failed to get TLS config"))
 				Expect(err.Error()).To(ContainSubstring("unable to construct new cert pool using provided cluster CA data"))
@@ -49,12 +48,14 @@ var _ = Describe("grpc", func() {
 				defer lis.Close()
 				fqdn := lis.Addr().String()
 
-				serviceClient, conn, err := secureTLSBootstrapServiceClientFactory(ctx, logger, serviceClientFactoryOpts{
+				res, err := secureTLSBootstrapServiceDialer(ctx, logger, &dialerConfig{
 					clusterCAData: clusterCACertPEM,
 					nextProto:     nextProto,
 					authToken:     "token",
 					fqdn:          fqdn,
 				})
+				serviceClient := res.serviceClient
+				conn := res.grpcConn
 				defer conn.Close()
 
 				Expect(err).To(BeNil())
