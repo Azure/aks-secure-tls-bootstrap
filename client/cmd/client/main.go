@@ -22,7 +22,7 @@ const (
 	flagLogFile                    = "log-file"
 	flagAzureConfigPath            = "azure-config"
 	flagClusterCAFilePath          = "cluster-ca-file"
-	flagAPIServerFQDN              = "apiserver-fdqn"
+	flagAPIServerFQDN              = "apiserver-fqdn"
 	flagCustomClientID             = "custom-client-id"
 	flagLogFormat                  = "log-format"
 	flagNextProto                  = "next-proto"
