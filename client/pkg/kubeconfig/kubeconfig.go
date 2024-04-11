@@ -34,7 +34,7 @@ func GenerateForCertAndKey(certPEM []byte, privateKey *ecdsa.PrivateKey, opts *G
 
 	kubeconfigData := &clientcmdapi.Config{
 		Clusters: map[string]*clientcmdapi.Cluster{"default-cluster": {
-			Server:                   opts.APIServerFQDN,
+			Server:                   fmt.Sprintf("https://%s:443", opts.APIServerFQDN),
 			CertificateAuthorityData: opts.ClusterCAData,
 		}},
 		// Define auth based on the obtained client cert.
