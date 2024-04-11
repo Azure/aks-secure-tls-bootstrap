@@ -32,7 +32,7 @@ var _ = Describe("kubeconfig tests", func() {
 			Expect(err).To(BeNil())
 			Expect(kubeconfigData.Clusters).To(HaveKey("default-cluster"))
 			defaultCluster := kubeconfigData.Clusters["default-cluster"]
-			Expect(defaultCluster.Server).To(Equal(opts.APIServerFQDN))
+			Expect(defaultCluster.Server).To(Equal("https://host:443"))
 			Expect(defaultCluster.CertificateAuthorityData).To(Equal(opts.ClusterCAData))
 
 			Expect(kubeconfigData.AuthInfos).To(HaveKey("default-auth"))

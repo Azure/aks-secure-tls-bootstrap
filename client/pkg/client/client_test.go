@@ -30,7 +30,7 @@ import (
 var _ = Describe("SecureTLSBootstrapClient tests", func() {
 	const (
 		emptyJSON                = "{}"
-		defaultAPIServerFQDN     = "https://controlplane.azmk8s.io"
+		defaultAPIServerFQDN     = "controlplane.azmk8s.io"
 		defaultClusterCAFilePath = "path/to/ca.crt"
 		defaultKubeconfigPath    = "path/to/kubeconfig"
 		defaultAzureConfigPath   = "path/to/azure.json"
@@ -358,7 +358,7 @@ var _ = Describe("SecureTLSBootstrapClient tests", func() {
 
 				Expect(kubeconfigData.Clusters).To(HaveKey("default-cluster"))
 				defaultCluster := kubeconfigData.Clusters["default-cluster"]
-				Expect(defaultCluster.Server).To(Equal(defaultOpts.APIServerFQDN))
+				Expect(defaultCluster.Server).To(Equal("https://controlplane.azmk8s.io:443"))
 				Expect(defaultCluster.CertificateAuthorityData).To(Equal(defaultOpts.ClusterCAData))
 
 				Expect(kubeconfigData.AuthInfos).To(HaveKey("default-auth"))

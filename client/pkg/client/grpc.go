@@ -45,7 +45,7 @@ func secureTLSBootstrapServiceClientFactory(
 		zap.Bool("tlsConfig.InsecureSkipVerify", tlsConfig.InsecureSkipVerify))
 	conn, err := grpc.DialContext(
 		ctx,
-		opts.fqdn,
+		fmt.Sprintf("%s:443", opts.fqdn),
 		grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)),
 		grpc.WithPerRPCCredentials(oauth.TokenSource{
 			TokenSource: oauth2.StaticTokenSource(&oauth2.Token{
