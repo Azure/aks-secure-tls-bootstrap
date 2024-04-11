@@ -5,7 +5,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -132,17 +131,6 @@ func getLoggerForCmd(logFile, format string, verbose bool) (*zap.Logger, error) 
 }
 
 func flush(logger *zap.Logger) {
-	syncErr := logger.Sync()
-	if syncErr == nil {
-		return
-	}
-
-	switch {
-	case errors.Is(syncErr, syscall.ENOTTY):
-		// This is a known issue with Zap when redirecting stdout/stderr to a console
-		// https://github.com/uber-go/zap/issues/880#issuecomment-1181854418
-		return
-	default:
-		logger.Error("Error during logger sync", zap.Error(syncErr))
-	}
+	// per guidance from: https://github.com/uber-go/zap/issues/328
+	_ = logger.Sync()
 }
