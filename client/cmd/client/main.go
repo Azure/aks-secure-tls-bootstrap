@@ -131,5 +131,6 @@ func getLoggerForCmd(logFile, format string, verbose bool) (*zap.Logger, error) 
 }
 
 func flush(logger *zap.Logger) {
+	// per guidance from: https://github.com/uber-go/zap/issues/328
 	_ = logger.Sync()
 }
