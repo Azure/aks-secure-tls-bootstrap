@@ -6,6 +6,8 @@ package client
 import (
 	"context"
 	"crypto/x509"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/testutil"
@@ -22,38 +24,68 @@ var _ = Describe("grpc", func() {
 	Expect(err).To(BeNil())
 
 	Context("secureTLSBootstrapServiceClientFactory", func() {
-		When("cluster ca data is invalid", func() {
+		When("cluster ca data cannot be read", func() {
 			It("should return an error", func() {
+				caFilePath := "does/not/exist.crt"
+
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 
-				serviceClient, conn, err := secureTLSBootstrapServiceClientFactory(ctx, logger, serviceClientFactoryOpts{
-					clusterCAData: []byte("SGVsbG8gV29ybGQh"),
-					nextProto:     nextProto,
-					authToken:     "token",
-					fqdn:          "fqdn",
+				serviceClient, conn, err := secureTLSBootstrapServiceClientFactory(ctx, logger, &serviceClientFactoryConfig{
+					clusterCAFilePath: caFilePath,
+					nextProto:         nextProto,
+					authToken:         "token",
+					fqdn:              "fqdn",
+				})
+				Expect(serviceClient).To(BeNil())
+				Expect(conn).To(BeNil())
+				Expect(err).ToNot(BeNil())
+				Expect(err.Error()).To(ContainSubstring("reading cluster CA data from does/not/exist.crt"))
+
+			})
+		})
+		When("cluster ca data is invalid", func() {
+			It("should return an error", func() {
+				tempDir := GinkgoT().TempDir()
+				caFilePath := filepath.Join(tempDir, "ca.crt")
+				err := os.WriteFile(caFilePath, []byte("SGVsbG8gV29ybGQh"), os.ModePerm)
+				Expect(err).To(BeNil())
+
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+
+				serviceClient, conn, err := secureTLSBootstrapServiceClientFactory(ctx, logger, &serviceClientFactoryConfig{
+					clusterCAFilePath: caFilePath,
+					nextProto:         nextProto,
+					authToken:         "token",
+					fqdn:              "fqdn",
 				})
 				Expect(serviceClient).To(BeNil())
 				Expect(conn).To(BeNil())
 				Expect(err).ToNot(BeNil())
 				Expect(err.Error()).To(ContainSubstring("failed to get TLS config"))
-				Expect(err.Error()).To(ContainSubstring("unable to construct new cert pool using provided cluster CA data"))
+				Expect(err.Error()).To(ContainSubstring("unable to construct new cert pool using cluster CA data"))
 			})
 		})
 
 		When("client connection can be created with provided auth token", func() {
 			It("should create the connection without error", func() {
+				tempDir := GinkgoT().TempDir()
+				caFilePath := filepath.Join(tempDir, "ca.crt")
+				err := os.WriteFile(caFilePath, clusterCACertPEM, os.ModePerm)
+				Expect(err).To(BeNil())
+
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 				lis := bufconn.Listen(1024)
 				defer lis.Close()
 				fqdn := lis.Addr().String()
 
-				serviceClient, conn, err := secureTLSBootstrapServiceClientFactory(ctx, logger, serviceClientFactoryOpts{
-					clusterCAData: clusterCACertPEM,
-					nextProto:     nextProto,
-					authToken:     "token",
-					fqdn:          fqdn,
+				serviceClient, conn, err := secureTLSBootstrapServiceClientFactory(ctx, logger, &serviceClientFactoryConfig{
+					clusterCAFilePath: caFilePath,
+					nextProto:         nextProto,
+					authToken:         "token",
+					fqdn:              fqdn,
 				})
 				defer conn.Close()
 

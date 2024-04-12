@@ -44,10 +44,10 @@ var _ = Describe("SecureTLSBootstrapClient tests", func() {
 		bootstrapClient     *SecureTLSBootstrapClient
 	)
 	defaultOpts := &GetKubeletClientCredentialOpts{
-		NextProto:      "bootstrap",
-		ClusterCAData:  clusterCACertPEM,
-		APIServerFQDN:  defaultAPIServerFQDN,
-		KubeconfigPath: defaultKubeconfigPath,
+		NextProto:         "bootstrap",
+		ClusterCAFilePath: mockClusterCAFilePath,
+		APIServerFQDN:     defaultAPIServerFQDN,
+		KubeconfigPath:    defaultKubeconfigPath,
 		AzureConfig: &datamodel.AzureConfig{
 			ClientID:     "clientId",
 			ClientSecret: "clientSecret",
@@ -85,7 +85,7 @@ var _ = Describe("SecureTLSBootstrapClient tests", func() {
 			bootstrapClient.serviceClientFactory = func(
 				ctx context.Context,
 				logger *zap.Logger,
-				opts serviceClientFactoryOpts) (secureTLSBootstrapService.SecureTLSBootstrapServiceClient, *grpc.ClientConn, error) {
+				cfg *serviceClientFactoryConfig) (secureTLSBootstrapService.SecureTLSBootstrapServiceClient, *grpc.ClientConn, error) {
 				return serviceClient, nil, nil
 			}
 		})
@@ -318,7 +318,13 @@ var _ = Describe("SecureTLSBootstrapClient tests", func() {
 		})
 
 		When("bootstrap server can generate a credential", func() {
-			It("should return a new kubeconfig object with the credential embedded", func() {
+			It("should return a new kubeconfig object referencing the new credential", func() {
+				tempDir := GinkgoT().TempDir()
+				certPath := filepath.Join(tempDir, "client.crt")
+				keyPath := filepath.Join(tempDir, "client.key")
+				defaultOpts.CertFilePath = certPath
+				defaultOpts.KeyFilePath = keyPath
+
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 				clientCertPEM, _, err := testutil.GenerateCertPEMWithExpiration("system:node:node", "system:nodes", time.Now().Add(time.Hour))
@@ -359,12 +365,12 @@ var _ = Describe("SecureTLSBootstrapClient tests", func() {
 				Expect(kubeconfigData.Clusters).To(HaveKey("default-cluster"))
 				defaultCluster := kubeconfigData.Clusters["default-cluster"]
 				Expect(defaultCluster.Server).To(Equal("https://controlplane.azmk8s.io:443"))
-				Expect(defaultCluster.CertificateAuthorityData).To(Equal(defaultOpts.ClusterCAData))
+				Expect(defaultCluster.CertificateAuthority).To(Equal(defaultOpts.ClusterCAFilePath))
 
 				Expect(kubeconfigData.AuthInfos).To(HaveKey("default-auth"))
 				defaultAuth := kubeconfigData.AuthInfos["default-auth"]
-				Expect(defaultAuth.ClientCertificateData).To(Equal(clientCertPEM))
-				Expect(defaultAuth.ClientKeyData).ToNot(BeEmpty())
+				Expect(defaultAuth.ClientCertificate).To(Equal(certPath))
+				Expect(defaultAuth.ClientKey).To(Equal(keyPath))
 
 				Expect(kubeconfigData.Contexts).To(HaveKey("default-context"))
 				defaultContext := kubeconfigData.Contexts["default-context"]
@@ -372,6 +378,14 @@ var _ = Describe("SecureTLSBootstrapClient tests", func() {
 				Expect(defaultContext.AuthInfo).To(Equal("default-auth"))
 
 				Expect(kubeconfigData.CurrentContext).To(Equal("default-context"))
+
+				certData, err := os.ReadFile(certPath)
+				Expect(err).To(BeNil())
+				Expect(certData).ToNot(BeEmpty())
+
+				keyData, err := os.ReadFile(keyPath)
+				Expect(err).To(BeNil())
+				Expect(keyData).ToNot(BeEmpty())
 			})
 		})
 	})
@@ -380,40 +394,42 @@ var _ = Describe("SecureTLSBootstrapClient tests", func() {
 		Context("ValidateAndSet", func() {
 			var opts *GetKubeletClientCredentialOpts
 			defaultAzureConfigPath := "path/to/azure.json"
-			defaultClusterCAFilePath := "path/to/ca.crt"
 
 			BeforeEach(func() {
 				opts = &GetKubeletClientCredentialOpts{
-					APIServerFQDN:  "fqdn",
-					CustomClientID: "clientId",
-					NextProto:      "alpn",
-					AADResource:    "appID",
-					KubeconfigPath: "path",
+					APIServerFQDN:     "fqdn",
+					CustomClientID:    "clientId",
+					NextProto:         "alpn",
+					AADResource:       "appID",
+					ClusterCAFilePath: "path",
+					KubeconfigPath:    "path",
+					CertFilePath:      "path",
+					KeyFilePath:       "path",
 				}
-			})
-
-			When("clusterCAFilePath is empty", func() {
-				It("should return an error", func() {
-					emptyClusterCAFilePath := ""
-					err := opts.ValidateAndSet(defaultAzureConfigPath, emptyClusterCAFilePath)
-					Expect(err).ToNot(BeNil())
-					Expect(err.Error()).To(ContainSubstring("cluster CA file path must be specified"))
-				})
 			})
 
 			When("azureConfigPath is empty", func() {
 				It("should return an error", func() {
 					emptyAzureConfigPath := ""
-					err := opts.ValidateAndSet(emptyAzureConfigPath, defaultClusterCAFilePath)
+					err := opts.ValidateAndSet(emptyAzureConfigPath)
 					Expect(err).ToNot(BeNil())
 					Expect(err.Error()).To(ContainSubstring("azure config path must be specified"))
+				})
+			})
+
+			When("ClusterCAFilePath is empty", func() {
+				It("should return an error", func() {
+					opts.ClusterCAFilePath = ""
+					err := opts.ValidateAndSet(defaultAzureConfigPath)
+					Expect(err).ToNot(BeNil())
+					Expect(err.Error()).To(ContainSubstring("cluster CA file path must be specified"))
 				})
 			})
 
 			When("APIServerFQDN is empty", func() {
 				It("should return an error", func() {
 					opts.APIServerFQDN = ""
-					err := opts.ValidateAndSet(defaultAzureConfigPath, defaultClusterCAFilePath)
+					err := opts.ValidateAndSet(defaultAzureConfigPath)
 					Expect(err).ToNot(BeNil())
 					Expect(err.Error()).To(ContainSubstring("apiserver FQDN must be specified"))
 				})
@@ -422,7 +438,7 @@ var _ = Describe("SecureTLSBootstrapClient tests", func() {
 			When("NextProto is empty", func() {
 				It("should return an error", func() {
 					opts.NextProto = ""
-					err := opts.ValidateAndSet(defaultAzureConfigPath, defaultClusterCAFilePath)
+					err := opts.ValidateAndSet(defaultAzureConfigPath)
 					Expect(err).ToNot(BeNil())
 					Expect(err.Error()).To(ContainSubstring("next proto header value must be specified"))
 				})
@@ -431,7 +447,7 @@ var _ = Describe("SecureTLSBootstrapClient tests", func() {
 			When("AADResource is empty", func() {
 				It("should return an error", func() {
 					opts.AADResource = ""
-					err := opts.ValidateAndSet(defaultAzureConfigPath, defaultClusterCAFilePath)
+					err := opts.ValidateAndSet(defaultAzureConfigPath)
 					Expect(err).ToNot(BeNil())
 					Expect(err.Error()).To(ContainSubstring("AAD resource must be specified"))
 				})
@@ -440,25 +456,40 @@ var _ = Describe("SecureTLSBootstrapClient tests", func() {
 			When("KubeconfigPath is empty", func() {
 				It("should return an error", func() {
 					opts.KubeconfigPath = ""
-					err := opts.ValidateAndSet(defaultAzureConfigPath, defaultClusterCAFilePath)
+					err := opts.ValidateAndSet(defaultAzureConfigPath)
 					Expect(err).ToNot(BeNil())
-					Expect(err.Error()).To(ContainSubstring("kubeconfig must be specified"))
+					Expect(err.Error()).To(ContainSubstring("kubeconfig path must be specified"))
+				})
+			})
+
+			When("CertFilePath is empty", func() {
+				It("should return an error", func() {
+					opts.CertFilePath = ""
+					err := opts.ValidateAndSet(defaultAzureConfigPath)
+					Expect(err).ToNot(BeNil())
+					Expect(err.Error()).To(ContainSubstring("cert file path must be specified"))
+				})
+			})
+
+			When("KeyFilePath is empty", func() {
+				It("should return an error", func() {
+					opts.KeyFilePath = ""
+					err := opts.ValidateAndSet(defaultAzureConfigPath)
+					Expect(err).ToNot(BeNil())
+					Expect(err.Error()).To(ContainSubstring("key file path must be specified"))
 				})
 			})
 
 			When("client opts are valid", func() {
 				It("should validate without error", func() {
 					tempDir := GinkgoT().TempDir()
-					clusterCAFilePath := filepath.Join(tempDir, "ca.crt")
-					err := os.WriteFile(clusterCAFilePath, clusterCACertPEM, os.ModePerm)
-					Expect(err).To(BeNil())
 					azureConfigPath := filepath.Join(tempDir, "azure.json")
 					azureConfigBytes, err := json.Marshal(defaultOpts.AzureConfig)
 					Expect(err).To(BeNil())
 					err = os.WriteFile(azureConfigPath, azureConfigBytes, os.ModePerm)
 					Expect(err).To(BeNil())
 
-					err = opts.ValidateAndSet(azureConfigPath, clusterCAFilePath)
+					err = opts.ValidateAndSet(azureConfigPath)
 					Expect(err).To(BeNil())
 				})
 			})

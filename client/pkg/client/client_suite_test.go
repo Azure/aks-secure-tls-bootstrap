@@ -4,6 +4,8 @@
 package client
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -14,8 +16,8 @@ import (
 )
 
 var (
-	logger           *zap.Logger
-	clusterCACertPEM []byte
+	logger                *zap.Logger
+	mockClusterCAFilePath string
 )
 
 func TestTLSBootstrapClient(t *testing.T) {
@@ -25,7 +27,11 @@ func TestTLSBootstrapClient(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
-	var err error
-	clusterCACertPEM, _, err = testutil.GenerateCertPEMWithExpiration("hcp", "aks", time.Now().Add(time.Hour))
+	clusterCACertPEM, _, err := testutil.GenerateCertPEMWithExpiration("hcp", "aks", time.Now().Add(time.Hour))
+	Expect(err).To(BeNil())
+
+	tempDir := GinkgoT().TempDir()
+	mockClusterCAFilePath = filepath.Join(tempDir, "ca.crt")
+	err = os.WriteFile(mockClusterCAFilePath, clusterCACertPEM, os.ModePerm)
 	Expect(err).To(BeNil())
 })

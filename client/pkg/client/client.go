@@ -20,22 +20,24 @@ import (
 )
 
 type GetKubeletClientCredentialOpts struct {
-	ClusterCAData              []byte
 	APIServerFQDN              string
 	CustomClientID             string
 	NextProto                  string
 	AADResource                string
+	ClusterCAFilePath          string
 	KubeconfigPath             string
+	CertFilePath               string
+	KeyFilePath                string
 	InsecureSkipTLSVerify      bool
 	EnsureClientAuthentication bool
 	AzureConfig                *datamodel.AzureConfig
 }
 
-func (o *GetKubeletClientCredentialOpts) ValidateAndSet(azureConfigPath, clusterCAFilePath string) error {
+func (o *GetKubeletClientCredentialOpts) ValidateAndSet(azureConfigPath string) error {
 	if azureConfigPath == "" {
 		return fmt.Errorf("azure config path must be specified")
 	}
-	if clusterCAFilePath == "" {
+	if o.ClusterCAFilePath == "" {
 		return fmt.Errorf("cluster CA file path must be specified")
 	}
 	if o.APIServerFQDN == "" {
@@ -48,8 +50,15 @@ func (o *GetKubeletClientCredentialOpts) ValidateAndSet(azureConfigPath, cluster
 		return fmt.Errorf("AAD resource must be specified")
 	}
 	if o.KubeconfigPath == "" {
-		return fmt.Errorf("kubeconfig must be specified")
+		return fmt.Errorf("kubeconfig path must be specified")
 	}
+	if o.CertFilePath == "" {
+		return fmt.Errorf("cert file path must be specified")
+	}
+	if o.KeyFilePath == "" {
+		return fmt.Errorf("key file path must be specified")
+	}
+
 	azureConfig := &datamodel.AzureConfig{}
 	azureConfigData, err := os.ReadFile(azureConfigPath)
 	if err != nil {
@@ -58,12 +67,8 @@ func (o *GetKubeletClientCredentialOpts) ValidateAndSet(azureConfigPath, cluster
 	if err = json.Unmarshal(azureConfigData, azureConfig); err != nil {
 		return fmt.Errorf("unmarshaling azure config data: %w", err)
 	}
-	clusterCAData, err := os.ReadFile(clusterCAFilePath)
-	if err != nil {
-		return fmt.Errorf("reading cluster CA data from %s: %w", clusterCAFilePath, err)
-	}
 	o.AzureConfig = azureConfig
-	o.ClusterCAData = clusterCAData
+
 	return nil
 }
 
@@ -101,9 +106,9 @@ func (c *SecureTLSBootstrapClient) GetKubeletClientCredential(ctx context.Contex
 	c.logger.Info("generated JWT token for auth")
 
 	c.logger.Debug("creating GRPC connection and bootstrap service client...")
-	serviceClient, conn, err := c.serviceClientFactory(ctx, c.logger, serviceClientFactoryOpts{
+	serviceClient, conn, err := c.serviceClientFactory(ctx, c.logger, &serviceClientFactoryConfig{
 		fqdn:                  opts.APIServerFQDN,
-		clusterCAData:         opts.ClusterCAData,
+		clusterCAFilePath:     opts.ClusterCAFilePath,
 		insecureSkipTLSVerify: opts.InsecureSkipTLSVerify,
 		nextProto:             opts.NextProto,
 		authToken:             authToken,
@@ -177,9 +182,11 @@ func (c *SecureTLSBootstrapClient) GetKubeletClientCredential(ctx context.Contex
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode cert data from bootstrap server")
 	}
-	kubeconfigData, err := kubeconfig.GenerateForCertAndKey(certPEM, privateKey, &kubeconfig.GenerateOpts{
-		APIServerFQDN: opts.APIServerFQDN,
-		ClusterCAData: opts.ClusterCAData,
+	kubeconfigData, err := kubeconfig.GenerateForCertAndKey(certPEM, privateKey, &kubeconfig.GenerationConfig{
+		APIServerFQDN:     opts.APIServerFQDN,
+		ClusterCAFilePath: opts.ClusterCAFilePath,
+		CertFilePath:      opts.CertFilePath,
+		KeyFilePath:       opts.KeyFilePath,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate kubeconfig for new client cert and key: %w", err)
