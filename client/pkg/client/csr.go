@@ -11,13 +11,22 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
+	"os"
+	"strings"
 )
 
 const (
 	blockTypeCertificateRequest = "CERTIFICATE REQUEST"
 )
 
-func makeKubeletClientCSR(hostname string) (csrPEM []byte, privateKey *ecdsa.PrivateKey, err error) {
+// makeKubeletClientCSR returns a valid kubelet client CSR for the bootstrapping host,
+// along with the associated (ECDSA) private key.
+func makeKubeletClientCSR() (csrPEM []byte, privateKey *ecdsa.PrivateKey, err error) {
+	hostName, err := getHostname()
+	if err != nil {
+		return nil, nil, fmt.Errorf("resolving hostname: %w", err)
+	}
+
 	privateKey, err = ecdsa.GenerateKey(elliptic.P256(), cryptorand.Reader)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to generate ECDSA 256 private key for kubelet client CSR: %w", err)
@@ -26,7 +35,7 @@ func makeKubeletClientCSR(hostname string) (csrPEM []byte, privateKey *ecdsa.Pri
 	template := x509.CertificateRequest{
 		Subject: pkix.Name{
 			Organization: []string{"system:nodes"},
-			CommonName:   fmt.Sprintf("system:node:%s", hostname),
+			CommonName:   fmt.Sprintf("system:node:%s", hostName),
 		},
 		SignatureAlgorithm: x509.ECDSAWithSHA256,
 	}
@@ -42,4 +51,21 @@ func makeKubeletClientCSR(hostname string) (csrPEM []byte, privateKey *ecdsa.Pri
 	}
 
 	return pem.EncodeToMemory(pemBlock), privateKey, nil
+}
+
+// Returns the canonicalized (trimmed and lowercased) hostname of the VM.
+func getHostname() (string, error) {
+	hostName, err := os.Hostname()
+	if err != nil {
+		return "", fmt.Errorf("couldn't determine hostname: %w", err)
+	}
+
+	// Trim whitespaces first to avoid getting an empty hostname
+	// For linux, the hostname is read from file /proc/sys/kernel/hostname directly
+	hostName = strings.TrimSpace(hostName)
+	if len(hostName) == 0 {
+		return "", fmt.Errorf("empty hostname is invalid")
+	}
+
+	return strings.ToLower(hostName), nil
 }

@@ -147,15 +147,8 @@ func (c *SecureTLSBootstrapClient) GetKubeletClientCredential(ctx context.Contex
 	}
 	c.logger.Info("retrieved IMDS attested data")
 
-	c.logger.Debug("resolving hostname...")
-	hostname, err := os.Hostname()
-	if err != nil {
-		return nil, fmt.Errorf("failed to resolve own hostname for kubelet CSR creation: %w", err)
-	}
-	c.logger.Info("resolved hostname", zap.String("hostname", hostname))
-
 	c.logger.Debug("generating kubelet client CSR and associated private key...")
-	csrPEM, privateKey, err := makeKubeletClientCSR(hostname)
+	csrPEM, privateKey, err := makeKubeletClientCSR()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create kubelet client CSR: %w", err)
 	}

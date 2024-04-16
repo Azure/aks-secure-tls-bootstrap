@@ -15,7 +15,7 @@ import (
 var _ = Describe("CSR tests", func() {
 	Context("makeKubeletClientCSR tests", func() {
 		It("should generate and return a new kubelet client CSR for the provided hostname", func() {
-			csrPEM, privateKey, err := makeKubeletClientCSR("node")
+			csrPEM, privateKey, err := makeKubeletClientCSR()
 			Expect(err).To(BeNil())
 			Expect(csrPEM).ToNot(BeEmpty())
 			Expect(privateKey.Curve).To(Equal(elliptic.P256()))
@@ -30,7 +30,7 @@ var _ = Describe("CSR tests", func() {
 			subject := csr.Subject
 			Expect(len(subject.Organization)).To(Equal(1))
 			Expect(subject.Organization[0]).To(Equal("system:nodes"))
-			Expect(subject.CommonName).To(Equal("system:node:node"))
+			Expect(subject.CommonName).To(HavePrefix("system:node:"))
 			Expect(csr.SignatureAlgorithm).To(Equal(x509.ECDSAWithSHA256))
 		})
 	})
