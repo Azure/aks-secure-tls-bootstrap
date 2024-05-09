@@ -8,6 +8,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"os"
 
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
@@ -16,12 +17,18 @@ const (
 	blockTypeECPrivateKey = "EC PRIVATE KEY"
 )
 
-type GenerateOpts struct {
-	APIServerFQDN string
-	ClusterCAData []byte
+// GenerationConfig is used to specify various configurations for generation a kubeconfig.
+type GenerationConfig struct {
+	APIServerFQDN     string
+	ClusterCAFilePath string
+	CertFilePath      string
+	KeyFilePath       string
 }
 
-func GenerateForCertAndKey(certPEM []byte, privateKey *ecdsa.PrivateKey, opts *GenerateOpts) (*clientcmdapi.Config, error) {
+// GenerateForCertAndKey generates a valid kubeconfig with the specified cert, key, and configuration.
+// The cert and key will have their PEM-encodings written out to respective cert and key files to be
+// referenced within the generated kubeconfig.
+func GenerateForCertAndKey(certPEM []byte, privateKey *ecdsa.PrivateKey, cfg *GenerationConfig) (*clientcmdapi.Config, error) {
 	keyDER, err := x509.MarshalECPrivateKey(privateKey)
 	if err != nil {
 		return nil, fmt.Errorf("unable to marshal EC private key during kubeconfig generation: %w", err)
@@ -32,15 +39,23 @@ func GenerateForCertAndKey(certPEM []byte, privateKey *ecdsa.PrivateKey, opts *G
 	}
 	keyPEM := pem.EncodeToMemory(block)
 
+	if err = os.WriteFile(cfg.CertFilePath, certPEM, 0644); err != nil {
+		return nil, fmt.Errorf("failed to write new client certificate to %s: %w", cfg.CertFilePath, err)
+	}
+
+	if err = os.WriteFile(cfg.KeyFilePath, keyPEM, 0600); err != nil {
+		return nil, fmt.Errorf("failed to write new client key to %s: %w", cfg.KeyFilePath, err)
+	}
+
 	kubeconfigData := &clientcmdapi.Config{
 		Clusters: map[string]*clientcmdapi.Cluster{"default-cluster": {
-			Server:                   fmt.Sprintf("https://%s:443", opts.APIServerFQDN),
-			CertificateAuthorityData: opts.ClusterCAData,
+			Server:               fmt.Sprintf("https://%s:443", cfg.APIServerFQDN),
+			CertificateAuthority: cfg.ClusterCAFilePath,
 		}},
 		// Define auth based on the obtained client cert.
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{"default-auth": {
-			ClientCertificateData: certPEM,
-			ClientKeyData:         keyPEM,
+			ClientCertificate: cfg.CertFilePath,
+			ClientKey:         cfg.KeyFilePath,
 		}},
 		// Define a context that connects the auth info and cluster, and set it as the default
 		Contexts: map[string]*clientcmdapi.Context{"default-context": {

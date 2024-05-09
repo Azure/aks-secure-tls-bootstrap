@@ -28,6 +28,8 @@ const (
 	flagAADResource                = "aad-resource"
 	flagVerbose                    = "verbose"
 	flagKubeconfigPath             = "kubeconfig"
+	flagCertFilePath               = "cert-file"
+	flagKeyFilePath                = "key-file"
 	flagInsecureSkipTLSVerify      = "insecure-skip-tls-verify"
 	flagEnsureClientAuthentication = "ensure-client-authentication"
 )
@@ -46,19 +48,18 @@ func main() {
 
 func createBootstrapCommand() *cobra.Command {
 	var (
-		opts              = &client.GetKubeletClientCredentialOpts{}
-		azureConfigPath   string
-		clusterCAFilePath string
-		logFile           string
-		format            string
-		verbose           bool
+		opts            = &client.GetKubeletClientCredentialOpts{}
+		azureConfigPath string
+		logFile         string
+		format          string
+		verbose         bool
 	)
 
 	cmd := &cobra.Command{
 		Use:   "bootstrap",
 		Short: "generate a secure TLS bootstrap token to securely join an AKS cluster",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := opts.ValidateAndSet(azureConfigPath, clusterCAFilePath); err != nil {
+			if err := opts.ValidateAndSet(azureConfigPath); err != nil {
 				return fmt.Errorf("validating and setting opts for kubelet client credential generation: %w", err)
 			}
 
@@ -95,7 +96,6 @@ func createBootstrapCommand() *cobra.Command {
 
 	cmd.Flags().BoolVar(&verbose, flagVerbose, false, "Enable verbose logging.")
 	cmd.Flags().StringVar(&azureConfigPath, flagAzureConfigPath, "", "Path to the azure config file.")
-	cmd.Flags().StringVar(&clusterCAFilePath, flagClusterCAFilePath, "", "Path to the cluster CA file.")
 	cmd.Flags().StringVar(&logFile, flagLogFile, "", "Path to the file where logs will be written.")
 	cmd.Flags().StringVar(&format, flagLogFormat, "json", "Log format: json or console.")
 	cmd.Flags().BoolVar(&opts.InsecureSkipTLSVerify, flagInsecureSkipTLSVerify, false, "Skip TLS verification when connecting to the API server FQDN.")
@@ -105,6 +105,9 @@ func createBootstrapCommand() *cobra.Command {
 	cmd.Flags().StringVar(&opts.AADResource, flagAADResource, "", "Resource (audience) used to request JWT tokens from AAD for authentication.")
 	cmd.Flags().StringVar(&opts.NextProto, flagNextProto, "", "ALPN Next Protocol value to send within requests to the bootstrap server.")
 	cmd.Flags().StringVar(&opts.KubeconfigPath, flagKubeconfigPath, "", "Path to the kubeconfig file containing the generated kubelet client certificate.")
+	cmd.Flags().StringVar(&opts.ClusterCAFilePath, flagClusterCAFilePath, "", "Path to the cluster CA file.")
+	cmd.Flags().StringVar(&opts.CertFilePath, flagCertFilePath, "", "Path to the file which will contain the PEM-encoded client certificate, referenced by the generated kubeconfig.")
+	cmd.Flags().StringVar(&opts.KeyFilePath, flagKeyFilePath, "", "Path to the file which will contain the PEM-encoded client key, referenced by the generated kubeconfig.")
 	return cmd
 }
 
