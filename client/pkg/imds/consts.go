@@ -35,6 +35,8 @@ const (
 	nonceHeaderKey = "nonce"
 	// Used to specify "Metadata" header in IMDS requests.
 	metadataHeaderKey = "Metadata"
+	// Used to specify the user-agent header in IMDS requests.
+	userAgentHeaderKey = "User-Agent"
 )
 
 const (

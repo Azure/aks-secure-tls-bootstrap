@@ -10,10 +10,14 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/client"
 	"github.com/spf13/cobra"
+
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -83,14 +87,13 @@ func createBootstrapCommand() *cobra.Command {
 			}
 
 			// kubeconfigData will be nil when bootstrapping is skipped
-			if kubeconfigData != nil {
-				logger.Info("writing generated kubeconfig data to disk", zap.String("kubeconfig", opts.KubeconfigPath))
-				return clientcmd.WriteToFile(*kubeconfigData, opts.KubeconfigPath)
-			} else {
+			if kubeconfigData == nil {
 				logger.Info("existing kubeconfig is already valid, no new kubeconfig data to write")
+				return nil
 			}
 
-			return nil
+			logger.Info("writing generated kubeconfig data to disk", zap.String("kubeconfig", opts.KubeconfigPath))
+			return clientcmd.WriteToFile(*kubeconfigData, opts.KubeconfigPath)
 		},
 	}
 
@@ -124,6 +127,10 @@ func getLoggerForCmd(logFile, format string, verbose bool) (*zap.Logger, error) 
 	if strings.EqualFold(format, "console") {
 		cfg.Encoding = "console"
 	}
+
+	// Use RFC3339 timestamps
+	cfg.EncoderConfig.TimeKey = "timestamp"
+	cfg.EncoderConfig.EncodeTime = zapcore.TimeEncoderOfLayout(time.RFC3339)
 
 	logger, err := cfg.Build()
 	if err != nil {
