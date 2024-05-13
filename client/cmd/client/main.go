@@ -87,14 +87,13 @@ func createBootstrapCommand() *cobra.Command {
 			}
 
 			// kubeconfigData will be nil when bootstrapping is skipped
-			if kubeconfigData != nil {
-				logger.Info("writing generated kubeconfig data to disk", zap.String("kubeconfig", opts.KubeconfigPath))
-				return clientcmd.WriteToFile(*kubeconfigData, opts.KubeconfigPath)
-			} else {
+			if kubeconfigData == nil {
 				logger.Info("existing kubeconfig is already valid, no new kubeconfig data to write")
+				return nil
 			}
 
-			return nil
+			logger.Info("writing generated kubeconfig data to disk", zap.String("kubeconfig", opts.KubeconfigPath))
+			return clientcmd.WriteToFile(*kubeconfigData, opts.KubeconfigPath)
 		},
 	}
 
