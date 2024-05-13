@@ -60,6 +60,7 @@ func secureTLSBootstrapServiceClientFactory(
 				AccessToken: cfg.authToken,
 			}),
 		}),
+		grpc.WithUserAgent("aks-secure-tls-bootstrap-client"),
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to dial client connection with context: %w", err)
