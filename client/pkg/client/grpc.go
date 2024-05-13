@@ -10,9 +10,13 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/consts"
 	secureTLSBootstrapService "github.com/Azure/aks-secure-tls-bootstrap/service/protos"
+
 	"go.uber.org/zap"
+
 	"golang.org/x/oauth2"
+
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/oauth"
@@ -60,7 +64,7 @@ func secureTLSBootstrapServiceClientFactory(
 				AccessToken: cfg.authToken,
 			}),
 		}),
-		grpc.WithUserAgent("aks-secure-tls-bootstrap-client"),
+		grpc.WithUserAgent(consts.SecureTLSBootstrapClientUserAgentValue),
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to dial client connection with context: %w", err)

@@ -12,6 +12,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/consts"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/datamodel"
 	"github.com/hashicorp/go-retryablehttp"
 	"go.uber.org/zap"
@@ -105,6 +106,7 @@ func (c *ClientImpl) callIMDS(ctx context.Context, url string, queryParameters m
 		return fmt.Errorf("failed to construct new HTTP request to IMDS: %w", err)
 	}
 	req.Header.Add(metadataHeaderKey, "True")
+	req.Header.Add(userAgentHeaderKey, consts.SecureTLSBootstrapClientUserAgentValue)
 
 	query := req.URL.Query()
 	for key := range queryParameters {
