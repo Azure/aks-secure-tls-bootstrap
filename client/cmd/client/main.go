@@ -14,6 +14,7 @@ import (
 	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/client"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -124,6 +125,10 @@ func getLoggerForCmd(logFile, format string, verbose bool) (*zap.Logger, error) 
 	if strings.EqualFold(format, "console") {
 		cfg.Encoding = "console"
 	}
+
+	// Use ISO8601 timestamps
+	cfg.EncoderConfig.TimeKey = "timestamp"
+	cfg.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 
 	logger, err := cfg.Build()
 	if err != nil {
