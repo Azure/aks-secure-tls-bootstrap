@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/client"
 	"github.com/spf13/cobra"
@@ -128,9 +129,9 @@ func getLoggerForCmd(logFile, format string, verbose bool) (*zap.Logger, error) 
 		cfg.Encoding = "console"
 	}
 
-	// Use ISO8601 timestamps
+	// Use RFC3339 timestamps
 	cfg.EncoderConfig.TimeKey = "timestamp"
-	cfg.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+	cfg.EncoderConfig.EncodeTime = zapcore.TimeEncoderOfLayout(time.RFC3339)
 
 	logger, err := cfg.Build()
 	if err != nil {
