@@ -5,10 +5,8 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="4a763e78-5883-468c-99dc-f4bb84a4d313" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/.gitignore" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/aks-secure-tls-bootstrap.iml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/modules.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/pkg/bootstrap/config.go" beforeDir="false" afterPath="$PROJECT_DIR$/client/pkg/bootstrap/config.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/client/pkg/bootstrap/config_test.go" beforeDir="false" afterPath="$PROJECT_DIR$/client/pkg/bootstrap/config_test.go" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
