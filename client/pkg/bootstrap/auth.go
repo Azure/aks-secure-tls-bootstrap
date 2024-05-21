@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
 
-package client
+package bootstrap
 
 import (
 	"context"
@@ -20,7 +20,7 @@ const (
 // a user-assigned managed identity and thus fetch the corresponding MSI token from IMDS. Otherwise, the information specified
 // in the azure config read from azure.json to infer the identity type and either request the token from AAD directly, or from IMDS.
 // All tokens for MSIs will be fetched from IMDS, while all SPN tokens will be fetched from AAD directly.
-func (c *SecureTLSBootstrapClient) getAuthToken(ctx context.Context, customClientID, aadResource string, azureConfig *datamodel.AzureConfig) (string, error) {
+func (c *Client) getAuthToken(ctx context.Context, customClientID, aadResource string, azureConfig *datamodel.AzureConfig) (string, error) {
 	if customClientID != "" {
 		c.logger.Info("retrieving MSI access token from IMDS using user-specified client ID for UAMI...")
 		token, err := c.imdsClient.GetMSIToken(ctx, customClientID, aadResource)

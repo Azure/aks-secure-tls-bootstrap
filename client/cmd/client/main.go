@@ -12,8 +12,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/client"
 	"github.com/spf13/cobra"
+
+	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/bootstrap"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -52,7 +53,7 @@ func main() {
 
 func createBootstrapCommand() *cobra.Command {
 	var (
-		opts            = &client.GetKubeletClientCredentialOpts{}
+		opts            bootstrap.Config
 		azureConfigPath string
 		logFile         string
 		format          string
@@ -73,7 +74,7 @@ func createBootstrapCommand() *cobra.Command {
 			}
 			defer flush(logger)
 
-			bootstrapClient, err := client.NewSecureTLSBootstrapClient(logger)
+			bootstrapClient, err := bootstrap.NewClient(logger)
 			if err != nil {
 				return err
 			}
@@ -81,7 +82,7 @@ func createBootstrapCommand() *cobra.Command {
 			ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 			defer cancel()
 
-			kubeconfigData, err := bootstrapClient.GetKubeletClientCredential(ctx, opts)
+			kubeconfigData, err := bootstrapClient.GetKubeletClientCredential(ctx, &opts)
 			if err != nil {
 				return err
 			}
