@@ -10,7 +10,7 @@ import (
 )
 
 var _ = Describe("config tests", func() {
-	Context("GetKubeletClientCredentialOpts tests", func() {
+	Context("Config tests", func() {
 		Context("ValidateAndSet", func() {
 			var cfg *Config
 			defaultAzureConfigPath := "path/to/azure.json"
