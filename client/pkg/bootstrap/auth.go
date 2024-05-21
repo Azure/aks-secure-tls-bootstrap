@@ -25,7 +25,7 @@ func (c *Client) getAuthToken(ctx context.Context, customClientID, aadResource s
 		c.logger.Info("retrieving MSI access token from IMDS using user-specified client ID for UAMI...")
 		token, err := c.imdsClient.GetMSIToken(ctx, customClientID, aadResource)
 		if err != nil {
-			return "", fmt.Errorf("unable to get MSI token for UAMI using user-specified client ID")
+			return "", fmt.Errorf("unable to get MSI token for UAMI using user-specified client ID: %w", err)
 		}
 		return token, nil
 	}
@@ -61,5 +61,4 @@ func (c *Client) getAuthToken(ctx context.Context, customClientID, aadResource s
 		return "", fmt.Errorf("unable to get SPN token from AAD: %w", err)
 	}
 	return token, nil
-
 }
