@@ -20,3 +20,6 @@ bin/
 
 # Go workspace file
 go.work
+
+# Jetbrains
+.idea/
