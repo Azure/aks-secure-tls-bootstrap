@@ -29,10 +29,10 @@ build:
 
 artifacts:
   binaries:
-    src/client/bin/tls-bootstrap-client-amd64:
-    src/client/bin/tls-bootstrap-client-arm64:
-    src/client/bin/tls-bootstrap-client-amd64.exe:
-    src/client/bin/tls-bootstrap-client-arm64.exe:
+    src/bin/tls-bootstrap-client-amd64:
+    src/bin/tls-bootstrap-client-arm64:
+    src/bin/tls-bootstrap-client-amd64.exe:
+    src/bin/tls-bootstrap-client-arm64.exe:
 
 tests:
   - name: Check bin
