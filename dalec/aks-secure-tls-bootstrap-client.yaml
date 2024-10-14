@@ -1,7 +1,7 @@
 # syntax=ghcr.io/azure/dalec/frontend:latest
 
 name: aks-secure-tls-bootstrap-client
-version: v0.1.0~alpha.1
+version: v0.1.0~alpha.4
 revision: 1
 license: MIT
 description: AKS secure TLS bootstrapping client
