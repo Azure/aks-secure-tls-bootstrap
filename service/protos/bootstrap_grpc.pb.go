@@ -5,7 +5,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.3.0
 // - protoc             v4.24.3
-// source: service/protos/bootstrap.proto
+// source: protos/bootstrap.proto
 
 package protos
 
@@ -195,5 +195,5 @@ var SecureTLSBootstrapService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "service/protos/bootstrap.proto",
+	Metadata: "protos/bootstrap.proto",
 }
