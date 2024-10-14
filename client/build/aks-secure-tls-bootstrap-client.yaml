@@ -13,7 +13,7 @@ sources:
       - gomod: {}
     git:
       url: https://github.com/Azure/aks-secure-tls-bootstrap.git
-      commit: "client/v0.1.0-alpha.camdalec0"
+      commit: "client/v0.1.0-alpha.camdalec1"
 
 dependencies:
   build:
@@ -34,7 +34,5 @@ artifacts:
 tests:
   - name: check bin
     files:
-      /usr/bin/aks-secure-tls-bootstrap-client-amd64:
-        permissions: 0755
-      /usr/bin/aks-secure-tls-bootstrap-client-arm64:
+      /usr/bin/aks-secure-tls-bootstrap-client:
         permissions: 0755
