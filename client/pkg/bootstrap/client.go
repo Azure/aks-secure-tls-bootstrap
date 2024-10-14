@@ -1,78 +1,23 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
 
-package client
+package bootstrap
 
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
-	"os"
 
-	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/aad"
-	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/datamodel"
-	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/imds"
-	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/kubeconfig"
 	secureTLSBootstrapService "github.com/Azure/aks-secure-tls-bootstrap/service/protos"
 	"go.uber.org/zap"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+
+	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/aad"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/imds"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/kubeconfig"
 )
 
-type GetKubeletClientCredentialOpts struct {
-	APIServerFQDN              string
-	CustomClientID             string
-	NextProto                  string
-	AADResource                string
-	ClusterCAFilePath          string
-	KubeconfigPath             string
-	CertFilePath               string
-	KeyFilePath                string
-	InsecureSkipTLSVerify      bool
-	EnsureClientAuthentication bool
-	AzureConfig                *datamodel.AzureConfig
-}
-
-func (o *GetKubeletClientCredentialOpts) ValidateAndSet(azureConfigPath string) error {
-	if azureConfigPath == "" {
-		return fmt.Errorf("azure config path must be specified")
-	}
-	if o.ClusterCAFilePath == "" {
-		return fmt.Errorf("cluster CA file path must be specified")
-	}
-	if o.APIServerFQDN == "" {
-		return fmt.Errorf("apiserver FQDN must be specified")
-	}
-	if o.NextProto == "" {
-		return fmt.Errorf("next proto header value must be specified")
-	}
-	if o.AADResource == "" {
-		return fmt.Errorf("AAD resource must be specified")
-	}
-	if o.KubeconfigPath == "" {
-		return fmt.Errorf("kubeconfig path must be specified")
-	}
-	if o.CertFilePath == "" {
-		return fmt.Errorf("cert file path must be specified")
-	}
-	if o.KeyFilePath == "" {
-		return fmt.Errorf("key file path must be specified")
-	}
-
-	azureConfig := &datamodel.AzureConfig{}
-	azureConfigData, err := os.ReadFile(azureConfigPath)
-	if err != nil {
-		return fmt.Errorf("reading azure config data from %s: %w", azureConfigPath, err)
-	}
-	if err = json.Unmarshal(azureConfigData, azureConfig); err != nil {
-		return fmt.Errorf("unmarshaling azure config data: %w", err)
-	}
-	o.AzureConfig = azureConfig
-
-	return nil
-}
-
-type SecureTLSBootstrapClient struct {
+type Client struct {
 	logger               *zap.Logger
 	serviceClientFactory serviceClientFactoryFunc
 	imdsClient           imds.Client
@@ -80,8 +25,8 @@ type SecureTLSBootstrapClient struct {
 	kubeconfigValidator  kubeconfig.Validator
 }
 
-func NewSecureTLSBootstrapClient(logger *zap.Logger) (*SecureTLSBootstrapClient, error) {
-	return &SecureTLSBootstrapClient{
+func NewClient(logger *zap.Logger) (*Client, error) {
+	return &Client{
 		logger:               logger,
 		serviceClientFactory: secureTLSBootstrapServiceClientFactory,
 		imdsClient:           imds.NewClient(logger),
@@ -90,15 +35,15 @@ func NewSecureTLSBootstrapClient(logger *zap.Logger) (*SecureTLSBootstrapClient,
 	}, nil
 }
 
-func (c *SecureTLSBootstrapClient) GetKubeletClientCredential(ctx context.Context, opts *GetKubeletClientCredentialOpts) (*clientcmdapi.Config, error) {
-	err := c.kubeconfigValidator.Validate(opts.KubeconfigPath, opts.EnsureClientAuthentication)
+func (c *Client) GetKubeletClientCredential(ctx context.Context, cfg *Config) (*clientcmdapi.Config, error) {
+	err := c.kubeconfigValidator.Validate(cfg.KubeconfigPath, cfg.EnsureClientAuthentication)
 	if err == nil {
 		c.logger.Info("existing kubeconfig is valid, exiting without bootstrapping")
 		return nil, nil
 	}
-	c.logger.Info("failed to validate existing kubeconfig, will continue to bootstrap", zap.String("kubeconfig", opts.KubeconfigPath), zap.Error(err))
+	c.logger.Info("failed to validate existing kubeconfig, will continue to bootstrap", zap.String("kubeconfig", cfg.KubeconfigPath), zap.Error(err))
 
-	authToken, err := c.getAuthToken(ctx, opts.CustomClientID, opts.AADResource, opts.AzureConfig)
+	authToken, err := c.getAuthToken(ctx, cfg.CustomClientID, cfg.AADResource, cfg.AzureConfig)
 	if err != nil {
 		c.logger.Error("failed to generate JWT for GRPC connection", zap.Error(err))
 		return nil, fmt.Errorf("failed to generate JWT for GRPC connection: %w", err)
@@ -106,10 +51,10 @@ func (c *SecureTLSBootstrapClient) GetKubeletClientCredential(ctx context.Contex
 	c.logger.Info("generated JWT for auth")
 
 	serviceClient, conn, err := c.serviceClientFactory(ctx, c.logger, &serviceClientFactoryConfig{
-		fqdn:                  opts.APIServerFQDN,
-		clusterCAFilePath:     opts.ClusterCAFilePath,
-		insecureSkipTLSVerify: opts.InsecureSkipTLSVerify,
-		nextProto:             opts.NextProto,
+		fqdn:                  cfg.APIServerFQDN,
+		clusterCAFilePath:     cfg.ClusterCAFilePath,
+		insecureSkipTLSVerify: cfg.InsecureSkipTLSVerify,
+		nextProto:             cfg.NextProto,
 		authToken:             authToken,
 	})
 	if err != nil {
@@ -177,10 +122,10 @@ func (c *SecureTLSBootstrapClient) GetKubeletClientCredential(ctx context.Contex
 		return nil, fmt.Errorf("failed to decode cert data from bootstrap server: %w", err)
 	}
 	kubeconfigData, err := kubeconfig.GenerateForCertAndKey(certPEM, privateKey, &kubeconfig.GenerationConfig{
-		APIServerFQDN:     opts.APIServerFQDN,
-		ClusterCAFilePath: opts.ClusterCAFilePath,
-		CertFilePath:      opts.CertFilePath,
-		KeyFilePath:       opts.KeyFilePath,
+		APIServerFQDN:     cfg.APIServerFQDN,
+		ClusterCAFilePath: cfg.ClusterCAFilePath,
+		CertFilePath:      cfg.CertFilePath,
+		KeyFilePath:       cfg.KeyFilePath,
 	})
 	if err != nil {
 		c.logger.Error("failed to generate kubeconfig for new client cert and key", zap.Error(err))
