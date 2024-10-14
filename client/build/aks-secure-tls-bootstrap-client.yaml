@@ -13,7 +13,7 @@ sources:
       - gomod: {}
     git:
       url: https://github.com/Azure/aks-secure-tls-bootstrap.git
-      commit: "client/v0.1.0-alpha.4"
+      commit: "client/v0.1.0-alpha.camdalec0"
 
 dependencies:
   build:
@@ -25,14 +25,11 @@ build:
   steps:
     - command: |
         cd src
-        make build-all
+        go build -o bin/aks-secure-tls-bootstrap-client cmd/client/main.go
 
 artifacts:
   binaries:
-    src/bin/aks-secure-tls-bootstrap-client-amd64:
-    src/bin/aks-secure-tls-bootstrap-client-arm64:
-    src/bin/aks-secure-tls-bootstrap-client-amd64.exe:
-    src/bin/aks-secure-tls-bootstrap-client-arm64.exe:
+    src/bin/aks-secure-tls-bootstrap-client:
 
 tests:
   - name: check bin

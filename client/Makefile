@@ -59,14 +59,6 @@ build-linux: ## Builds the client binary for the specified linux architecture.
 build-windows: ## Builds the client binary for the specified windows architecture.
 	CGO_ENABLED=0 GOOS=windows GOARCH=$(ARCH) go build -o bin/aks-secure-tls-bootstrap-client-$(ARCH).exe cmd/client/main.go
 
-.PHONY: dalec-linux
-dalec-linux: ## Build and package linux client binaries with Dalec. https://azure.github.io/dalec/targets#available-targets
-	docker build -f build/aks-secure-tls-bootstrap-client.yaml --target=azlinux3/rpm --output=_output .
-
-.PHONY: dalec-windows
-dalec-windows: ## Build and package windows client binaries with Dalec.
-	docker build -f build/aks-secure-tls-bootstrap-client.yaml --target=windowscross/zip --output=_output .
-
 ##@ Util
 
 # go-get-tool will 'go get' any package $2 and install it to $1.
