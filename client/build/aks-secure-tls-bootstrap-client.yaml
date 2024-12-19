@@ -1,0 +1,38 @@
+# syntax=ghcr.io/azure/dalec/frontend:latest
+
+name: aks-secure-tls-bootstrap-client
+version: v0.1.0~alpha.4
+revision: 1
+license: MIT
+description: AKS secure TLS bootstrapping client
+
+sources:
+  src:
+    path: client
+    generate:
+      - gomod: {}
+    git:
+      url: https://github.com/Azure/aks-secure-tls-bootstrap.git
+      commit: "client/v0.1.0-alpha.camdalec1"
+
+dependencies:
+  build:
+    golang:
+
+build:
+  env:
+    CGO_ENABLED: "0"
+  steps:
+    - command: |
+        cd src
+        go build -o bin/aks-secure-tls-bootstrap-client cmd/client/main.go
+
+artifacts:
+  binaries:
+    src/bin/aks-secure-tls-bootstrap-client:
+
+tests:
+  - name: check bin
+    files:
+      /usr/bin/aks-secure-tls-bootstrap-client:
+        permissions: 0755
