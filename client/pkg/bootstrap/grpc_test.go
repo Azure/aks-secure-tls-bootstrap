@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
 
-package client
+package bootstrap
 
 import (
 	"context"
@@ -10,10 +10,11 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/testutil"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"google.golang.org/grpc/test/bufconn"
+
+	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/testutil"
 )
 
 var _ = Describe("grpc", func() {
@@ -31,7 +32,7 @@ var _ = Describe("grpc", func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 
-				serviceClient, conn, err := secureTLSBootstrapServiceClientFactory(ctx, logger, &serviceClientFactoryConfig{
+				serviceClient, conn, err := secureTLSBootstrapServiceClientFactory(ctx, testLogger, &serviceClientFactoryConfig{
 					clusterCAFilePath: caFilePath,
 					nextProto:         nextProto,
 					authToken:         "token",
@@ -54,7 +55,7 @@ var _ = Describe("grpc", func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 
-				serviceClient, conn, err := secureTLSBootstrapServiceClientFactory(ctx, logger, &serviceClientFactoryConfig{
+				serviceClient, conn, err := secureTLSBootstrapServiceClientFactory(ctx, testLogger, &serviceClientFactoryConfig{
 					clusterCAFilePath: caFilePath,
 					nextProto:         nextProto,
 					authToken:         "token",
@@ -81,7 +82,7 @@ var _ = Describe("grpc", func() {
 				defer lis.Close()
 				fqdn := lis.Addr().String()
 
-				serviceClient, conn, err := secureTLSBootstrapServiceClientFactory(ctx, logger, &serviceClientFactoryConfig{
+				serviceClient, conn, err := secureTLSBootstrapServiceClientFactory(ctx, testLogger, &serviceClientFactoryConfig{
 					clusterCAFilePath: caFilePath,
 					nextProto:         nextProto,
 					authToken:         "token",

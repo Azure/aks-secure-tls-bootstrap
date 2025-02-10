@@ -1,17 +1,18 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
 
-package client
+package bootstrap
 
 import (
 	"context"
 
-	aadmocks "github.com/Azure/aks-secure-tls-bootstrap/client/pkg/aad/mocks"
-	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/datamodel"
-	imdsmocks "github.com/Azure/aks-secure-tls-bootstrap/client/pkg/imds/mocks"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"go.uber.org/mock/gomock"
+
+	aadmocks "github.com/Azure/aks-secure-tls-bootstrap/client/pkg/aad/mocks"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/datamodel"
+	imdsmocks "github.com/Azure/aks-secure-tls-bootstrap/client/pkg/imds/mocks"
 )
 
 var _ = Describe("Auth", func() {
@@ -19,15 +20,15 @@ var _ = Describe("Auth", func() {
 		mockCtrl        *gomock.Controller
 		imdsClient      *imdsmocks.MockClient
 		aadClient       *aadmocks.MockClient
-		bootstrapClient *SecureTLSBootstrapClient
+		bootstrapClient *Client
 	)
 
 	BeforeEach(func() {
 		mockCtrl = gomock.NewController(GinkgoT())
 		imdsClient = imdsmocks.NewMockClient(mockCtrl)
 		aadClient = aadmocks.NewMockClient(mockCtrl)
-		bootstrapClient = &SecureTLSBootstrapClient{
-			logger:     logger,
+		bootstrapClient = &Client{
+			logger:     testLogger,
 			imdsClient: imdsClient,
 			aadClient:  aadClient,
 		}
