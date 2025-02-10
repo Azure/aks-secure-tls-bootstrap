@@ -12,11 +12,8 @@ import (
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/consts"
 	secureTLSBootstrapService "github.com/Azure/aks-secure-tls-bootstrap/service/protos"
-
 	"go.uber.org/zap"
-
 	"golang.org/x/oauth2"
-
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/oauth"
@@ -37,24 +34,16 @@ func secureTLSBootstrapServiceClientFactory(
 	ctx context.Context,
 	logger *zap.Logger,
 	cfg *serviceClientFactoryConfig) (secureTLSBootstrapService.SecureTLSBootstrapServiceClient, *grpc.ClientConn, error) {
-	logger.Debug("reading cluster CA data", zap.String("path", cfg.clusterCAFilePath))
 	clusterCAData, err := os.ReadFile(cfg.clusterCAFilePath)
 	if err != nil {
 		return nil, nil, fmt.Errorf("reading cluster CA data from %s: %w", cfg.clusterCAFilePath, err)
 	}
 	logger.Info("read cluster CA data", zap.String("path", cfg.clusterCAFilePath))
 
-	logger.Debug("generating TLS config for GRPC client connection...")
 	tlsConfig, err := getTLSConfig(clusterCAData, cfg.nextProto, cfg.insecureSkipTLSVerify)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get TLS config: %w", err)
 	}
-	logger.Info("generated TLS config for GRPC client connection")
-
-	logger.Debug("dialing TLS bootstrap server and creating GRPC connection...",
-		zap.String("fqdn", cfg.fqdn),
-		zap.Strings("tlsConfig.NextProtos", tlsConfig.NextProtos),
-		zap.Bool("tlsConfig.InsecureSkipVerify", tlsConfig.InsecureSkipVerify))
 	conn, err := grpc.DialContext(
 		ctx,
 		fmt.Sprintf("%s:443", cfg.fqdn),

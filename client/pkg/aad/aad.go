@@ -62,17 +62,16 @@ func (c *ClientImpl) GetToken(ctx context.Context, azureConfig *datamodel.AzureC
 		return "", fmt.Errorf("failed to create confidential client from azure.json sp/secret: %w", err)
 	}
 
-	logger := c.logger.With(
-		zap.Strings("scopes", scopes),
-		zap.String("aadEndpoint", env.ActiveDirectoryEndpoint),
-		zap.String("clientID", azureConfig.ClientID),
-		zap.String("tenantID", azureConfig.TenantID))
-	logger.Debug("requesting new AAD token")
-	authResult, err := client.AcquireTokenByCredential(ctx, scopes, confidential.WithTenantID(azureConfig.TenantID))
+	result, err := client.AcquireTokenByCredential(ctx, scopes, confidential.WithTenantID(azureConfig.TenantID))
 	if err != nil {
 		return "", fmt.Errorf("failed to acquire token via service principal credential: %w", err)
 	}
-	logger.Info("retrieved new AAD token")
+	c.logger.Info("retrieved new AAD token",
+		zap.Strings("scopes", scopes),
+		zap.String("aadEndpoint", env.ActiveDirectoryEndpoint),
+		zap.String("clientID", azureConfig.ClientID),
+		zap.String("tenantID", azureConfig.TenantID),
+	)
 
-	return authResult.AccessToken, nil
+	return result.AccessToken, nil
 }

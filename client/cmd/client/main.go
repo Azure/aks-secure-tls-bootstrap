@@ -12,13 +12,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/spf13/cobra"
-
 	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/bootstrap"
-
+	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -62,13 +59,13 @@ func createBootstrapCommand() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "bootstrap",
-		Short: "generate a secure TLS bootstrap token to securely join an AKS cluster",
+		Short: "bootstrap a kubelet client credential",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := cfg.ValidateAndSet(azureConfigPath); err != nil {
 				return fmt.Errorf("validating and setting cfg for kubelet client credential generation: %w", err)
 			}
 
-			logger, err := getLoggerForCmd(logFile, format, verbose)
+			logger, err := getLogger(logFile, format, verbose)
 			if err != nil {
 				return err
 			}
@@ -115,7 +112,7 @@ func createBootstrapCommand() *cobra.Command {
 	return cmd
 }
 
-func getLoggerForCmd(logFile, format string, verbose bool) (*zap.Logger, error) {
+func getLogger(logFile, format string, verbose bool) (*zap.Logger, error) {
 	cfg := zap.NewProductionConfig()
 	if logFile != "" {
 		cfg.OutputPaths = append(cfg.OutputPaths, logFile)
@@ -133,12 +130,7 @@ func getLoggerForCmd(logFile, format string, verbose bool) (*zap.Logger, error) 
 	cfg.EncoderConfig.TimeKey = "timestamp"
 	cfg.EncoderConfig.EncodeTime = zapcore.TimeEncoderOfLayout(time.RFC3339)
 
-	logger, err := cfg.Build()
-	if err != nil {
-		return nil, err
-	}
-
-	return logger, nil
+	return cfg.Build()
 }
 
 func flush(logger *zap.Logger) {
