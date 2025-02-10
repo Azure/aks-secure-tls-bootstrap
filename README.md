@@ -7,8 +7,8 @@
 
 This repo contains the following:
 
-- The [client](client/) module, which makes up the implementation of the AKS secure TLS bootstrap client.
-- The [service](service/) module, which holds and makes available the proto definitions used by the client to communicate with the bootstrap server.
+- The [client](client/) module, which holds the implementation of the AKS secure TLS bootstrap client.
+- The [service](service/) module, which holds relevant proto definitions.
 
 ## Contributing
 
@@ -31,36 +31,3 @@ trademarks or logos is subject to and must follow
 [Microsoft's Trademark & Brand Guidelines](https://www.microsoft.com/en-us/legal/intellectualproperty/trademarks/usage/general).
 Use of Microsoft trademarks or logos in modified versions of this project must not cause confusion or imply Microsoft sponsorship.
 Any use of third-party trademarks or logos are subject to those third-party's policies.
-
-## Testing
-
-Ginkgo is used for unit tests.
-
-### Setting up goproxy
-ado token: https://dev.azure.com/msazure/_usersSettings/tokens
-```
-vim ~./zshrc # bashrc 
-export AKS_GOPROXY_TOKEN=******
-export GOPROXY=https://<username>:$AKS_GOPROXY_TOKEN@goproxyprod.goms.io
-soruce ~./zshrc
-```
-
-
-### Make your targets
-```
-aks-secure-tls-bootstrap % make test
-aks-secure-tls-bootstrap % make coverage
-```
-
-### Run the test suite
-Unit tests are available inside client/pkgs/
-```
-aks-secure-tls-bootstrap/client/pkg % go test ./... -coverprofile cover.out 
-
-# To see the unit test coverage
-aks-secure-tls-bootstrap/client/pkg % go tool cover -html=cover.out
-```
-You can also run individual test packages 
-```
-aks-secure-tls-bootstrap/client/pkg/aad % go test
-```
