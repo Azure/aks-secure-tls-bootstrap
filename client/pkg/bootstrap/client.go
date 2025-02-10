@@ -8,13 +8,12 @@ import (
 	"encoding/base64"
 	"fmt"
 
-	secureTLSBootstrapService "github.com/Azure/aks-secure-tls-bootstrap/service/protos"
-	"go.uber.org/zap"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-
 	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/aad"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/imds"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/kubeconfig"
+	secureTLSBootstrapService "github.com/Azure/aks-secure-tls-bootstrap/service/protos"
+	"go.uber.org/zap"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
 type Client struct {
