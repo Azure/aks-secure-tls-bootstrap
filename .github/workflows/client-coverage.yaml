@@ -1,9 +1,12 @@
-name: "Test Client Module Coverage"
+name: Client module unit tests
 on:
   push:
-    branches: ["main"]
+    paths:
+      - "client/**"
   pull_request:
-    branches: ["main"]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+    paths:
+      - "client/**"
     
 jobs:
   unit_tests:

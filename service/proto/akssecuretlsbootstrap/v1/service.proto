@@ -1,0 +1,18 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+syntax = "proto3";
+
+package akssecuretlsbootstrap.v1;
+
+import "akssecuretlsbootstrap/v1/credential.proto";
+import "akssecuretlsbootstrap/v1/nonce.proto";
+
+option go_package = "github.com/Azure/aks-secure-tls-bootstrap/service/pkg/gen/akssecuretlsbootstrap/v1;akssecuretlsbootstrapv1";
+
+service SecureTLSBootstrapService {
+  // Generates a nonce to be used when requesting attested data from IMDS.
+  rpc GetNonce(GetNonceRequest) returns (GetNonceResponse);
+
+  // Generates a kubelet client credential used to register with an AKS cluster.
+  rpc GetCredential(GetCredentialRequest) returns (GetCredentialResponse);
+}
