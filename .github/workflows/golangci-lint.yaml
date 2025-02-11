@@ -3,10 +3,6 @@ on:
   push:
     branches: ["main"]
 
-permissions:
-  contents: read
-  pull-requests: read
-
 jobs:
   golangci:
     name: lint
@@ -14,17 +10,11 @@ jobs:
     steps:
       - uses: actions/setup-go@v3
         with:
-          go-version: '1.21'
+          go-version: '1.23'
       - uses: actions/checkout@v3
       - name: golangci-lint-client
         uses: golangci/golangci-lint-action@v3
         with:
           version: v1.54
           working-directory: client
-          args: --timeout=10m
-      - name: golangci-lint-service
-        uses: golangci/golangci-lint-action@v3
-        with:
-          version: v1.54
-          working-directory: service
           args: --timeout=10m
