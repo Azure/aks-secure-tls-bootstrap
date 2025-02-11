@@ -24,7 +24,7 @@ proto-lint:
 	@($(BUF) breaking --against '../.git#branch=main,subdir=service')
 
 .PHONY: mock-generate
-mock-generate: mockgen ## Generates gomocks in both the service and client modules.
+mock-generate: mockgen
 	bin/mockgen \
 		-package=mocks \
 		-copyright_file=$(PROJECT_DIR)/../hack/copyright_header.txt \
