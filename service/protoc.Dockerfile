@@ -29,7 +29,7 @@ RUN set -ex; \
     tar -xzf protoc-gen-go.tar.gz -C /usr/local/bin; \
     rm protoc-gen-go.tar.gz; \
     \
-    # Download and install go
+    # Download and install Go
     curl -O "https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz"; \
     rm -rf /usr/local/go && tar -C /usr/local -xzf "go${GO_VERSION}.linux-amd64.tar.gz"; \
     rm "go${GO_VERSION}.linux-amd64.tar.gz"; \
@@ -42,7 +42,6 @@ RUN set -ex; \
     protoc-gen-go-grpc -version
 
 ENV PATH="$PATH:/root/go/bin"
-RUN echo $PATH
 
 # Default command
 CMD ["protoc"]
