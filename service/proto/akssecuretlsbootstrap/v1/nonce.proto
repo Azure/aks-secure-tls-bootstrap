@@ -1,0 +1,17 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+syntax = "proto3";
+
+package akssecuretlsbootstrap.v1;
+
+option go_package = "github.com/Azure/aks-secure-tls-bootstrap/service/pkg/gen/akssecuretlsbootstrap/v1;akssecuretlsbootstrapv1";
+
+message GetNonceRequest {
+  // Resource ID of the bootstrapping VM.
+  string resource_id = 1;
+}
+
+message GetNonceResponse {
+  // Nonce to be used when requesting attested data from IMDS.
+  string nonce = 1;
+}
