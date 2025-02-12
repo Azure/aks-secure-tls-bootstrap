@@ -13,20 +13,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-go@v5
         with:
           go-version: '1.23'
+
       - name: Run unit tests with coverage
-        run: make test-coverage-client
-      - name: Remove mocks.go lines from coverage_raw.out
         run: |
+          make test-coverage-client
           pushd client
-          sed '/mocks.go/d' coverage_raw.out > coverage.out
+            sed '/mocks.go/d' coverage_raw.out > coverage.out
           popd
-      - uses: jandelgado/gcov2lcov-action@v1
-        with:
-          working-directory: client
+          
       - uses: coverallsapp/github-action@v2
         with:
-          path-to-lcov: client/coverage.lcov
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          file: coverage.out
+          format: golang
