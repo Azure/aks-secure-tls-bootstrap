@@ -62,7 +62,7 @@ test-client: ## Test all applicable go packages within the client module.
 
 .PHONY: test-coverage-client
 test-coverage-client: ## Test all applicable go packages within the client module and calculate coverage.
-	pushd $(PROJECT_DIR)/client && go test $(shell cd client && go list ./... | grep -v proto | grep -v vendor | grep -v mock) -coverprofile coverage_raw.out -covermode count && popd
+	pushd $(PROJECT_DIR)/client && go test $(shell cd client && go list ./... | grep -v vendor | grep -v mock | grep -v testutil) -coverprofile coverage_raw.out -covermode count && popd
 
 .PHONY: protobuf
 protobuf: # Generates protobuf implementation files within the service module.
