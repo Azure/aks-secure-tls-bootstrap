@@ -2,10 +2,12 @@ name: Client module unit tests
 on:
   push:
     paths:
+      - ".github/workflows/client-coverage.yaml"
       - "client/**"
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
     paths:
+      - ".github/workflows/client-coverage.yaml"
       - "client/**"
     
 jobs:

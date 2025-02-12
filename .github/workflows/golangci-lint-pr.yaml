@@ -2,10 +2,12 @@ name: golangci-lint-pr
 on:
   push:
     paths:
+      - ".github/workflows/golangci-lint-pr.yaml"
       - "client/**"
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
     paths:
+      - ".github/workflows/golangci-lint-pr.yaml"
       - "client/**"
       
 jobs:

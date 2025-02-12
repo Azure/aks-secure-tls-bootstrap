@@ -2,10 +2,12 @@ name: Build client binaries
 on:
   push:
     paths:
+      - ".github/workflows/build-client.yaml"
       - "client/**"
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
     paths:
+      - ".github/workflows/build-client.yaml"
       - "client/**"
 
 jobs:
