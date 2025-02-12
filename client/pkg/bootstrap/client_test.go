@@ -81,7 +81,7 @@ var _ = Describe("Client tests", Ordered, func() {
 			Expect(err).To(BeNil())
 			Expect(c).ToNot(BeNil())
 			Expect(c.logger).ToNot(BeNil())
-			Expect(c.serviceClientFactory).ToNot(BeNil())
+			Expect(c.getServiceClient).ToNot(BeNil())
 			Expect(c.aadClient).ToNot(BeNil())
 			Expect(c.imdsClient).ToNot(BeNil())
 			Expect(c.kubeconfigValidator).ToNot(BeNil())
@@ -102,7 +102,7 @@ var _ = Describe("Client tests", Ordered, func() {
 				imdsClient:          imdsClient,
 				aadClient:           aadClient,
 				kubeconfigValidator: kubeconfigValidator,
-				serviceClientFactory: func(_ *zap.Logger, _ string, _ *Config) (akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient, func() error, error) {
+				getServiceClient: func(_ *zap.Logger, _ string, _ *Config) (akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient, func() error, error) {
 					return serviceClient, func() error { return nil }, nil
 				},
 			}

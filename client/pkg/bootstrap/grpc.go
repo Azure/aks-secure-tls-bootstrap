@@ -18,11 +18,11 @@ import (
 	"google.golang.org/grpc/credentials/oauth"
 )
 
-// serviceClientFactory provides an interface to produce and return a new SecureTLSBootstrapServiceClient over a GRPC connection.
+// serviceClientFactoryFunc provides an interface to produce and return a new SecureTLSBootstrapServiceClient over a GRPC connection.
 // Fake implementations are provided within unit tests.
 type serviceClientFactoryFunc func(logger *zap.Logger, token string, cfg *Config) (akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient, func() error, error)
 
-func secureTLSBootstrapServiceClientFactory(logger *zap.Logger, token string, cfg *Config) (akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient, func() error, error) {
+func serviceClientFactory(logger *zap.Logger, token string, cfg *Config) (akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient, func() error, error) {
 	clusterCAData, err := os.ReadFile(cfg.ClusterCAFilePath)
 	if err != nil {
 		return nil, nil, fmt.Errorf("reading cluster CA data from %s: %w", cfg.ClusterCAFilePath, err)

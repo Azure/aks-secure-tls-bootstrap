@@ -39,7 +39,7 @@ var _ = Describe("grpc", Ordered, func() {
 	Context("secureTLSBootstrapServiceClientFactory", func() {
 		When("cluster ca data cannot be read", func() {
 			It("should return an error", func() {
-				serviceClient, close, err := secureTLSBootstrapServiceClientFactory(logger, "token", &Config{
+				serviceClient, close, err := serviceClientFactory(logger, "token", &Config{
 					ClusterCAFilePath: "does/not/exist.crt",
 					NextProto:         "nextProto",
 					APIServerFQDN:     "fqdn",
@@ -59,7 +59,7 @@ var _ = Describe("grpc", Ordered, func() {
 				err := os.WriteFile(caFilePath, []byte("SGVsbG8gV29ybGQh"), os.ModePerm)
 				Expect(err).To(BeNil())
 
-				serviceClient, close, err := secureTLSBootstrapServiceClientFactory(logger, "token", &Config{
+				serviceClient, close, err := serviceClientFactory(logger, "token", &Config{
 					ClusterCAFilePath: caFilePath,
 					NextProto:         "nextProto",
 					APIServerFQDN:     "fqdn",
@@ -83,7 +83,7 @@ var _ = Describe("grpc", Ordered, func() {
 				lis := bufconn.Listen(1024)
 				defer lis.Close()
 
-				serviceClient, close, err := secureTLSBootstrapServiceClientFactory(logger, "token", &Config{
+				serviceClient, close, err := serviceClientFactory(logger, "token", &Config{
 					ClusterCAFilePath: caFilePath,
 					NextProto:         "nextProto",
 					APIServerFQDN:     lis.Addr().String(),

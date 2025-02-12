@@ -17,20 +17,20 @@ import (
 )
 
 type Client struct {
-	logger               *zap.Logger
-	serviceClientFactory serviceClientFactoryFunc
-	imdsClient           imds.Client
-	aadClient            aad.Client
-	kubeconfigValidator  kubeconfig.Validator
+	logger              *zap.Logger
+	getServiceClient    serviceClientFactoryFunc
+	imdsClient          imds.Client
+	aadClient           aad.Client
+	kubeconfigValidator kubeconfig.Validator
 }
 
 func NewClient(logger *zap.Logger) (*Client, error) {
 	return &Client{
-		logger:               logger,
-		serviceClientFactory: secureTLSBootstrapServiceClientFactory,
-		imdsClient:           imds.NewClient(logger),
-		aadClient:            aad.NewClient(logger),
-		kubeconfigValidator:  kubeconfig.NewValidator(),
+		logger:              logger,
+		getServiceClient:    serviceClientFactory,
+		imdsClient:          imds.NewClient(logger),
+		aadClient:           aad.NewClient(logger),
+		kubeconfigValidator: kubeconfig.NewValidator(),
 	}, nil
 }
 
@@ -49,7 +49,7 @@ func (c *Client) GetKubeletClientCredential(ctx context.Context, cfg *Config) (*
 	}
 	c.logger.Info("generated JWT for auth")
 
-	serviceClient, close, err := c.serviceClientFactory(c.logger, token, cfg)
+	serviceClient, close, err := c.getServiceClient(c.logger, token, cfg)
 	if err != nil {
 		c.logger.Error("failed to setup bootstrap service connection", zap.Error(err))
 		return nil, fmt.Errorf("failed to setup bootstrap service connection: %w", err)

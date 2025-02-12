@@ -15,10 +15,6 @@ import (
 	"strings"
 )
 
-const (
-	blockTypeCertificateRequest = "CERTIFICATE REQUEST"
-)
-
 // makeKubeletClientCSR returns a valid kubelet client CSR for the bootstrapping host,
 // along with the associated (ECDSA) private key.
 func makeKubeletClientCSR() (csrPEM []byte, privateKey *ecdsa.PrivateKey, err error) {
@@ -26,7 +22,6 @@ func makeKubeletClientCSR() (csrPEM []byte, privateKey *ecdsa.PrivateKey, err er
 	if err != nil {
 		return nil, nil, fmt.Errorf("resolving hostname: %w", err)
 	}
-
 	privateKey, err = ecdsa.GenerateKey(elliptic.P256(), cryptorand.Reader)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to generate ECDSA 256 private key for kubelet client CSR: %w", err)
@@ -45,12 +40,12 @@ func makeKubeletClientCSR() (csrPEM []byte, privateKey *ecdsa.PrivateKey, err er
 		return nil, nil, fmt.Errorf("unable to create kubelet client certificate request from template: %w", err)
 	}
 
-	pemBlock := &pem.Block{
-		Type:  blockTypeCertificateRequest,
+	block := &pem.Block{
+		Type:  "CERTIFICATE REQUEST",
 		Bytes: csrDER,
 	}
 
-	return pem.EncodeToMemory(pemBlock), privateKey, nil
+	return pem.EncodeToMemory(block), privateKey, nil
 }
 
 // Returns the canonicalized (trimmed and lowercased) hostname of the VM.
