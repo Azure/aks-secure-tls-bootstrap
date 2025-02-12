@@ -24,15 +24,16 @@ jobs:
         run: |
           set -ex
           # Build the binaries
-          make build-client-all
+          cd client
+          make build-all
 
           # Make sure we can actually invoke linux/amd64
-          pushd client/bin
-          chmod +x ./tls-bootstrap-client-amd64
-          ./tls-bootstrap-client-amd64 -h
-          if [ $? -ne 0 ]; then
-            echo "unable to invoke linux/amd64 binary"
-            exit 1
-          fi
+          pushd bin
+            chmod +x ./tls-bootstrap-client-amd64
+            ./tls-bootstrap-client-amd64 -h
+            if [ $? -ne 0 ]; then
+              echo "unable to invoke linux/amd64 binary"
+              exit 1
+            fi
           popd
           

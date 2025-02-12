@@ -22,8 +22,9 @@ jobs:
 
       - name: Run unit tests with coverage
         run: |
-          make test-coverage-client
-          sed '/mocks.go/d' client/coverage_raw.out > coverage.out
+          cd client
+          make test-coverage
+          sed '/mocks.go/d' coverage_raw.out > ../coverage.out
           
       - uses: coverallsapp/github-action@v2
         with:

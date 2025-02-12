@@ -3,7 +3,7 @@
 
 package kubeconfig
 
-//go:generate ../../../bin/mockgen -copyright_file=../../../hack/copyright_header.txt -destination=./mocks/mock_validator.go -package=mocks github.com/Azure/aks-secure-tls-bootstrap/client/pkg/kubeconfig Validator
+//go:generate ../../bin/mockgen -copyright_file=../../../hack/copyright_header.txt -destination=./mocks/mock_validator.go -package=mocks github.com/Azure/aks-secure-tls-bootstrap/client/pkg/kubeconfig Validator
 
 import (
 	"fmt"
