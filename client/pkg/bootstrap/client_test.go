@@ -17,13 +17,12 @@ import (
 	imdsmocks "github.com/Azure/aks-secure-tls-bootstrap/client/pkg/imds/mocks"
 	kubeconfigmocks "github.com/Azure/aks-secure-tls-bootstrap/client/pkg/kubeconfig/mocks"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/testutil"
-	secureTLSBootstrapService "github.com/Azure/aks-secure-tls-bootstrap/service/protos"
-	servicemocks "github.com/Azure/aks-secure-tls-bootstrap/service/protos/mocks"
+	akssecuretlsbootstrapv1 "github.com/Azure/aks-secure-tls-bootstrap/service/pkg/gen/akssecuretlsbootstrap/v1"
+	akssecuretlsbootstrapv1_mocks "github.com/Azure/aks-secure-tls-bootstrap/service/pkg/gen/mocks/akssecuretlsbootstrap/v1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"go.uber.org/mock/gomock"
 	"go.uber.org/zap"
-	"google.golang.org/grpc"
 )
 
 var _ = Describe("Client tests", Ordered, func() {
@@ -37,7 +36,7 @@ var _ = Describe("Client tests", Ordered, func() {
 		imdsClient          *imdsmocks.MockClient
 		aadClient           *aadmocks.MockClient
 		kubeconfigValidator *kubeconfigmocks.MockValidator
-		serviceClient       *servicemocks.MockSecureTLSBootstrapServiceClient
+		serviceClient       *akssecuretlsbootstrapv1_mocks.MockSecureTLSBootstrapServiceClient
 		bootstrapClient     *Client
 		bootstrapConfig     *Config
 		logger              *zap.Logger
@@ -61,14 +60,11 @@ var _ = Describe("Client tests", Ordered, func() {
 		err = os.WriteFile(clusterCAFilePath, clusterCACertPEM, os.ModePerm)
 		Expect(err).To(BeNil())
 
-		clientCertPath := filepath.Join(tempDir, "client.crt")
-		clientKeyPath := filepath.Join(tempDir, "client.key")
-
 		bootstrapConfig = &Config{
 			NextProto:         "bootstrap",
 			ClusterCAFilePath: clusterCAFilePath,
-			CertFilePath:      clientCertPath,
-			KeyFilePath:       clientKeyPath,
+			CertFilePath:      filepath.Join(tempDir, "client.crt"),
+			KeyFilePath:       filepath.Join(tempDir, "client.key"),
 			APIServerFQDN:     apiServerFQDN,
 			KubeconfigPath:    kubeconfigPath,
 			AzureConfig: &datamodel.AzureConfig{
@@ -99,19 +95,16 @@ var _ = Describe("Client tests", Ordered, func() {
 			imdsClient = imdsmocks.NewMockClient(mockCtrl)
 			aadClient = aadmocks.NewMockClient(mockCtrl)
 			kubeconfigValidator = kubeconfigmocks.NewMockValidator(mockCtrl)
-			serviceClient = servicemocks.NewMockSecureTLSBootstrapServiceClient(mockCtrl)
+			serviceClient = akssecuretlsbootstrapv1_mocks.NewMockSecureTLSBootstrapServiceClient(mockCtrl)
 
 			bootstrapClient = &Client{
 				logger:              logger,
 				imdsClient:          imdsClient,
 				aadClient:           aadClient,
 				kubeconfigValidator: kubeconfigValidator,
-			}
-			bootstrapClient.serviceClientFactory = func(
-				ctx context.Context,
-				logger *zap.Logger,
-				cfg *serviceClientFactoryConfig) (secureTLSBootstrapService.SecureTLSBootstrapServiceClient, *grpc.ClientConn, error) {
-				return serviceClient, nil, nil
+				serviceClientFactory: func(_ *zap.Logger, _ string, _ *Config) (akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient, func() error, error) {
+					return serviceClient, func() error { return nil }, nil
+				},
 			}
 		})
 
@@ -186,7 +179,7 @@ var _ = Describe("Client tests", Ordered, func() {
 					Return(&datamodel.VMSSInstanceData{}, nil).
 					Times(1)
 				serviceClient.EXPECT().GetNonce(ctx, gomock.Any()).
-					Return(&secureTLSBootstrapService.NonceResponse{}, errors.New("cannot get nonce response")).
+					Return(&akssecuretlsbootstrapv1.GetNonceResponse{}, errors.New("cannot get nonce response")).
 					Times(1)
 
 				kubeconfigData, err := bootstrapClient.GetKubeletClientCredential(ctx, bootstrapConfig)
@@ -209,7 +202,7 @@ var _ = Describe("Client tests", Ordered, func() {
 					Return(&datamodel.VMSSInstanceData{}, nil).
 					Times(1)
 				serviceClient.EXPECT().GetNonce(ctx, gomock.Any()).
-					Return(&secureTLSBootstrapService.NonceResponse{
+					Return(&akssecuretlsbootstrapv1.GetNonceResponse{
 						Nonce: "nonce",
 					}, nil).
 					Times(1)
@@ -237,7 +230,7 @@ var _ = Describe("Client tests", Ordered, func() {
 					Return(&datamodel.VMSSInstanceData{}, nil).
 					Times(1)
 				serviceClient.EXPECT().GetNonce(ctx, gomock.Any()).
-					Return(&secureTLSBootstrapService.NonceResponse{
+					Return(&akssecuretlsbootstrapv1.GetNonceResponse{
 						Nonce: "nonce",
 					}, nil).
 					Times(1)
@@ -270,7 +263,7 @@ var _ = Describe("Client tests", Ordered, func() {
 					Return(&datamodel.VMSSInstanceData{}, nil).
 					Times(1)
 				serviceClient.EXPECT().GetNonce(ctx, gomock.Any()).
-					Return(&secureTLSBootstrapService.NonceResponse{
+					Return(&akssecuretlsbootstrapv1.GetNonceResponse{
 						Nonce: "nonce",
 					}, nil).
 					Times(1)
@@ -280,8 +273,8 @@ var _ = Describe("Client tests", Ordered, func() {
 					}, nil).
 					Times(1)
 				serviceClient.EXPECT().GetCredential(ctx, gomock.Any()).
-					Return(&secureTLSBootstrapService.CredentialResponse{
-						EncodedCertPEM: "",
+					Return(&akssecuretlsbootstrapv1.GetCredentialResponse{
+						EncodedCertPem: "",
 					}, nil).
 					Times(1)
 
@@ -304,7 +297,7 @@ var _ = Describe("Client tests", Ordered, func() {
 					Return(&datamodel.VMSSInstanceData{}, nil).
 					Times(1)
 				serviceClient.EXPECT().GetNonce(ctx, gomock.Any()).
-					Return(&secureTLSBootstrapService.NonceResponse{
+					Return(&akssecuretlsbootstrapv1.GetNonceResponse{
 						Nonce: "nonce",
 					}, nil).
 					Times(1)
@@ -314,8 +307,8 @@ var _ = Describe("Client tests", Ordered, func() {
 					}, nil).
 					Times(1)
 				serviceClient.EXPECT().GetCredential(ctx, gomock.Any()).
-					Return(&secureTLSBootstrapService.CredentialResponse{
-						EncodedCertPEM: "YW55IGNhcm5hbCBwbGVhc3U======",
+					Return(&akssecuretlsbootstrapv1.GetCredentialResponse{
+						EncodedCertPem: "YW55IGNhcm5hbCBwbGVhc3U======",
 					}, nil).
 					Times(1)
 
@@ -334,6 +327,7 @@ var _ = Describe("Client tests", Ordered, func() {
 					Expiration:   time.Now().Add(time.Hour),
 				})
 				Expect(err).To(BeNil())
+
 				kubeconfigValidator.EXPECT().Validate(kubeconfigPath, false).
 					Return(fmt.Errorf("invalid kubeconfig")).
 					Times(1)
@@ -348,7 +342,7 @@ var _ = Describe("Client tests", Ordered, func() {
 					}, nil).
 					Times(1)
 				serviceClient.EXPECT().GetNonce(ctx, gomock.Any()).
-					Return(&secureTLSBootstrapService.NonceResponse{
+					Return(&akssecuretlsbootstrapv1.GetNonceResponse{
 						Nonce: "nonce",
 					}, nil).
 					Times(1)
@@ -358,8 +352,8 @@ var _ = Describe("Client tests", Ordered, func() {
 					}, nil).
 					Times(1)
 				serviceClient.EXPECT().GetCredential(ctx, gomock.Any()).
-					Return(&secureTLSBootstrapService.CredentialResponse{
-						EncodedCertPEM: base64.StdEncoding.EncodeToString(clientCertPEM),
+					Return(&akssecuretlsbootstrapv1.GetCredentialResponse{
+						EncodedCertPem: base64.StdEncoding.EncodeToString(clientCertPEM),
 					}, nil).
 					Times(1)
 
@@ -386,7 +380,7 @@ var _ = Describe("Client tests", Ordered, func() {
 
 				certData, err := os.ReadFile(bootstrapConfig.CertFilePath)
 				Expect(err).To(BeNil())
-				Expect(certData).ToNot(BeEmpty())
+				Expect(certData).To(Equal(clientCertPEM))
 
 				keyData, err := os.ReadFile(bootstrapConfig.KeyFilePath)
 				Expect(err).To(BeNil())

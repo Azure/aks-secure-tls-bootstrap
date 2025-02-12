@@ -4,7 +4,6 @@
 package bootstrap
 
 import (
-	"context"
 	"crypto/x509"
 	"os"
 	"path/filepath"
@@ -40,19 +39,14 @@ var _ = Describe("grpc", Ordered, func() {
 	Context("secureTLSBootstrapServiceClientFactory", func() {
 		When("cluster ca data cannot be read", func() {
 			It("should return an error", func() {
-				caFilePath := "does/not/exist.crt"
-
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
-
-				serviceClient, conn, err := secureTLSBootstrapServiceClientFactory(ctx, logger, &serviceClientFactoryConfig{
-					clusterCAFilePath: caFilePath,
-					nextProto:         "nextProto",
-					authToken:         "token",
-					fqdn:              "fqdn",
+				serviceClient, close, err := secureTLSBootstrapServiceClientFactory(logger, "token", &Config{
+					ClusterCAFilePath: "does/not/exist.crt",
+					NextProto:         "nextProto",
+					APIServerFQDN:     "fqdn",
 				})
+
 				Expect(serviceClient).To(BeNil())
-				Expect(conn).To(BeNil())
+				Expect(close).To(BeNil())
 				Expect(err).ToNot(BeNil())
 				Expect(err.Error()).To(ContainSubstring("reading cluster CA data from does/not/exist.crt"))
 
@@ -65,17 +59,14 @@ var _ = Describe("grpc", Ordered, func() {
 				err := os.WriteFile(caFilePath, []byte("SGVsbG8gV29ybGQh"), os.ModePerm)
 				Expect(err).To(BeNil())
 
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
-
-				serviceClient, conn, err := secureTLSBootstrapServiceClientFactory(ctx, logger, &serviceClientFactoryConfig{
-					clusterCAFilePath: caFilePath,
-					nextProto:         "nextProto",
-					authToken:         "token",
-					fqdn:              "fqdn",
+				serviceClient, close, err := secureTLSBootstrapServiceClientFactory(logger, "token", &Config{
+					ClusterCAFilePath: caFilePath,
+					NextProto:         "nextProto",
+					APIServerFQDN:     "fqdn",
 				})
+
 				Expect(serviceClient).To(BeNil())
-				Expect(conn).To(BeNil())
+				Expect(close).To(BeNil())
 				Expect(err).ToNot(BeNil())
 				Expect(err.Error()).To(ContainSubstring("failed to get TLS config"))
 				Expect(err.Error()).To(ContainSubstring("unable to construct new cert pool using cluster CA data"))
@@ -89,33 +80,30 @@ var _ = Describe("grpc", Ordered, func() {
 				err := os.WriteFile(caFilePath, clusterCACertPEM, os.ModePerm)
 				Expect(err).To(BeNil())
 
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
 				lis := bufconn.Listen(1024)
 				defer lis.Close()
-				fqdn := lis.Addr().String()
 
-				serviceClient, conn, err := secureTLSBootstrapServiceClientFactory(ctx, logger, &serviceClientFactoryConfig{
-					clusterCAFilePath: caFilePath,
-					nextProto:         "nextProto",
-					authToken:         "token",
-					fqdn:              fqdn,
+				serviceClient, close, err := secureTLSBootstrapServiceClientFactory(logger, "token", &Config{
+					ClusterCAFilePath: caFilePath,
+					NextProto:         "nextProto",
+					APIServerFQDN:     lis.Addr().String(),
 				})
-				defer conn.Close()
 
 				Expect(err).To(BeNil())
-				Expect(conn).ToNot(BeNil())
+				Expect(close).ToNot(BeNil())
 				Expect(serviceClient).ToNot(BeNil())
+
+				close()
 			})
 		})
 	})
 
 	Context("getTLSConfig tests", func() {
-		var poolWithCACert *x509.CertPool
+		var rootPool *x509.CertPool
 
 		BeforeEach(func() {
-			poolWithCACert = x509.NewCertPool()
-			ok := poolWithCACert.AppendCertsFromPEM(clusterCACertPEM)
+			rootPool = x509.NewCertPool()
+			ok := rootPool.AppendCertsFromPEM(clusterCACertPEM)
 			Expect(ok).To(BeTrue())
 		})
 
@@ -126,7 +114,7 @@ var _ = Describe("grpc", Ordered, func() {
 				Expect(config).ToNot(BeNil())
 				Expect(config.NextProtos).To(BeNil())
 				Expect(config.InsecureSkipVerify).To(BeFalse())
-				Expect(config.RootCAs.Equal(poolWithCACert)).To(BeTrue())
+				Expect(config.RootCAs.Equal(rootPool)).To(BeTrue())
 			})
 		})
 
@@ -138,7 +126,7 @@ var _ = Describe("grpc", Ordered, func() {
 				Expect(config.NextProtos).NotTo(BeNil())
 				Expect(config.NextProtos).To(Equal([]string{"bootstrap", "h2"}))
 				Expect(config.InsecureSkipVerify).To(BeFalse())
-				Expect(config.RootCAs.Equal(poolWithCACert)).To(BeTrue())
+				Expect(config.RootCAs.Equal(rootPool)).To(BeTrue())
 			})
 		})
 
@@ -148,7 +136,7 @@ var _ = Describe("grpc", Ordered, func() {
 				Expect(err).To(BeNil())
 				Expect(config).NotTo(BeNil())
 				Expect(config.InsecureSkipVerify).To(BeFalse())
-				Expect(config.RootCAs.Equal(poolWithCACert)).To(BeTrue())
+				Expect(config.RootCAs.Equal(rootPool)).To(BeTrue())
 			})
 		})
 
@@ -158,7 +146,7 @@ var _ = Describe("grpc", Ordered, func() {
 				Expect(err).To(BeNil())
 				Expect(config).NotTo(BeNil())
 				Expect(config.InsecureSkipVerify).To(BeTrue())
-				Expect(config.RootCAs.Equal(poolWithCACert)).To(BeTrue())
+				Expect(config.RootCAs.Equal(rootPool)).To(BeTrue())
 			})
 		})
 	})
