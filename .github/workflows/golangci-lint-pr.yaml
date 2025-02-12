@@ -2,10 +2,12 @@ name: golangci-lint-pr
 on:
   push:
     paths:
+      - ".github/workflows/golangci-lint-pr.yaml"
       - "client/**"
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
     paths:
+      - ".github/workflows/golangci-lint-pr.yaml"
       - "client/**"
       
 jobs:
@@ -14,9 +16,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-go@v5
         with:
           go-version: '1.23'
+          
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
