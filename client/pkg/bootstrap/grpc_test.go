@@ -93,7 +93,7 @@ var _ = Describe("grpc", Ordered, func() {
 				Expect(close).ToNot(BeNil())
 				Expect(serviceClient).ToNot(BeNil())
 
-				close()
+				_ = close()
 			})
 		})
 	})
