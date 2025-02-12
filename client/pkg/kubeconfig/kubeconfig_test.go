@@ -22,14 +22,18 @@ var _ = Describe("kubeconfig tests", func() {
 			certPath := filepath.Join(tempDir, "client.crt")
 			keyPath := filepath.Join(tempDir, "client.key")
 
-			certPEM, keyPEM, err := testutil.GenerateCertPEMWithExpiration("system:node:node", "system:nodes", time.Now().Add(time.Hour))
+			certPEM, keyPEM, err := testutil.GenerateCertPEMWithExpiration(testutil.CertTemplate{
+				CommonName:   "system:node:node",
+				Organization: "system:nodes",
+				Expiration:   time.Now().Add(time.Hour),
+			})
 			Expect(err).To(BeNil())
 			block, rest := pem.Decode(keyPEM)
 			Expect(rest).To(BeEmpty())
 			privateKey, err := x509.ParseECPrivateKey(block.Bytes)
 			Expect(err).To(BeNil())
 
-			cfg := &GenerationConfig{
+			cfg := &Config{
 				APIServerFQDN:     "host",
 				ClusterCAFilePath: "path",
 				CertFilePath:      certPath,

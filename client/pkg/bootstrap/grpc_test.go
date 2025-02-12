@@ -12,17 +12,30 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"go.uber.org/zap"
 	"google.golang.org/grpc/test/bufconn"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/testutil"
 )
 
-var _ = Describe("grpc", func() {
-	const (
-		nextProto = "nextProto"
+var _ = Describe("grpc", Ordered, func() {
+	var (
+		clusterCACertPEM []byte
+		logger           *zap.Logger
 	)
-	clusterCACertPEM, _, err := testutil.GenerateCertPEMWithExpiration("hcp", "aks", time.Now().Add(time.Hour))
-	Expect(err).To(BeNil())
+
+	BeforeAll(func() {
+		logger, _ = zap.NewDevelopment()
+
+		var err error
+		clusterCACertPEM, _, err = testutil.GenerateCertPEMWithExpiration(testutil.CertTemplate{
+			CommonName:   "hcp",
+			Organization: "aks",
+			IsCA:         true,
+			Expiration:   time.Now().Add(time.Hour),
+		})
+		Expect(err).To(BeNil())
+	})
 
 	Context("secureTLSBootstrapServiceClientFactory", func() {
 		When("cluster ca data cannot be read", func() {
@@ -32,9 +45,9 @@ var _ = Describe("grpc", func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 
-				serviceClient, conn, err := secureTLSBootstrapServiceClientFactory(ctx, testLogger, &serviceClientFactoryConfig{
+				serviceClient, conn, err := secureTLSBootstrapServiceClientFactory(ctx, logger, &serviceClientFactoryConfig{
 					clusterCAFilePath: caFilePath,
-					nextProto:         nextProto,
+					nextProto:         "nextProto",
 					authToken:         "token",
 					fqdn:              "fqdn",
 				})
@@ -55,9 +68,9 @@ var _ = Describe("grpc", func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 
-				serviceClient, conn, err := secureTLSBootstrapServiceClientFactory(ctx, testLogger, &serviceClientFactoryConfig{
+				serviceClient, conn, err := secureTLSBootstrapServiceClientFactory(ctx, logger, &serviceClientFactoryConfig{
 					clusterCAFilePath: caFilePath,
-					nextProto:         nextProto,
+					nextProto:         "nextProto",
 					authToken:         "token",
 					fqdn:              "fqdn",
 				})
@@ -82,9 +95,9 @@ var _ = Describe("grpc", func() {
 				defer lis.Close()
 				fqdn := lis.Addr().String()
 
-				serviceClient, conn, err := secureTLSBootstrapServiceClientFactory(ctx, testLogger, &serviceClientFactoryConfig{
+				serviceClient, conn, err := secureTLSBootstrapServiceClientFactory(ctx, logger, &serviceClientFactoryConfig{
 					clusterCAFilePath: caFilePath,
-					nextProto:         nextProto,
+					nextProto:         "nextProto",
 					authToken:         "token",
 					fqdn:              fqdn,
 				})

@@ -12,13 +12,10 @@ jobs:
   unit_tests:
     runs-on: ubuntu-latest
     steps:
-      - name: Install Go
-        if: success()
-        uses: actions/setup-go@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
         with:
-          go-version: 1.20.2
-      - name: Checkout code
-        uses: actions/checkout@v2
+          go-version: '1.23'
       - name: Run unit tests with coverage
         run: make test-coverage-client
       - name: Remove mocks.go lines from coverage_raw.out
@@ -26,12 +23,10 @@ jobs:
           pushd client
           sed '/mocks.go/d' coverage_raw.out > coverage.out
           popd
-      - name: Convert coverage to lcov
-        uses: jandelgado/gcov2lcov-action@v1
+      - uses: jandelgado/gcov2lcov-action@v1
         with:
           working-directory: client
-      - name: Coveralls
-        uses: coverallsapp/github-action@v2
+      - uses: coverallsapp/github-action@v2
         with:
           path-to-lcov: client/coverage.lcov
           github-token: ${{ secrets.GITHUB_TOKEN }}

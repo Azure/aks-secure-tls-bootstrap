@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/datamodel"
+	"github.com/Azure/go-autorest/autorest/azure"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -15,10 +17,13 @@ import (
 var _ = Describe("config tests", func() {
 	Context("Config tests", func() {
 		Context("ValidateAndSet", func() {
-			var cfg *Config
-			defaultAzureConfigPath := "path/to/azure.json"
+			var (
+				cfg             *Config
+				azureConfigPath string
+			)
 
 			BeforeEach(func() {
+				azureConfigPath = "path/to/azure.json"
 				cfg = &Config{
 					APIServerFQDN:     "fqdn",
 					CustomClientID:    "clientId",
@@ -33,8 +38,8 @@ var _ = Describe("config tests", func() {
 
 			When("azureConfigPath is empty", func() {
 				It("should return an error", func() {
-					emptyAzureConfigPath := ""
-					err := cfg.ValidateAndSet(emptyAzureConfigPath)
+					azureConfigPath = ""
+					err := cfg.ValidateAndSet(azureConfigPath)
 					Expect(err).ToNot(BeNil())
 					Expect(err.Error()).To(ContainSubstring("azure config path must be specified"))
 				})
@@ -43,7 +48,7 @@ var _ = Describe("config tests", func() {
 			When("ClusterCAFilePath is empty", func() {
 				It("should return an error", func() {
 					cfg.ClusterCAFilePath = ""
-					err := cfg.ValidateAndSet(defaultAzureConfigPath)
+					err := cfg.ValidateAndSet(azureConfigPath)
 					Expect(err).ToNot(BeNil())
 					Expect(err.Error()).To(ContainSubstring("cluster CA file path must be specified"))
 				})
@@ -52,7 +57,7 @@ var _ = Describe("config tests", func() {
 			When("APIServerFQDN is empty", func() {
 				It("should return an error", func() {
 					cfg.APIServerFQDN = ""
-					err := cfg.ValidateAndSet(defaultAzureConfigPath)
+					err := cfg.ValidateAndSet(azureConfigPath)
 					Expect(err).ToNot(BeNil())
 					Expect(err.Error()).To(ContainSubstring("apiserver FQDN must be specified"))
 				})
@@ -61,7 +66,7 @@ var _ = Describe("config tests", func() {
 			When("NextProto is empty", func() {
 				It("should return an error", func() {
 					cfg.NextProto = ""
-					err := cfg.ValidateAndSet(defaultAzureConfigPath)
+					err := cfg.ValidateAndSet(azureConfigPath)
 					Expect(err).ToNot(BeNil())
 					Expect(err.Error()).To(ContainSubstring("next proto header value must be specified"))
 				})
@@ -70,7 +75,7 @@ var _ = Describe("config tests", func() {
 			When("AADResource is empty", func() {
 				It("should return an error", func() {
 					cfg.AADResource = ""
-					err := cfg.ValidateAndSet(defaultAzureConfigPath)
+					err := cfg.ValidateAndSet(azureConfigPath)
 					Expect(err).ToNot(BeNil())
 					Expect(err.Error()).To(ContainSubstring("AAD resource must be specified"))
 				})
@@ -79,7 +84,7 @@ var _ = Describe("config tests", func() {
 			When("KubeconfigPath is empty", func() {
 				It("should return an error", func() {
 					cfg.KubeconfigPath = ""
-					err := cfg.ValidateAndSet(defaultAzureConfigPath)
+					err := cfg.ValidateAndSet(azureConfigPath)
 					Expect(err).ToNot(BeNil())
 					Expect(err.Error()).To(ContainSubstring("kubeconfig path must be specified"))
 				})
@@ -88,7 +93,7 @@ var _ = Describe("config tests", func() {
 			When("CertFilePath is empty", func() {
 				It("should return an error", func() {
 					cfg.CertFilePath = ""
-					err := cfg.ValidateAndSet(defaultAzureConfigPath)
+					err := cfg.ValidateAndSet(azureConfigPath)
 					Expect(err).ToNot(BeNil())
 					Expect(err.Error()).To(ContainSubstring("cert file path must be specified"))
 				})
@@ -97,7 +102,7 @@ var _ = Describe("config tests", func() {
 			When("KeyFilePath is empty", func() {
 				It("should return an error", func() {
 					cfg.KeyFilePath = ""
-					err := cfg.ValidateAndSet(defaultAzureConfigPath)
+					err := cfg.ValidateAndSet(azureConfigPath)
 					Expect(err).ToNot(BeNil())
 					Expect(err.Error()).To(ContainSubstring("key file path must be specified"))
 				})
@@ -105,15 +110,22 @@ var _ = Describe("config tests", func() {
 
 			When("client opts are valid", func() {
 				It("should validate without error", func() {
+					azureConfig := &datamodel.AzureConfig{
+						ClientID:               "msi",
+						UserAssignedIdentityID: "identityId",
+						Cloud:                  azure.PublicCloud.Name,
+					}
 					tempDir := GinkgoT().TempDir()
-					azureConfigPath := filepath.Join(tempDir, "azure.json")
-					azureConfigBytes, err := json.Marshal(defaultTestCfg.AzureConfig)
+					azureConfigPath = filepath.Join(tempDir, "azure.json")
+					azureConfigBytes, err := json.Marshal(azureConfig)
 					Expect(err).To(BeNil())
+
 					err = os.WriteFile(azureConfigPath, azureConfigBytes, os.ModePerm)
 					Expect(err).To(BeNil())
 
 					err = cfg.ValidateAndSet(azureConfigPath)
 					Expect(err).To(BeNil())
+					Expect(cfg.AzureConfig).To(Equal(azureConfig))
 				})
 			})
 		})

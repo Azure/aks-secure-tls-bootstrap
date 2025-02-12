@@ -35,7 +35,7 @@ func NewClient(logger *zap.Logger) (*Client, error) {
 }
 
 func (c *Client) GetKubeletClientCredential(ctx context.Context, cfg *Config) (*clientcmdapi.Config, error) {
-	err := c.kubeconfigValidator.Validate(cfg.KubeconfigPath, cfg.EnsureClientAuthentication)
+	err := c.kubeconfigValidator.Validate(cfg.KubeconfigPath, cfg.EnsureAuthorizedClient)
 	if err == nil {
 		c.logger.Info("existing kubeconfig is valid, exiting without bootstrapping")
 		return nil, nil
@@ -120,7 +120,7 @@ func (c *Client) GetKubeletClientCredential(ctx context.Context, cfg *Config) (*
 		c.logger.Error("failed to decode cert data from bootstrap server", zap.Error(err))
 		return nil, fmt.Errorf("failed to decode cert data from bootstrap server: %w", err)
 	}
-	kubeconfigData, err := kubeconfig.GenerateForCertAndKey(certPEM, privateKey, &kubeconfig.GenerationConfig{
+	kubeconfigData, err := kubeconfig.GenerateForCertAndKey(certPEM, privateKey, &kubeconfig.Config{
 		APIServerFQDN:     cfg.APIServerFQDN,
 		ClusterCAFilePath: cfg.ClusterCAFilePath,
 		CertFilePath:      cfg.CertFilePath,

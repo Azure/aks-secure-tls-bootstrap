@@ -10,27 +10,29 @@ import (
 	"net/http/httptest"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/datamodel"
+	"github.com/hashicorp/go-retryablehttp"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
-const (
-	mockMSITokenResponseJSON          = `{"access_token":"accesstoken"}`
-	mockVMSSInstanceDataJSON          = `{"compute":{"resourceId": "resourceId"}}`
-	mockVMSSAttestedDataJSON          = `{"signature":"signature"}`
-	mockMSITokenResponseJSONWithError = `{"error":"tokenError","error_description":"error generating new JWT"}`
-
-	malformedJSON = `{{}`
-)
-
 var _ = Describe("Client Tests", func() {
+	const (
+		mockMSITokenResponseJSON          = `{"access_token":"accesstoken"}`
+		mockVMSSInstanceDataJSON          = `{"compute":{"resourceId": "resourceId"}}`
+		mockVMSSAttestedDataJSON          = `{"signature":"signature"}`
+		mockMSITokenResponseJSONWithError = `{"error":"tokenError","error_description":"error generating new JWT"}`
+		malformedJSON                     = `{{}`
+	)
 	var (
-		imdsClient *ClientImpl
+		imdsClient *client
 		resource   = "resource"
 	)
 
 	BeforeEach(func() {
-		imdsClient = NewClient(logger)
+		imdsClient = &client{
+			httpClient: retryablehttp.NewClient(),
+			logger:     logger,
+		}
 	})
 
 	Context("callIMDS", func() {
