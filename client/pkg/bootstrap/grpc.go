@@ -4,14 +4,13 @@
 package bootstrap
 
 import (
-	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
 	"os"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/consts"
-	secureTLSBootstrapService "github.com/Azure/aks-secure-tls-bootstrap/service/protos"
+	akssecuretlsbootstrapv1 "github.com/Azure/aks-secure-tls-bootstrap/service/pkg/gen/akssecuretlsbootstrap/v1"
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 	"google.golang.org/grpc"
@@ -19,38 +18,28 @@ import (
 	"google.golang.org/grpc/credentials/oauth"
 )
 
-// serviceClientFactory provides an interface to produce and return a new SecureTLSBootstrapServiceClient over a GRPC connection
-type serviceClientFactoryFunc func(ctx context.Context, logger *zap.Logger, cfg *serviceClientFactoryConfig) (secureTLSBootstrapService.SecureTLSBootstrapServiceClient, *grpc.ClientConn, error)
+// serviceClientFactoryFunc provides an interface to produce and return a new SecureTLSBootstrapServiceClient over a GRPC connection.
+// Fake implementations are provided within unit tests.
+type serviceClientFactoryFunc func(logger *zap.Logger, token string, cfg *Config) (akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient, func() error, error)
 
-type serviceClientFactoryConfig struct {
-	clusterCAFilePath     string
-	insecureSkipTLSVerify bool
-	fqdn                  string
-	nextProto             string
-	authToken             string
-}
-
-func secureTLSBootstrapServiceClientFactory(
-	ctx context.Context,
-	logger *zap.Logger,
-	cfg *serviceClientFactoryConfig) (secureTLSBootstrapService.SecureTLSBootstrapServiceClient, *grpc.ClientConn, error) {
-	clusterCAData, err := os.ReadFile(cfg.clusterCAFilePath)
+func serviceClientFactory(logger *zap.Logger, token string, cfg *Config) (akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient, func() error, error) {
+	clusterCAData, err := os.ReadFile(cfg.ClusterCAFilePath)
 	if err != nil {
-		return nil, nil, fmt.Errorf("reading cluster CA data from %s: %w", cfg.clusterCAFilePath, err)
+		return nil, nil, fmt.Errorf("reading cluster CA data from %s: %w", cfg.ClusterCAFilePath, err)
 	}
-	logger.Info("read cluster CA data", zap.String("path", cfg.clusterCAFilePath))
+	logger.Info("read cluster CA data", zap.String("path", cfg.ClusterCAFilePath))
 
-	tlsConfig, err := getTLSConfig(clusterCAData, cfg.nextProto, cfg.insecureSkipTLSVerify)
+	tlsConfig, err := getTLSConfig(clusterCAData, cfg.NextProto, cfg.InsecureSkipTLSVerify)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get TLS config: %w", err)
 	}
-	conn, err := grpc.DialContext(
-		ctx,
-		fmt.Sprintf("%s:443", cfg.fqdn),
+
+	conn, err := grpc.NewClient(
+		fmt.Sprintf("%s:443", cfg.APIServerFQDN),
 		grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)),
 		grpc.WithPerRPCCredentials(oauth.TokenSource{
 			TokenSource: oauth2.StaticTokenSource(&oauth2.Token{
-				AccessToken: cfg.authToken,
+				AccessToken: token,
 			}),
 		}),
 		grpc.WithUserAgent(consts.SecureTLSBootstrapClientUserAgentValue),
@@ -60,7 +49,7 @@ func secureTLSBootstrapServiceClientFactory(
 	}
 	logger.Info("dialed TLS bootstrap server and created GRPC connection")
 
-	return secureTLSBootstrapService.NewSecureTLSBootstrapServiceClient(conn), conn, nil
+	return akssecuretlsbootstrapv1.NewSecureTLSBootstrapServiceClient(conn), conn.Close, nil
 }
 
 func getTLSConfig(caPEM []byte, nextProto string, insecureSkipVerify bool) (*tls.Config, error) {

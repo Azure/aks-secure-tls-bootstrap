@@ -70,16 +70,10 @@ protobuf: # Generates protobuf implementation files within the service module.
 
 .PHONY: generate
 generate: mockgen ## Generates gomocks in both the service and client modules.
-	bin/mockgen \
-		-copyright_file=hack/copyright_header.txt \
-		-source=service/protos/bootstrap_grpc.pb.go \
-		-destination=service/protos/mocks/mock_client.go \
-		-package=mocks github.com/Azure/aks-secure-tls-bootstrap/service/protos \
-		SecureTLSBootstrapServiceClient
 	pushd $(PROJECT_DIR)/client && go generate ./... && popd
 
 mockgen:
-	$(call go-install-tool,$(PROJECT_DIR)/bin/mockgen,go.uber.org/mock/mockgen@v0.2.0)
+	$(call go-install-tool,$(PROJECT_DIR)/bin/mockgen,go.uber.org/mock/mockgen@v0.5.0)
 
 ##@ Build
 
