@@ -27,9 +27,9 @@ proto-lint:
 mock-generate: mockgen
 	bin/mockgen \
 		-package=mocks \
-		-copyright_file=$(PROJECT_DIR)/../hack/copyright_header.txt \
+		-copyright_file=../hack/copyright_header.txt \
 		-source=pkg/gen/akssecuretlsbootstrap/v1/service_grpc.pb.go \
-		-destination=pkg/mocks/akssecuretlsbootstrap/v1/service.go \
+		-destination=pkg/gen/mocks/akssecuretlsbootstrap/v1/service.go \
 		github.com/Azure/aks-secure-tls-bootstrap/service/proto \
 		SecureTLSBootstrapServiceClient
 
