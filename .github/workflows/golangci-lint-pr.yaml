@@ -1,6 +1,8 @@
 name: golangci-lint-pr
 on:
   push:
+    branches:
+      - main
     paths:
       - ".github/workflows/golangci-lint-pr.yaml"
       - "client/**"
