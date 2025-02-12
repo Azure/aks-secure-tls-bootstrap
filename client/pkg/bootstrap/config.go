@@ -12,17 +12,17 @@ import (
 )
 
 type Config struct {
-	APIServerFQDN              string
-	CustomClientID             string
-	NextProto                  string
-	AADResource                string
-	ClusterCAFilePath          string
-	KubeconfigPath             string
-	CertFilePath               string
-	KeyFilePath                string
-	InsecureSkipTLSVerify      bool
-	EnsureClientAuthentication bool
-	AzureConfig                *datamodel.AzureConfig
+	APIServerFQDN          string
+	CustomClientID         string
+	NextProto              string
+	AADResource            string
+	ClusterCAFilePath      string
+	KubeconfigPath         string
+	CertFilePath           string
+	KeyFilePath            string
+	InsecureSkipTLSVerify  bool
+	EnsureAuthorizedClient bool
+	AzureConfig            *datamodel.AzureConfig
 }
 
 func (c *Config) ValidateAndSet(azureConfigPath string) error {

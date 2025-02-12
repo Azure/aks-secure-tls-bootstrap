@@ -24,25 +24,25 @@ type Client interface {
 	GetAttestedData(ctx context.Context, nonce string) (*datamodel.VMSSAttestedData, error)
 }
 
-type ClientImpl struct {
+type client struct {
 	baseURL    string
 	httpClient *retryablehttp.Client
 	logger     *zap.Logger
 }
 
-var _ Client = (*ClientImpl)(nil)
+var _ Client = (*client)(nil)
 
-func NewClient(logger *zap.Logger) *ClientImpl {
+func NewClient(logger *zap.Logger) Client {
 	httpClient := retryablehttp.NewClient()
 	httpClient.HTTPClient.Timeout = defaultIMDSRequestTimeout
-	return &ClientImpl{
+	return &client{
 		baseURL:    imdsURL,
 		httpClient: httpClient,
 		logger:     logger,
 	}
 }
 
-func (c *ClientImpl) GetMSIToken(ctx context.Context, clientID, aadResource string) (string, error) {
+func (c *client) GetMSIToken(ctx context.Context, clientID, aadResource string) (string, error) {
 	url := fmt.Sprintf("%s/%s", c.baseURL, msiTokenEndpoint)
 	c.logger.Info("calling IMDS MSI token endpoint", zap.String("url", url))
 
@@ -65,7 +65,7 @@ func (c *ClientImpl) GetMSIToken(ctx context.Context, clientID, aadResource stri
 	return tokenResponse.AccessToken, nil
 }
 
-func (c *ClientImpl) GetInstanceData(ctx context.Context) (*datamodel.VMSSInstanceData, error) {
+func (c *client) GetInstanceData(ctx context.Context) (*datamodel.VMSSInstanceData, error) {
 	url := fmt.Sprintf("%s/%s", c.baseURL, instanceDataEndpoint)
 	c.logger.Info("calling IMDS instance data endpoint", zap.String("url", url))
 
@@ -82,7 +82,7 @@ func (c *ClientImpl) GetInstanceData(ctx context.Context) (*datamodel.VMSSInstan
 	return data, nil
 }
 
-func (c *ClientImpl) GetAttestedData(ctx context.Context, nonce string) (*datamodel.VMSSAttestedData, error) {
+func (c *client) GetAttestedData(ctx context.Context, nonce string) (*datamodel.VMSSAttestedData, error) {
 	url := fmt.Sprintf("%s/%s", c.baseURL, attestedDataEndpoint)
 	c.logger.Info("calling IMDS attested data endpoint", zap.String("url", url))
 
@@ -100,7 +100,7 @@ func (c *ClientImpl) GetAttestedData(ctx context.Context, nonce string) (*datamo
 	return data, nil
 }
 
-func (c *ClientImpl) callIMDS(ctx context.Context, url string, queryParameters map[string]string, responseObject interface{}) error {
+func (c *client) callIMDS(ctx context.Context, url string, queryParameters map[string]string, responseObject interface{}) error {
 	req, err := retryablehttp.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return fmt.Errorf("failed to construct new HTTP request to IMDS: %w", err)

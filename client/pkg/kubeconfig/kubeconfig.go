@@ -13,12 +13,8 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
-const (
-	blockTypeECPrivateKey = "EC PRIVATE KEY"
-)
-
-// GenerationConfig is used to specify various configurations for generation a kubeconfig.
-type GenerationConfig struct {
+// Config is used to configure a newly-generated kubeconfig.
+type Config struct {
 	APIServerFQDN     string
 	ClusterCAFilePath string
 	CertFilePath      string
@@ -28,13 +24,13 @@ type GenerationConfig struct {
 // GenerateForCertAndKey generates a valid kubeconfig with the specified cert, key, and configuration.
 // The cert and key will have their PEM-encodings written out to respective cert and key files to be
 // referenced within the generated kubeconfig.
-func GenerateForCertAndKey(certPEM []byte, privateKey *ecdsa.PrivateKey, cfg *GenerationConfig) (*clientcmdapi.Config, error) {
+func GenerateForCertAndKey(certPEM []byte, privateKey *ecdsa.PrivateKey, cfg *Config) (*clientcmdapi.Config, error) {
 	keyDER, err := x509.MarshalECPrivateKey(privateKey)
 	if err != nil {
 		return nil, fmt.Errorf("unable to marshal EC private key during kubeconfig generation: %w", err)
 	}
 	block := &pem.Block{
-		Type:  blockTypeECPrivateKey,
+		Type:  "EC PRIVATE KEY",
 		Bytes: keyDER,
 	}
 	keyPEM := pem.EncodeToMemory(block)

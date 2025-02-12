@@ -9,26 +9,32 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"go.uber.org/mock/gomock"
+	"go.uber.org/zap"
 
 	aadmocks "github.com/Azure/aks-secure-tls-bootstrap/client/pkg/aad/mocks"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/datamodel"
 	imdsmocks "github.com/Azure/aks-secure-tls-bootstrap/client/pkg/imds/mocks"
 )
 
-var _ = Describe("Auth", func() {
+var _ = Describe("Auth", Ordered, func() {
 	var (
 		mockCtrl        *gomock.Controller
 		imdsClient      *imdsmocks.MockClient
 		aadClient       *aadmocks.MockClient
 		bootstrapClient *Client
+		logger          *zap.Logger
 	)
+
+	BeforeAll(func() {
+		logger, _ = zap.NewDevelopment()
+	})
 
 	BeforeEach(func() {
 		mockCtrl = gomock.NewController(GinkgoT())
 		imdsClient = imdsmocks.NewMockClient(mockCtrl)
 		aadClient = aadmocks.NewMockClient(mockCtrl)
 		bootstrapClient = &Client{
-			logger:     testLogger,
+			logger:     logger,
 			imdsClient: imdsClient,
 			aadClient:  aadClient,
 		}

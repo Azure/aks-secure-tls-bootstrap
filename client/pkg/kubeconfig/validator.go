@@ -27,18 +27,18 @@ type clientConfigLoaderFunc func(kubeconfigPath string) (*restclient.Config, err
 type clientsetLoaderFunc func(clientConfig *restclient.Config) (kubernetes.Interface, error)
 
 type Validator interface {
-	Validate(kubeConfigPath string, ensureAuthorization bool) error
+	Validate(kubeconfigPath string, ensureAuthorizedClient bool) error
 }
 
-type ValidatorImpl struct {
+type validator struct {
 	clientConfigLoader clientConfigLoaderFunc
 	clientsetLoader    clientsetLoaderFunc
 }
 
-var _ Validator = (*ValidatorImpl)(nil)
+var _ Validator = (*validator)(nil)
 
-func NewValidator() *ValidatorImpl {
-	return &ValidatorImpl{
+func NewValidator() Validator {
+	return &validator{
 		clientConfigLoader: func(kubeconfigPath string) (*restclient.Config, error) {
 			if _, err := os.Stat(kubeconfigPath); err != nil {
 				return nil, fmt.Errorf("failed to read specified kubeconfig: %w", err)
@@ -63,7 +63,7 @@ func NewValidator() *ValidatorImpl {
 	}
 }
 
-func (v *ValidatorImpl) Validate(kubeconfigPath string, ensureAuthorization bool) error {
+func (v *validator) Validate(kubeconfigPath string, ensureAuthorizedClient bool) error {
 	clientConfig, err := v.clientConfigLoader(kubeconfigPath)
 	if err != nil {
 		return fmt.Errorf("failed to create REST client config from kubeconfig: %w", err)
@@ -71,7 +71,7 @@ func (v *ValidatorImpl) Validate(kubeconfigPath string, ensureAuthorization bool
 	if err := ensureClientConfig(clientConfig); err != nil {
 		return fmt.Errorf("failed to ensure client config contents: %w", err)
 	}
-	if ensureAuthorization {
+	if ensureAuthorizedClient {
 		clientset, err := v.clientsetLoader(clientConfig)
 		if err != nil {
 			return fmt.Errorf("failed to create clientset from client REST config: %w", err)
@@ -83,14 +83,13 @@ func (v *ValidatorImpl) Validate(kubeconfigPath string, ensureAuthorization bool
 	return nil
 }
 
-// ensureClientConfig returns a nil error iff the specified rest config contains a valid, unexpired
-// client certificate. Note that this function does NOT check whether the certificate signer is valid.
+// ensureClientConfig returns a nil error iff the specified rest config contains a valid, unexpired client certificate.
+// Note that this function does NOT check whether the certificate signer is valid.
 func ensureClientConfig(clientConfig *restclient.Config) error {
 	transportConfig, err := clientConfig.TransportConfig()
 	if err != nil {
 		return fmt.Errorf("unable to load transport configuration from existing kubeconfig: %w", err)
 	}
-	// has side effect of populating transport config data fields
 	if _, err := transport.TLSConfigFor(transportConfig); err != nil {
 		return fmt.Errorf("unable to load TLS configuration from existing kubeconfig: %w", err)
 	}

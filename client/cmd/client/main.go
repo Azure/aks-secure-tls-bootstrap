@@ -100,7 +100,7 @@ func createBootstrapCommand() *cobra.Command {
 	cmd.Flags().StringVar(&logFile, flagLogFile, "", "Path to the file where logs will be written.")
 	cmd.Flags().StringVar(&format, flagLogFormat, "json", "Log format: json or console.")
 	cmd.Flags().BoolVar(&cfg.InsecureSkipTLSVerify, flagInsecureSkipTLSVerify, false, "Skip TLS verification when connecting to the API server FQDN.")
-	cmd.Flags().BoolVar(&cfg.EnsureClientAuthentication, flagEnsureClientAuthentication, false, "Ensure kubernetes client authentication before generating a new certificate.")
+	cmd.Flags().BoolVar(&cfg.EnsureAuthorizedClient, flagEnsureClientAuthentication, false, "Ensure kubernetes client authentication before generating a new certificate.")
 	cmd.Flags().StringVar(&cfg.APIServerFQDN, flagAPIServerFQDN, "", "FQDN of the apiserver.")
 	cmd.Flags().StringVar(&cfg.CustomClientID, flagCustomClientID, "", "Client ID of the user-assigned managed identity to use. Will default to kubelet identity on MSI-enabled clusters if this is not specified.")
 	cmd.Flags().StringVar(&cfg.AADResource, flagAADResource, "", "Resource (audience) used to request JWT tokens from AAD for authentication.")

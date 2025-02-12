@@ -4,17 +4,23 @@
 package aad
 
 import (
+	"context"
 	"testing"
 
+	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/confidential"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"go.uber.org/zap"
 )
 
-var logger *zap.Logger
+type fakeTokenAcquirer struct {
+	AcquireTokenByCredentialFunc func(ctx context.Context, scopes []string, opts ...confidential.AcquireByCredentialOption) (confidential.AuthResult, error)
+}
+
+func (a *fakeTokenAcquirer) AcquireTokenByCredential(ctx context.Context, scopes []string, opts ...confidential.AcquireByCredentialOption) (confidential.AuthResult, error) {
+	return a.AcquireTokenByCredentialFunc(ctx, scopes, opts...)
+}
 
 func TestAAD(t *testing.T) {
-	logger, _ = zap.NewDevelopment()
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "aad suite")
 }

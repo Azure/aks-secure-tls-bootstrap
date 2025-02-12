@@ -16,55 +16,69 @@ import (
 	"go.uber.org/zap"
 )
 
+// tokenAcquirer provides an interface for acquiring AAD tokens via a credential. Fake implementations provided in unit tests.
+type tokenAcquirer interface {
+	AcquireTokenByCredential(ctx context.Context, scopes []string, opts ...confidential.AcquireByCredentialOption) (confidential.AuthResult, error)
+}
+
+// getTokenAcquirerFunc returns a tokenAcquirer based on the specified parameters. Fake implementations provided in unit tests.
+type getTokenAcquirerFunc func(authority string, clientID string, cred confidential.Credential, options ...confidential.Option) (tokenAcquirer, error)
+
+// getConfidentialAcquirer returns a tokenAcquirer implementation backed by a confidential client.
+func getConfidentialAcquirer(authority string, clientID string, cred confidential.Credential, options ...confidential.Option) (tokenAcquirer, error) {
+	return confidential.New(authority, clientID, cred, options...)
+}
+
 type Client interface {
 	GetToken(ctx context.Context, azureConfig *datamodel.AzureConfig, resource string) (string, error)
 }
 
-var _ Client = (*ClientImpl)(nil)
+var _ Client = (*client)(nil)
 
-type ClientImpl struct {
-	httpClient *retryablehttp.Client
-	logger     *zap.Logger
+type client struct {
+	getTokenAcquirer getTokenAcquirerFunc
+	httpClient       *retryablehttp.Client
+	logger           *zap.Logger
 }
 
-func NewClient(logger *zap.Logger) *ClientImpl {
+func NewClient(logger *zap.Logger) Client {
 	httpClient := retryablehttp.NewClient()
 	httpClient.RetryMax = maxGetTokenRetries
 	httpClient.RetryWaitMax = maxGetTokenDelay
-	return &ClientImpl{
-		httpClient: httpClient,
-		logger:     logger,
+	return &client{
+		getTokenAcquirer: getConfidentialAcquirer,
+		httpClient:       httpClient,
+		logger:           logger,
 	}
 }
 
-func (c *ClientImpl) GetToken(ctx context.Context, azureConfig *datamodel.AzureConfig, resource string) (string, error) {
+func (c *client) GetToken(ctx context.Context, azureConfig *datamodel.AzureConfig, resource string) (string, error) {
 	scopes := []string{
 		fmt.Sprintf("%s/.default", resource),
 	}
 
 	credential, err := confidential.NewCredFromSecret(azureConfig.ClientSecret)
 	if err != nil {
-		return "", fmt.Errorf("failed to create confidential secret credential from azure.json: %w", err)
+		return "", fmt.Errorf("creating credential from client secret: %w", err)
 	}
 
-	// confirmed that this value will be AzureStackCloud in AGC environments
 	env, err := azure.EnvironmentFromName(azureConfig.Cloud)
 	if err != nil {
-		return "", fmt.Errorf("getting azure environment from name %q: %w", azureConfig.Cloud, err)
+		return "", fmt.Errorf("getting azure environment from cloud name %q: %w", azureConfig.Cloud, err)
 	}
 
-	client, err := confidential.New(
+	acquirer, err := c.getTokenAcquirer(
 		env.ActiveDirectoryEndpoint,
 		azureConfig.ClientID,
 		credential,
 		confidential.WithHTTPClient(c.httpClient.StandardClient()))
 	if err != nil {
-		return "", fmt.Errorf("failed to create confidential client from azure.json sp/secret: %w", err)
+		return "", fmt.Errorf("creating confidential client with secret credential: %w", err)
 	}
 
-	result, err := client.AcquireTokenByCredential(ctx, scopes, confidential.WithTenantID(azureConfig.TenantID))
+	result, err := acquirer.AcquireTokenByCredential(ctx, scopes, confidential.WithTenantID(azureConfig.TenantID))
 	if err != nil {
-		return "", fmt.Errorf("failed to acquire token via service principal credential: %w", err)
+		return "", fmt.Errorf("acquiring AAD token with secret credential: %w", err)
 	}
 	c.logger.Info("retrieved new AAD token",
 		zap.Strings("scopes", scopes),
