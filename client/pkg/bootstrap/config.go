@@ -12,21 +12,22 @@ import (
 )
 
 type Config struct {
-	APIServerFQDN          string
-	CustomClientID         string
-	NextProto              string
-	AADResource            string
-	ClusterCAFilePath      string
-	KubeconfigPath         string
-	CertFilePath           string
-	KeyFilePath            string
-	InsecureSkipTLSVerify  bool
-	EnsureAuthorizedClient bool
-	AzureConfig            *datamodel.AzureConfig
+	datamodel.AzureConfig
+	AzureConfigPath        string `json:"azureConfigPath"`
+	APIServerFQDN          string `json:"apiServerFqdn"`
+	CustomClientID         string `json:"customClientId"`
+	NextProto              string `json:"nextProto"`
+	AADResource            string `json:"aadResource"`
+	ClusterCAFilePath      string `json:"clusterCaFilePath"`
+	KubeconfigPath         string `json:"kubeconfigPath"`
+	CertFilePath           string `json:"certFilePath"`
+	KeyFilePath            string `json:"keyFilePath"`
+	InsecureSkipTLSVerify  bool   `json:"insecureSkipTlsVerify"`
+	EnsureAuthorizedClient bool   `json:"ensureAuthorizedClient"`
 }
 
-func (c *Config) ValidateAndSet(azureConfigPath string) error {
-	if azureConfigPath == "" {
+func (c *Config) Validate() error {
+	if c.AzureConfigPath == "" {
 		return fmt.Errorf("azure config path must be specified")
 	}
 	if c.ClusterCAFilePath == "" {
@@ -50,16 +51,27 @@ func (c *Config) ValidateAndSet(azureConfigPath string) error {
 	if c.KeyFilePath == "" {
 		return fmt.Errorf("key file path must be specified")
 	}
+	return c.loadAzureConfig()
+}
 
-	azureConfig := &datamodel.AzureConfig{}
-	azureConfigData, err := os.ReadFile(azureConfigPath)
+func (c *Config) LoadFromFile(path string) error {
+	data, err := os.ReadFile(path)
 	if err != nil {
-		return fmt.Errorf("reading azure config data from %s: %w", azureConfigPath, err)
+		return fmt.Errorf("reading config file: %w", err)
 	}
-	if err = json.Unmarshal(azureConfigData, azureConfig); err != nil {
-		return fmt.Errorf("unmarshaling azure config data: %w", err)
+	if err := json.Unmarshal(data, c); err != nil {
+		return fmt.Errorf("unmarshalling config file content: %w", err)
 	}
-	c.AzureConfig = azureConfig
+	return nil
+}
 
+func (c *Config) loadAzureConfig() error {
+	data, err := os.ReadFile(c.AzureConfigPath)
+	if err != nil {
+		return fmt.Errorf("reading azure config data: %w", err)
+	}
+	if err = json.Unmarshal(data, &c.AzureConfig); err != nil {
+		return fmt.Errorf("unmarshalling azure config data: %w", err)
+	}
 	return nil
 }
