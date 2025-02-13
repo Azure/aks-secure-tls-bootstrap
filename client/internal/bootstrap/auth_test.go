@@ -11,9 +11,9 @@ import (
 	"go.uber.org/mock/gomock"
 	"go.uber.org/zap"
 
-	aadmocks "github.com/Azure/aks-secure-tls-bootstrap/client/pkg/aad/mocks"
-	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/datamodel"
-	imdsmocks "github.com/Azure/aks-secure-tls-bootstrap/client/pkg/imds/mocks"
+	aadmocks "github.com/Azure/aks-secure-tls-bootstrap/client/internal/aad/mocks"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/datamodel"
+	imdsmocks "github.com/Azure/aks-secure-tls-bootstrap/client/internal/imds/mocks"
 )
 
 var _ = Describe("Auth", Ordered, func() {

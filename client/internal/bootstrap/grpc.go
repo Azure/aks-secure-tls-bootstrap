@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/consts"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/consts"
 	akssecuretlsbootstrapv1 "github.com/Azure/aks-secure-tls-bootstrap/service/pkg/gen/akssecuretlsbootstrap/v1"
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"

@@ -14,7 +14,7 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc/test/bufconn"
 
-	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/testutil"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/testutil"
 )
 
 var _ = Describe("grpc", Ordered, func() {

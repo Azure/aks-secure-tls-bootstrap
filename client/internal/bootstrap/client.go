@@ -8,9 +8,9 @@ import (
 	"encoding/base64"
 	"fmt"
 
-	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/aad"
-	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/imds"
-	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/kubeconfig"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/aad"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/imds"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/kubeconfig"
 	akssecuretlsbootstrapv1 "github.com/Azure/aks-secure-tls-bootstrap/service/pkg/gen/akssecuretlsbootstrap/v1"
 	"go.uber.org/zap"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
