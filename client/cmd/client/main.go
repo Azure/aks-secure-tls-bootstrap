@@ -22,14 +22,12 @@ var (
 	bootstrapConfig bootstrap.Config
 	configFile      string
 	logFile         string
-	format          string
 	verbose         bool
 )
 
 func init() {
 	flag.StringVar(&configFile, "config-file", "", "path to the configuration file, settings in this file will take priority over command line arguments")
 	flag.StringVar(&logFile, "log-file", "", "path to a file where logs will be written, will be created if it does not already exist")
-	flag.StringVar(&format, "format", "json", "log format (json or console)")
 	flag.BoolVar(&verbose, "verbose", false, "enable verbose log output")
 	flag.StringVar(&bootstrapConfig.AzureConfigPath, "azure-config", "", "path to the azure config file")
 	flag.StringVar(&bootstrapConfig.APIServerFQDN, "apiserver-fqdn", "", "FQDN of the apiserver")
