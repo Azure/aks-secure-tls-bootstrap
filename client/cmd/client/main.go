@@ -61,6 +61,7 @@ func run(ctx context.Context, logger *zap.Logger) int {
 	if configFile != "" {
 		if err := bootstrapConfig.LoadFromFile(configFile); err != nil {
 			logger.Error("error loading configuration file", zap.Error(err))
+			return 1
 		}
 	}
 	client, err := bootstrap.NewClient(logger)
