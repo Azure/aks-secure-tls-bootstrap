@@ -42,7 +42,7 @@ func (c *Client) GetKubeletClientCredential(ctx context.Context, cfg *Config) (*
 	}
 	c.logger.Info("failed to validate existing kubeconfig, will continue to bootstrap", zap.String("kubeconfig", cfg.KubeconfigPath), zap.Error(err))
 
-	token, err := c.getAuthToken(ctx, cfg.CustomClientID, cfg.AADResource, cfg.AzureConfig)
+	token, err := c.getAuthToken(ctx, cfg.CustomClientID, cfg.AADResource, &cfg.AzureConfig)
 	if err != nil {
 		c.logger.Error("failed to generate JWT for GRPC connection", zap.Error(err))
 		return nil, fmt.Errorf("failed to generate JWT for GRPC connection: %w", err)

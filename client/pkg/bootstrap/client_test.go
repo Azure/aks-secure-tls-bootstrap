@@ -67,7 +67,7 @@ var _ = Describe("Client tests", Ordered, func() {
 			KeyFilePath:       filepath.Join(tempDir, "client.key"),
 			APIServerFQDN:     apiServerFQDN,
 			KubeconfigPath:    kubeconfigPath,
-			AzureConfig: &datamodel.AzureConfig{
+			AzureConfig: datamodel.AzureConfig{
 				ClientID:     "clientId",
 				ClientSecret: "clientSecret",
 				TenantID:     "tenantId",
