@@ -28,7 +28,7 @@ var (
 )
 
 func init() {
-	flag.StringVar(&configFile, "config-file", "", "path to the configuration file")
+	flag.StringVar(&configFile, "config-file", "", "path to the configuration file, settings in this file will take priority over command line arguments")
 	flag.StringVar(&logFile, "log-file", "", "path to a file where logs will be written")
 	flag.StringVar(&format, "format", "json", "log format (json or console)")
 	flag.BoolVar(&verbose, "verbose", false, "enable verbose log output")
