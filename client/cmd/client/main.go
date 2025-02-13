@@ -9,9 +9,8 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"strings"
+	"path/filepath"
 	"syscall"
-	"time"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/bootstrap"
 	"go.uber.org/zap"
@@ -23,14 +22,12 @@ var (
 	bootstrapConfig bootstrap.Config
 	configFile      string
 	logFile         string
-	format          string
 	verbose         bool
 )
 
 func init() {
 	flag.StringVar(&configFile, "config-file", "", "path to the configuration file, settings in this file will take priority over command line arguments")
-	flag.StringVar(&logFile, "log-file", "", "path to a file where logs will be written")
-	flag.StringVar(&format, "format", "json", "log format (json or console)")
+	flag.StringVar(&logFile, "log-file", "", "path to a file where logs will be written, will be created if it does not already exist")
 	flag.BoolVar(&verbose, "verbose", false, "enable verbose log output")
 	flag.StringVar(&bootstrapConfig.AzureConfigPath, "azure-config", "", "path to the azure config file")
 	flag.StringVar(&bootstrapConfig.APIServerFQDN, "apiserver-fqdn", "", "FQDN of the apiserver")
@@ -47,7 +44,7 @@ func init() {
 }
 
 func main() {
-	logger, err := constructLogger(logFile, format, verbose)
+	logger, err := configureLogging(logFile, verbose)
 	if err != nil {
 		fmt.Printf("unable to construct zap logger: %s\n", err)
 		os.Exit(1)
@@ -64,6 +61,7 @@ func run(ctx context.Context, logger *zap.Logger) int {
 	if configFile != "" {
 		if err := bootstrapConfig.LoadFromFile(configFile); err != nil {
 			logger.Error("error loading configuration file", zap.Error(err))
+			return 1
 		}
 	}
 	client, err := bootstrap.NewClient(logger)
@@ -83,23 +81,33 @@ func run(ctx context.Context, logger *zap.Logger) int {
 	return 0
 }
 
-func constructLogger(logFile, format string, verbose bool) (*zap.Logger, error) {
-	cfg := zap.NewProductionConfig()
-	if logFile != "" {
-		cfg.OutputPaths = append(cfg.OutputPaths, logFile)
+func configureLogging(logFile string, verbose bool) (*zap.Logger, error) {
+	if err := os.MkdirAll(filepath.Dir(logFile), 0755); err != nil {
+		return nil, fmt.Errorf("failed to create log directory: %w", err)
 	}
-	// Production config defaults to INFO level
+
+	logFileHandle, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open log file: %w", err)
+	}
+
+	encoderConfig := zap.NewProductionEncoderConfig()
+	encoderConfig.TimeKey = "timestamp"
+	encoderConfig.EncodeTime = zapcore.RFC3339NanoTimeEncoder
+
+	fileEncoder := zapcore.NewJSONEncoder(encoderConfig)
+	consoleEncoder := zapcore.NewConsoleEncoder(encoderConfig)
+
+	level := zap.InfoLevel
 	if verbose {
-		cfg.Level = zap.NewAtomicLevelAt(zap.DebugLevel)
+		level = zap.DebugLevel
 	}
-	// Production config defaults to JSON encoding
-	if strings.EqualFold(format, "console") {
-		cfg.Encoding = "console"
-	}
-	// Use RFC3339 timestamps
-	cfg.EncoderConfig.TimeKey = "timestamp"
-	cfg.EncoderConfig.EncodeTime = zapcore.TimeEncoderOfLayout(time.RFC3339)
-	return cfg.Build()
+
+	core := zapcore.NewTee(
+		zapcore.NewCore(fileEncoder, zapcore.AddSync(logFileHandle), level),
+		zapcore.NewCore(consoleEncoder, zapcore.AddSync(os.Stdout), level),
+	)
+	return zap.New(core), nil
 }
 
 func flush(logger *zap.Logger) {
