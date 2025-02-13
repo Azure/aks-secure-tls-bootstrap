@@ -3,7 +3,7 @@
 
 package imds
 
-//go:generate ../../bin/mockgen -copyright_file=../../../hack/copyright_header.txt -destination=./mocks/mock_imds.go -package=mocks github.com/Azure/aks-secure-tls-bootstrap/client/pkg/imds Client
+//go:generate ../../bin/mockgen -copyright_file=../../../hack/copyright_header.txt -destination=./mocks/mock_imds.go -package=mocks github.com/Azure/aks-secure-tls-bootstrap/client/internal/imds Client
 
 import (
 	"context"
@@ -12,8 +12,8 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/consts"
-	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/datamodel"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/consts"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/datamodel"
 	"github.com/hashicorp/go-retryablehttp"
 	"go.uber.org/zap"
 )

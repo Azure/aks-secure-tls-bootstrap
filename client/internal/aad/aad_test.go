@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/datamodel"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/datamodel"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/confidential"
 	"github.com/hashicorp/go-retryablehttp"

@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/testutil"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/testutil"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

@@ -12,7 +12,7 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/bootstrap"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/bootstrap"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"k8s.io/client-go/tools/clientcmd"
