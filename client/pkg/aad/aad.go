@@ -10,9 +10,9 @@ import (
 	"fmt"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/datamodel"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/http"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/confidential"
-	"github.com/hashicorp/go-retryablehttp"
 	"go.uber.org/zap"
 )
 
@@ -37,17 +37,14 @@ var _ Client = (*client)(nil)
 
 type client struct {
 	getTokenAcquirer getTokenAcquirerFunc
-	httpClient       *retryablehttp.Client
+	httpClient       *http.Client
 	logger           *zap.Logger
 }
 
 func NewClient(logger *zap.Logger) Client {
-	httpClient := retryablehttp.NewClient()
-	httpClient.RetryMax = maxGetTokenRetries
-	httpClient.RetryWaitMax = maxGetTokenDelay
 	return &client{
 		getTokenAcquirer: getConfidentialAcquirer,
-		httpClient:       httpClient,
+		httpClient:       http.NewClient(http.WithRetryMax(maxGetTokenRetries), http.WithRetryWaitMax(maxGetTokenDelay)),
 		logger:           logger,
 	}
 }
