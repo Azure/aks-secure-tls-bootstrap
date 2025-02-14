@@ -64,6 +64,10 @@ func run(ctx context.Context, logger *zap.Logger) int {
 			return 1
 		}
 	}
+	if err := bootstrapConfig.Validate(); err != nil {
+		logger.Error("error validating bootstrap configuration", zap.Error(err))
+		return 1
+	}
 	client, err := bootstrap.NewClient(logger)
 	if err != nil {
 		logger.Error("error constructing bootstrap client", zap.Error(err))
