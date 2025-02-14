@@ -10,7 +10,7 @@ import (
 	"net/http/httptest"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/datamodel"
-	"github.com/hashicorp/go-retryablehttp"
+	internalhttp "github.com/Azure/aks-secure-tls-bootstrap/client/internal/http"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -30,7 +30,7 @@ var _ = Describe("Client Tests", func() {
 
 	BeforeEach(func() {
 		imdsClient = &client{
-			httpClient: retryablehttp.NewClient(),
+			httpClient: internalhttp.NewClient(),
 			logger:     logger,
 		}
 	})
@@ -94,7 +94,7 @@ var _ = Describe("Client Tests", func() {
 				imds := mockIMDSWithAssertions(mockMSITokenResponseJSON, func(r *http.Request) {
 					Expect(r.URL.Path).To(Equal("/metadata/identity/oauth2/token"))
 					queryParameters := r.URL.Query()
-					Expect(queryParameters.Get("api-version")).To(Equal("2018-02-01"))
+					Expect(queryParameters.Get("api-version")).To(Equal(apiVersion))
 					Expect(queryParameters.Get("resource")).To(Equal("resource"))
 					Expect(queryParameters.Has("client_id")).To(BeFalse())
 				})
@@ -115,7 +115,7 @@ var _ = Describe("Client Tests", func() {
 				imds := mockIMDSWithAssertions(mockMSITokenResponseJSON, func(r *http.Request) {
 					Expect(r.URL.Path).To(Equal("/metadata/identity/oauth2/token"))
 					queryParameters := r.URL.Query()
-					Expect(queryParameters.Get("api-version")).To(Equal("2018-02-01"))
+					Expect(queryParameters.Get("api-version")).To(Equal(apiVersion))
 					Expect(queryParameters.Get("resource")).To(Equal("resource"))
 					Expect(queryParameters.Get("client_id")).To(Equal("clientId"))
 				})
@@ -137,7 +137,7 @@ var _ = Describe("Client Tests", func() {
 				imds := mockIMDSWithAssertions(mockMSITokenResponseJSONWithError, func(r *http.Request) {
 					Expect(r.URL.Path).To(Equal("/metadata/identity/oauth2/token"))
 					queryParameters := r.URL.Query()
-					Expect(queryParameters.Get("api-version")).To(Equal("2018-02-01"))
+					Expect(queryParameters.Get("api-version")).To(Equal(apiVersion))
 					Expect(queryParameters.Get("resource")).To(Equal("resource"))
 					Expect(queryParameters.Has("client_id")).To(BeFalse())
 				})
@@ -159,7 +159,7 @@ var _ = Describe("Client Tests", func() {
 				imds := mockIMDSWithAssertions(malformedJSON, func(r *http.Request) {
 					Expect(r.URL.Path).To(Equal("/metadata/identity/oauth2/token"))
 					queryParameters := r.URL.Query()
-					Expect(queryParameters.Get("api-version")).To(Equal("2018-02-01"))
+					Expect(queryParameters.Get("api-version")).To(Equal(apiVersion))
 					Expect(queryParameters.Get("resource")).To(Equal("resource"))
 					Expect(queryParameters.Has("client_id")).To(BeFalse())
 				})
@@ -182,7 +182,7 @@ var _ = Describe("Client Tests", func() {
 			imds := mockIMDSWithAssertions(mockVMSSInstanceDataJSON, func(r *http.Request) {
 				Expect(r.URL.Path).To(Equal("/metadata/instance"))
 				queryParameters := r.URL.Query()
-				Expect(queryParameters.Get("api-version")).To(Equal("2021-05-01"))
+				Expect(queryParameters.Get("api-version")).To(Equal(apiVersion))
 				Expect(queryParameters.Get("format")).To(Equal("json"))
 			})
 			defer imds.Close()
@@ -202,7 +202,7 @@ var _ = Describe("Client Tests", func() {
 				imds := mockIMDSWithAssertions(malformedJSON, func(r *http.Request) {
 					Expect(r.URL.Path).To(Equal("/metadata/instance"))
 					queryParameters := r.URL.Query()
-					Expect(queryParameters.Get("api-version")).To(Equal("2021-05-01"))
+					Expect(queryParameters.Get("api-version")).To(Equal(apiVersion))
 					Expect(queryParameters.Get("format")).To(Equal("json"))
 				})
 				defer imds.Close()
@@ -224,7 +224,7 @@ var _ = Describe("Client Tests", func() {
 			imds := mockIMDSWithAssertions(mockVMSSAttestedDataJSON, func(r *http.Request) {
 				Expect(r.URL.Path).To(Equal("/metadata/attested/document"))
 				queryParameters := r.URL.Query()
-				Expect(queryParameters.Get("api-version")).To(Equal("2021-05-01"))
+				Expect(queryParameters.Get("api-version")).To(Equal(apiVersion))
 				Expect(queryParameters.Get("format")).To(Equal("json"))
 				Expect(queryParameters.Get("nonce")).To(Equal("nonce"))
 			})
@@ -246,7 +246,7 @@ var _ = Describe("Client Tests", func() {
 				imds := mockIMDSWithAssertions(malformedJSON, func(r *http.Request) {
 					Expect(r.URL.Path).To(Equal("/metadata/attested/document"))
 					queryParameters := r.URL.Query()
-					Expect(queryParameters.Get("api-version")).To(Equal("2021-05-01"))
+					Expect(queryParameters.Get("api-version")).To(Equal(apiVersion))
 					Expect(queryParameters.Get("format")).To(Equal("json"))
 					Expect(queryParameters.Get("nonce")).To(Equal("nonce"))
 				})
@@ -268,6 +268,7 @@ var _ = Describe("Client Tests", func() {
 
 func mockIMDSWithAssertions(response string, assertions func(r *http.Request)) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		Expect(r.Header.Get("User-Agent")).ToNot(BeEmpty())
 		assertions(r)
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintln(w, response)

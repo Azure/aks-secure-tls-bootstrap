@@ -12,9 +12,8 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/consts"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/datamodel"
-	"github.com/hashicorp/go-retryablehttp"
+	internalhttp "github.com/Azure/aks-secure-tls-bootstrap/client/internal/http"
 	"go.uber.org/zap"
 )
 
@@ -26,87 +25,78 @@ type Client interface {
 
 type client struct {
 	baseURL    string
-	httpClient *retryablehttp.Client
+	httpClient *http.Client
 	logger     *zap.Logger
 }
 
 var _ Client = (*client)(nil)
 
 func NewClient(logger *zap.Logger) Client {
-	httpClient := retryablehttp.NewClient()
-	httpClient.HTTPClient.Timeout = defaultIMDSRequestTimeout
 	return &client{
 		baseURL:    imdsURL,
-		httpClient: httpClient,
+		httpClient: internalhttp.NewClient(),
 		logger:     logger,
 	}
 }
 
 func (c *client) GetMSIToken(ctx context.Context, clientID, aadResource string) (string, error) {
-	url := fmt.Sprintf("%s/%s", c.baseURL, msiTokenEndpoint)
+	url := fmt.Sprintf("%s/%s", c.baseURL, tokenEndpoint)
 	c.logger.Info("calling IMDS MSI token endpoint", zap.String("url", url))
 
-	queryParameters := map[string]string{
-		apiVersionHeaderKey: msiTokenAPIVersion,
-		resourceHeaderKey:   aadResource,
-	}
+	params := getCommonParameters()
+	params[resourceParameterKey] = aadResource
 	if clientID != "" {
-		queryParameters[clientIDHeaderKey] = clientID
+		params[clientIDParameterKey] = clientID
 	}
 
-	tokenResponse := &datamodel.AADTokenResponse{}
-	if err := c.callIMDS(ctx, url, queryParameters, tokenResponse); err != nil {
+	var response datamodel.AADTokenResponse
+	if err := c.callIMDS(ctx, url, params, &response); err != nil {
 		return "", fmt.Errorf("failed to retrieve MSI token: %w", err)
 	}
-	if tokenResponse.Error != "" {
-		return "", fmt.Errorf("failed to retrieve MSI token: %s: %s", tokenResponse.Error, tokenResponse.ErrorDescription)
+	if response.Error != "" {
+		return "", fmt.Errorf("failed to retrieve MSI token: %s: %s", response.Error, response.ErrorDescription)
 	}
 
-	return tokenResponse.AccessToken, nil
+	return response.AccessToken, nil
 }
 
 func (c *client) GetInstanceData(ctx context.Context) (*datamodel.VMSSInstanceData, error) {
 	url := fmt.Sprintf("%s/%s", c.baseURL, instanceDataEndpoint)
 	c.logger.Info("calling IMDS instance data endpoint", zap.String("url", url))
 
-	queryParameters := map[string]string{
-		apiVersionHeaderKey: instanceDataAPIVersion,
-		formatHeaderKey:     formatJSON,
-	}
-	data := &datamodel.VMSSInstanceData{}
+	params := getCommonParameters()
+	params[formatParameterKey] = "json"
 
-	if err := c.callIMDS(ctx, url, queryParameters, data); err != nil {
+	var data datamodel.VMSSInstanceData
+	if err := c.callIMDS(ctx, url, params, &data); err != nil {
 		return nil, fmt.Errorf("failed to retrieve IMDS instance data: %w", err)
 	}
 
-	return data, nil
+	return &data, nil
 }
 
 func (c *client) GetAttestedData(ctx context.Context, nonce string) (*datamodel.VMSSAttestedData, error) {
 	url := fmt.Sprintf("%s/%s", c.baseURL, attestedDataEndpoint)
 	c.logger.Info("calling IMDS attested data endpoint", zap.String("url", url))
 
-	queryParameters := map[string]string{
-		apiVersionHeaderKey: attestedDataAPIVersion,
-		formatHeaderKey:     formatJSON,
-		nonceHeaderKey:      nonce,
-	}
+	params := getCommonParameters()
+	params[formatParameterKey] = "json"
+	params[nonceParameterKey] = nonce
 
-	data := &datamodel.VMSSAttestedData{}
-	if err := c.callIMDS(ctx, url, queryParameters, data); err != nil {
+	var data datamodel.VMSSAttestedData
+	if err := c.callIMDS(ctx, url, params, &data); err != nil {
 		return nil, fmt.Errorf("failed to retrieve IMDS attested data: %w", err)
 	}
 
-	return data, nil
+	return &data, nil
 }
 
 func (c *client) callIMDS(ctx context.Context, url string, queryParameters map[string]string, responseObject interface{}) error {
-	req, err := retryablehttp.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return fmt.Errorf("failed to construct new HTTP request to IMDS: %w", err)
 	}
 	req.Header.Add(metadataHeaderKey, "True")
-	req.Header.Add(userAgentHeaderKey, consts.SecureTLSBootstrapClientUserAgentValue)
 
 	query := req.URL.Query()
 	for key := range queryParameters {
@@ -132,4 +122,10 @@ func (c *client) callIMDS(ctx context.Context, url string, queryParameters map[s
 	}
 
 	return nil
+}
+
+func getCommonParameters() map[string]string {
+	return map[string]string{
+		apiVersionParameterKey: apiVersion,
+	}
 }

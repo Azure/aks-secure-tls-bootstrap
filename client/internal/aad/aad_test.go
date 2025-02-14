@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/datamodel"
+	internalhttp "github.com/Azure/aks-secure-tls-bootstrap/client/internal/http"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/confidential"
-	"github.com/hashicorp/go-retryablehttp"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"go.uber.org/zap"
@@ -51,7 +51,7 @@ var _ = Describe("AAD", Ordered, func() {
 						},
 					}, nil
 				},
-				httpClient: retryablehttp.NewClient(),
+				httpClient: internalhttp.NewClient(),
 				logger:     logger,
 			}
 		})

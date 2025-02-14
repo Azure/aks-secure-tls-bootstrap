@@ -25,9 +25,16 @@ jobs:
       - name: Build binaries and test linux-amd64
         run: |
           set -ex
+          
           # Build the binaries
           cd client
           make build-all
+          
+          # Assert that all the expected binaries were built
+          [ ! -f "bin/aks-stls-bootstrap-client-amd64" ] && echo "expected aks-stls-bootstrap-client-amd64 to have been built" && exit 1
+          [ ! -f "bin/aks-stls-bootstrap-client-arm64" ] && echo "expected aks-stls-bootstrap-client-arm64 to have been built" && exit 1
+          [ ! -f "bin/aks-stls-bootstrap-client-amd64.exe" ] && echo "expected aks-stls-bootstrap-client-amd64.exe to have been built" && exit 1
+          [ ! -f "bin/aks-stls-bootstrap-client-arm64.exe" ] && echo "expected aks-stls-bootstrap-client-arm64.exe to have been built" && exit 1
 
           # Make sure we can actually invoke linux/amd64
           pushd bin
