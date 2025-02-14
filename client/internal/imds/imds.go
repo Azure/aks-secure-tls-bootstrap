@@ -14,7 +14,6 @@ import (
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/datamodel"
 	internalhttp "github.com/Azure/aks-secure-tls-bootstrap/client/internal/http"
-	"github.com/hashicorp/go-retryablehttp"
 	"go.uber.org/zap"
 )
 
@@ -26,7 +25,7 @@ type Client interface {
 
 type client struct {
 	baseURL    string
-	httpClient *retryablehttp.Client
+	httpClient *http.Client
 	logger     *zap.Logger
 }
 
@@ -93,7 +92,7 @@ func (c *client) GetAttestedData(ctx context.Context, nonce string) (*datamodel.
 }
 
 func (c *client) callIMDS(ctx context.Context, url string, queryParameters map[string]string, responseObject interface{}) error {
-	req, err := retryablehttp.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return fmt.Errorf("failed to construct new HTTP request to IMDS: %w", err)
 	}

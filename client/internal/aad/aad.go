@@ -8,12 +8,12 @@ package aad
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/datamodel"
 	internalhttp "github.com/Azure/aks-secure-tls-bootstrap/client/internal/http"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/confidential"
-	"github.com/hashicorp/go-retryablehttp"
 	"go.uber.org/zap"
 )
 
@@ -38,7 +38,7 @@ var _ Client = (*client)(nil)
 
 type client struct {
 	getTokenAcquirer getTokenAcquirerFunc
-	httpClient       *retryablehttp.Client
+	httpClient       *http.Client
 	logger           *zap.Logger
 }
 
@@ -69,7 +69,7 @@ func (c *client) GetToken(ctx context.Context, azureConfig *datamodel.AzureConfi
 		env.ActiveDirectoryEndpoint,
 		azureConfig.ClientID,
 		credential,
-		confidential.WithHTTPClient(c.httpClient.StandardClient()))
+		confidential.WithHTTPClient(c.httpClient))
 	if err != nil {
 		return "", fmt.Errorf("creating confidential client with secret credential: %w", err)
 	}

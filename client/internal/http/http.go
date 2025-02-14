@@ -12,8 +12,8 @@ const (
 	userAgentHeaderKey = "User-Agent"
 )
 
-// NewClient returns a retryablehttp.Client with a custom transport.
-func NewClient() *retryablehttp.Client {
+// NewClient returns an http.Client shimed into a *retryablehttp.Client with a custom transport.
+func NewClient() *http.Client {
 	c := retryablehttp.NewClient()
 	c.RetryMax = 5
 	c.RetryWaitMin = 300 * time.Millisecond
@@ -24,7 +24,7 @@ func NewClient() *retryablehttp.Client {
 		baseTransport: baseTransport,
 	}
 
-	return c
+	return c.StandardClient()
 }
 
 type customTransport struct {
