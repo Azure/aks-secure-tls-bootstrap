@@ -8,14 +8,19 @@ else
 GOBIN=$(shell go env GOBIN)
 endif
 
-# Default arch is amd64.
-ARCH=amd64
-
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # This is a requirement for 'setup-envtest.sh' in the test target.
 # Options are set to exit when a recipe line exits non-zero or a piped command fails.
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
+
+# Go build parameter defaults.
+VERSION := $(shell VERSION=$$(git describe --tags --match "client/*" --abbrev=8 --dirty --always --long) && echo $${VERSION//client\//})
+BUILD_PACKAGE_PREFIX=github.com/Azure/aks-secure-tls-bootstrap/client/internal/build
+LDFLAGS="-X '$(BUILD_PACKAGE_PREFIX).Version=$(VERSION)'"
+ARCH=arm64
+OS=darwin
+EXTENSION=
 
 ##@ Development
 
@@ -38,18 +43,14 @@ mockgen:
 
 .PHONY: build-all
 build-all:
-	@$(MAKE) build-linux ARCH=amd64
-	@$(MAKE) build-linux ARCH=arm64
-	@$(MAKE) build-windows ARCH=amd64
-	@$(MAKE) build-windows ARCH=arm64
+	@$(MAKE) build OS=linux ARCH=amd64
+	@$(MAKE) build OS=linux ARCH=arm64
+	@$(MAKE) build OS=windows ARCH=amd64 EXTENSION=.exe
+	@$(MAKE) build OS=windows ARCH=arm64 EXTENSION=.exe
 
-.PHONY: build-linux
-build-linux:
-	CGO_ENABLED=0 GOOS=linux GOARCH=$(ARCH) go build -o bin/aks-stls-bootstrap-client-$(ARCH) cmd/client/main.go
-
-.PHONY: build-windows
-build-windows: ## Builds the client binary for the specified windows architecture.
-	CGO_ENABLED=0 GOOS=windows GOARCH=$(ARCH) go build -o bin/aks-stls-bootstrap-client-$(ARCH).exe cmd/client/main.go
+.PHONY: build
+build:
+	CGO_ENABLED=0 GOOS=$(OS) GOARCH=$(ARCH) go build -ldflags $(LDFLAGS) -o bin/aks-stls-bootstrap-client-$(ARCH)$(EXTENSION) cmd/client/main.go
 
 ##@ Util
 

@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/consts"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/build"
 	akssecuretlsbootstrapv1 "github.com/Azure/aks-secure-tls-bootstrap/service/pkg/gen/akssecuretlsbootstrap/v1"
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
@@ -36,13 +36,13 @@ func serviceClientFactory(logger *zap.Logger, token string, cfg *Config) (akssec
 
 	conn, err := grpc.NewClient(
 		fmt.Sprintf("%s:443", cfg.APIServerFQDN),
+		grpc.WithUserAgent(build.GetUserAgentValue()),
 		grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)),
 		grpc.WithPerRPCCredentials(oauth.TokenSource{
 			TokenSource: oauth2.StaticTokenSource(&oauth2.Token{
 				AccessToken: token,
 			}),
 		}),
-		grpc.WithUserAgent(consts.SecureTLSBootstrapClientUserAgentValue),
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to dial client connection with context: %w", err)

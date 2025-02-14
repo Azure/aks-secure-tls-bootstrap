@@ -12,11 +12,11 @@ import (
 	"path/filepath"
 	"time"
 
-	aadmocks "github.com/Azure/aks-secure-tls-bootstrap/client/pkg/aad/mocks"
-	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/datamodel"
-	imdsmocks "github.com/Azure/aks-secure-tls-bootstrap/client/pkg/imds/mocks"
-	kubeconfigmocks "github.com/Azure/aks-secure-tls-bootstrap/client/pkg/kubeconfig/mocks"
-	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/testutil"
+	aadmocks "github.com/Azure/aks-secure-tls-bootstrap/client/internal/aad/mocks"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/datamodel"
+	imdsmocks "github.com/Azure/aks-secure-tls-bootstrap/client/internal/imds/mocks"
+	kubeconfigmocks "github.com/Azure/aks-secure-tls-bootstrap/client/internal/kubeconfig/mocks"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/testutil"
 	akssecuretlsbootstrapv1 "github.com/Azure/aks-secure-tls-bootstrap/service/pkg/gen/akssecuretlsbootstrap/v1"
 	akssecuretlsbootstrapv1_mocks "github.com/Azure/aks-secure-tls-bootstrap/service/pkg/gen/mocks/akssecuretlsbootstrap/v1"
 	. "github.com/onsi/ginkgo/v2"
@@ -67,7 +67,7 @@ var _ = Describe("Client tests", Ordered, func() {
 			KeyFilePath:       filepath.Join(tempDir, "client.key"),
 			APIServerFQDN:     apiServerFQDN,
 			KubeconfigPath:    kubeconfigPath,
-			AzureConfig: &datamodel.AzureConfig{
+			AzureConfig: datamodel.AzureConfig{
 				ClientID:     "clientId",
 				ClientSecret: "clientSecret",
 				TenantID:     "tenantId",

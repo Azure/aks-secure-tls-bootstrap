@@ -9,8 +9,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	"github.com/Azure/aks-secure-tls-bootstrap/client/pkg/datamodel"
-	"github.com/hashicorp/go-retryablehttp"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/datamodel"
+	internalhttp "github.com/Azure/aks-secure-tls-bootstrap/client/internal/http"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -30,7 +30,7 @@ var _ = Describe("Client Tests", func() {
 
 	BeforeEach(func() {
 		imdsClient = &client{
-			httpClient: retryablehttp.NewClient(),
+			httpClient: internalhttp.NewClient(),
 			logger:     logger,
 		}
 	})
@@ -268,6 +268,7 @@ var _ = Describe("Client Tests", func() {
 
 func mockIMDSWithAssertions(response string, assertions func(r *http.Request)) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		Expect(r.Header.Get("User-Agent")).ToNot(BeEmpty())
 		assertions(r)
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintln(w, response)
