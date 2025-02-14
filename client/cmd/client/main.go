@@ -44,6 +44,16 @@ func init() {
 }
 
 func main() {
+	if configFile != "" {
+		if err := bootstrapConfig.LoadFromFile(configFile); err != nil {
+			fmt.Printf("unable to load configuration file: %s\n", err)
+			os.Exit(1)
+		}
+	}
+	if err := bootstrapConfig.Validate(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
 	logger, err := configureLogging(logFile, verbose)
 	if err != nil {
 		fmt.Printf("unable to construct zap logger: %s\n", err)
@@ -58,12 +68,6 @@ func main() {
 }
 
 func run(ctx context.Context, logger *zap.Logger) int {
-	if configFile != "" {
-		if err := bootstrapConfig.LoadFromFile(configFile); err != nil {
-			logger.Error("error loading configuration file", zap.Error(err))
-			return 1
-		}
-	}
 	client, err := bootstrap.NewClient(logger)
 	if err != nil {
 		logger.Error("error constructing bootstrap client", zap.Error(err))
