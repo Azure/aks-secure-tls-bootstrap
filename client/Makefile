@@ -18,8 +18,8 @@ SHELL = /usr/bin/env bash -o pipefail
 VERSION := $(shell VERSION=$$(git describe --tags --match "client/*" --abbrev=8 --dirty --always --long) && echo $${VERSION//client\//})
 BUILD_PACKAGE_PREFIX=github.com/Azure/aks-secure-tls-bootstrap/client/internal/build
 LDFLAGS="-X '$(BUILD_PACKAGE_PREFIX).Version=$(VERSION)'"
-ARCH=arm64
-OS=darwin
+ARCH=amd64
+OS=linux
 EXTENSION=
 
 ##@ Development
