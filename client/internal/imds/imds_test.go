@@ -268,7 +268,7 @@ var _ = Describe("Client Tests", func() {
 
 func mockIMDSWithAssertions(response string, assertions func(r *http.Request)) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		Expect(r.Header.Get("User-Agent")).ToNot(BeEmpty())
+		Expect(r.Header.Get("User-Agent")).To(HavePrefix("aks-secure-tls-bootstrap-client/"))
 		assertions(r)
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintln(w, response)

@@ -7,9 +7,12 @@ package kubeconfig
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"time"
 
+	internalhttp "github.com/Azure/aks-secure-tls-bootstrap/client/internal/http"
+	"github.com/hashicorp/go-retryablehttp"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -68,24 +71,31 @@ func (v *validator) Validate(kubeconfigPath string, ensureAuthorizedClient bool)
 	if err != nil {
 		return fmt.Errorf("failed to create REST client config from kubeconfig: %w", err)
 	}
-	if err := ensureClientConfig(clientConfig); err != nil {
-		return fmt.Errorf("failed to ensure client config contents: %w", err)
+	if err := validateClientConfig(clientConfig); err != nil {
+		return fmt.Errorf("failed to validate client config contents: %w", err)
 	}
-	if ensureAuthorizedClient {
-		clientset, err := v.clientsetLoader(clientConfig)
-		if err != nil {
-			return fmt.Errorf("failed to create clientset from client REST config: %w", err)
-		}
-		if err := ensureAuthorizedClientset(clientset); err != nil {
-			return fmt.Errorf("failed to ensure client config authorization: %w", err)
-		}
+	if !ensureAuthorizedClient {
+		return nil
+	}
+	restclient.AddUserAgent(clientConfig, internalhttp.GetUserAgentValue())
+	clientConfig.Wrap(func(rt http.RoundTripper) http.RoundTripper {
+		c := internalhttp.NewRetryableClient()
+		c.HTTPClient = &http.Client{Transport: rt}
+		return &retryablehttp.RoundTripper{Client: c}
+	})
+	clientset, err := v.clientsetLoader(clientConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create clientset from REST client config: %w", err)
+	}
+	if err := ensureAuthorized(clientset); err != nil {
+		return fmt.Errorf("failed to ensure client authorization: %w", err)
 	}
 	return nil
 }
 
-// ensureClientConfig returns a nil error iff the specified rest config contains a valid, unexpired client certificate.
+// validateClientConfig returns a nil error iff the specified rest config contains a valid, unexpired client certificate.
 // Note that this function does NOT check whether the certificate signer is valid.
-func ensureClientConfig(clientConfig *restclient.Config) error {
+func validateClientConfig(clientConfig *restclient.Config) error {
 	transportConfig, err := clientConfig.TransportConfig()
 	if err != nil {
 		return fmt.Errorf("unable to load transport configuration from existing kubeconfig: %w", err)
@@ -98,7 +108,7 @@ func ensureClientConfig(clientConfig *restclient.Config) error {
 		return fmt.Errorf("unable to load TLS certificates from existing kubeconfig: %w", err)
 	}
 	if len(certs) == 0 {
-		return fmt.Errorf("unable to read TLS certificates from existing kubeconfig: %w", err)
+		return fmt.Errorf("no client certificates found within kubeconfig: %w", err)
 	}
 	now := time.Now()
 	for _, cert := range certs {
@@ -109,7 +119,9 @@ func ensureClientConfig(clientConfig *restclient.Config) error {
 	return nil
 }
 
-func ensureAuthorizedClientset(clientset kubernetes.Interface) error {
+// ensureAuthorized ensures that the provided clientset is authorized by making a call to get the apiserver's version.
+// An error is returned if the call fails, or if the server returns an unauthorized response.
+func ensureAuthorized(clientset kubernetes.Interface) error {
 	_, err := clientset.Discovery().ServerVersion()
 	switch {
 	case err == nil:
@@ -117,7 +129,6 @@ func ensureAuthorizedClientset(clientset kubernetes.Interface) error {
 	case errors.IsUnauthorized(err):
 		return fmt.Errorf("cannot make authorized request to list server version: %w", err)
 	default:
-		// can potentially retry in these cases
 		return fmt.Errorf("encountered an unexpected error when attempting to request server version info: %w", err)
 	}
 }

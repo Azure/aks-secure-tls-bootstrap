@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/build"
+	internalhttp "github.com/Azure/aks-secure-tls-bootstrap/client/internal/http"
 	akssecuretlsbootstrapv1 "github.com/Azure/aks-secure-tls-bootstrap/service/pkg/gen/akssecuretlsbootstrap/v1"
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
@@ -36,7 +36,7 @@ func serviceClientFactory(logger *zap.Logger, token string, cfg *Config) (akssec
 
 	conn, err := grpc.NewClient(
 		fmt.Sprintf("%s:443", cfg.APIServerFQDN),
-		grpc.WithUserAgent(build.GetUserAgentValue()),
+		grpc.WithUserAgent(internalhttp.GetUserAgentValue()),
 		grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)),
 		grpc.WithPerRPCCredentials(oauth.TokenSource{
 			TokenSource: oauth2.StaticTokenSource(&oauth2.Token{

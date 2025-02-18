@@ -1,11 +1,8 @@
 package build
 
-import "fmt"
+// version holds the current version string, provided via go ldflags.
+var version string
 
-// Version holds the client binary's current version string.
-var Version string
-
-// GetUserAgentValue returns the common User-Agent header value used in all RPCs and HTTP calls.
-func GetUserAgentValue() string {
-	return fmt.Sprintf("aks-secure-tls-bootstrap-client/%s", Version)
+func GetVersion() string {
+	return version
 }
