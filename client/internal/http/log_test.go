@@ -6,7 +6,6 @@ package http
 import (
 	"bufio"
 	"bytes"
-	"fmt"
 	"io"
 	"net/url"
 
@@ -44,8 +43,7 @@ var _ = Describe("leveledLoggerShim", Ordered, func() {
 		})
 		Expect(err).To(BeNil())
 
-		customPath := fmt.Sprintf("custom:test")
-		config.OutputPaths = []string{customPath}
+		config.OutputPaths = []string{"custom:test"}
 
 		logger, err = config.Build()
 		Expect(err).To(BeNil())
