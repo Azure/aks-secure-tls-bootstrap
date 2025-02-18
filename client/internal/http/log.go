@@ -32,14 +32,13 @@ func (l *leveledLoggerShim) Warn(msg string, keysAndValues ...interface{}) {
 func getZapFields(keysAndValues []interface{}) []zap.Field {
 	var fields []zap.Field
 	failed := len(keysAndValues)%2 != 0
-	for i := 0; i < len(keysAndValues)-1 && !failed; {
+	for i := 0; i < len(keysAndValues)-1 && !failed; i += 2 {
 		key, ok := keysAndValues[i].(string)
 		if !ok || i+1 >= len(keysAndValues) {
 			failed = true
 			break
 		}
 		fields = append(fields, zap.Any(key, keysAndValues[i+1]))
-		i += 2
 	}
 	if failed {
 		fields = []zapcore.Field{
