@@ -94,7 +94,7 @@ var _ = Describe("Validator", func() {
 
 				err := v.Validate("path", false)
 				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("failed to ensure client config contents: unable to load TLS certificates from existing kubeconfig"))
+				Expect(err.Error()).To(ContainSubstring("failed to validate client config contents: unable to load TLS certificates from existing kubeconfig"))
 				Expect(err.Error()).To(ContainSubstring("does not contain any valid RSA or ECDSA certificates"))
 			})
 		})
@@ -135,7 +135,7 @@ var _ = Describe("Validator", func() {
 			})
 		})
 
-		Context("ensureAuthorization is true", func() {
+		Context("ensureAuthorizedClient is true", func() {
 			var (
 				clientset *fake.Clientset
 			)
@@ -163,7 +163,7 @@ var _ = Describe("Validator", func() {
 					}
 					err := v.Validate("path", true)
 					Expect(err).ToNot(BeNil())
-					Expect(err.Error()).To(ContainSubstring("failed to create clientset from client REST config"))
+					Expect(err.Error()).To(ContainSubstring("failed to create clientset from REST client config"))
 					Expect(err.Error()).To(ContainSubstring("bad rest config"))
 				})
 			})

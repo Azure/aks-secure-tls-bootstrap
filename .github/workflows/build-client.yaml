@@ -31,15 +31,15 @@ jobs:
           make build-all
           
           # Assert that all the expected binaries were built
-          [ ! -f "bin/aks-stls-bootstrap-client-amd64" ] && echo "expected aks-stls-bootstrap-client-amd64 to have been built" && exit 1
-          [ ! -f "bin/aks-stls-bootstrap-client-arm64" ] && echo "expected aks-stls-bootstrap-client-arm64 to have been built" && exit 1
-          [ ! -f "bin/aks-stls-bootstrap-client-amd64.exe" ] && echo "expected aks-stls-bootstrap-client-amd64.exe to have been built" && exit 1
-          [ ! -f "bin/aks-stls-bootstrap-client-arm64.exe" ] && echo "expected aks-stls-bootstrap-client-arm64.exe to have been built" && exit 1
+          [ ! -f "bin/aks-secure-tls-bootstrap-client-amd64" ] && echo "expected aks-secure-tls-bootstrap-client-amd64 to have been built" && exit 1
+          [ ! -f "bin/aks-secure-tls-bootstrap-client-arm64" ] && echo "expected aks-secure-tls-bootstrap-client-arm64 to have been built" && exit 1
+          [ ! -f "bin/aks-secure-tls-bootstrap-client-amd64.exe" ] && echo "expected aks-secure-tls-bootstrap-client-amd64.exe to have been built" && exit 1
+          [ ! -f "bin/aks-secure-tls-bootstrap-client-arm64.exe" ] && echo "expected aks-secure-tls-bootstrap-client-arm64.exe to have been built" && exit 1
 
           # Make sure we can actually invoke linux/amd64
           pushd bin
-            chmod +x ./aks-stls-bootstrap-client-amd64
-            ./aks-stls-bootstrap-client-amd64 -h
+            chmod +x ./aks-secure-tls-bootstrap-client-amd64
+            ./aks-secure-tls-bootstrap-client-amd64 -h
             if [ $? -ne 0 ]; then
               echo "unable to invoke linux/amd64 binary"
               exit 1

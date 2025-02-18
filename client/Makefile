@@ -17,7 +17,7 @@ SHELL = /usr/bin/env bash -o pipefail
 # Go build parameter defaults.
 VERSION := $(shell VERSION=$$(git describe --tags --match "client/*" --abbrev=8 --dirty --always --long) && echo $${VERSION//client\//})
 BUILD_PACKAGE_PREFIX=github.com/Azure/aks-secure-tls-bootstrap/client/internal/build
-LDFLAGS="-X '$(BUILD_PACKAGE_PREFIX).Version=$(VERSION)'"
+LDFLAGS="-X '$(BUILD_PACKAGE_PREFIX).version=$(VERSION)'"
 ARCH=amd64
 OS=linux
 EXTENSION=
@@ -50,7 +50,7 @@ build-all:
 
 .PHONY: build
 build:
-	CGO_ENABLED=0 GOOS=$(OS) GOARCH=$(ARCH) go build -ldflags $(LDFLAGS) -o bin/aks-stls-bootstrap-client-$(ARCH)$(EXTENSION) cmd/client/main.go
+	CGO_ENABLED=0 GOOS=$(OS) GOARCH=$(ARCH) go build -ldflags $(LDFLAGS) -o bin/aks-secure-tls-bootstrap-client-$(ARCH)$(EXTENSION) cmd/client/main.go
 
 ##@ Util
 

@@ -38,26 +38,32 @@ func GenerateForCertAndKey(certPEM []byte, privateKey *ecdsa.PrivateKey, cfg *Co
 	if err = os.WriteFile(cfg.CertFilePath, certPEM, 0644); err != nil {
 		return nil, fmt.Errorf("failed to write new client certificate to %s: %w", cfg.CertFilePath, err)
 	}
-
 	if err = os.WriteFile(cfg.KeyFilePath, keyPEM, 0600); err != nil {
 		return nil, fmt.Errorf("failed to write new client key to %s: %w", cfg.KeyFilePath, err)
 	}
 
 	kubeconfigData := &clientcmdapi.Config{
-		Clusters: map[string]*clientcmdapi.Cluster{"default-cluster": {
-			Server:               fmt.Sprintf("https://%s:443", cfg.APIServerFQDN),
-			CertificateAuthority: cfg.ClusterCAFilePath,
-		}},
+		// Define cluster based on the specified apiserver FQDN and cluster CA.
+		Clusters: map[string]*clientcmdapi.Cluster{
+			"default-cluster": {
+				Server:               fmt.Sprintf("https://%s:443", cfg.APIServerFQDN),
+				CertificateAuthority: cfg.ClusterCAFilePath,
+			},
+		},
 		// Define auth based on the obtained client cert.
-		AuthInfos: map[string]*clientcmdapi.AuthInfo{"default-auth": {
-			ClientCertificate: cfg.CertFilePath,
-			ClientKey:         cfg.KeyFilePath,
-		}},
+		AuthInfos: map[string]*clientcmdapi.AuthInfo{
+			"default-auth": {
+				ClientCertificate: cfg.CertFilePath,
+				ClientKey:         cfg.KeyFilePath,
+			},
+		},
 		// Define a context that connects the auth info and cluster, and set it as the default
-		Contexts: map[string]*clientcmdapi.Context{"default-context": {
-			Cluster:  "default-cluster",
-			AuthInfo: "default-auth",
-		}},
+		Contexts: map[string]*clientcmdapi.Context{
+			"default-context": {
+				Cluster:  "default-cluster",
+				AuthInfo: "default-auth",
+			},
+		},
 		CurrentContext: "default-context",
 	}
 
