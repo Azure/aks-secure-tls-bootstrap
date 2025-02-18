@@ -13,9 +13,10 @@ import (
 	internalhttp "github.com/Azure/aks-secure-tls-bootstrap/client/internal/http"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"go.uber.org/zap"
 )
 
-var _ = Describe("Client Tests", func() {
+var _ = Describe("Client Tests", Ordered, func() {
 	const (
 		mockMSITokenResponseJSON          = `{"access_token":"accesstoken"}`
 		mockVMSSInstanceDataJSON          = `{"compute":{"resourceId": "resourceId"}}`
@@ -24,13 +25,18 @@ var _ = Describe("Client Tests", func() {
 		malformedJSON                     = `{{}`
 	)
 	var (
+		logger     *zap.Logger
 		imdsClient *client
 		resource   = "resource"
 	)
 
+	BeforeAll(func() {
+		logger, _ = zap.NewDevelopment()
+	})
+
 	BeforeEach(func() {
 		imdsClient = &client{
-			httpClient: internalhttp.NewClient(),
+			httpClient: internalhttp.NewClient(logger),
 			logger:     logger,
 		}
 	})

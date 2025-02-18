@@ -8,13 +8,9 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"go.uber.org/zap"
 )
 
-var logger *zap.Logger
-
 func TestIMDS(t *testing.T) {
-	logger, _ = zap.NewDevelopment()
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "imds suite")
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/testutil"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	fakediscovery "k8s.io/client-go/discovery/fake"
@@ -19,10 +20,16 @@ import (
 	"k8s.io/client-go/testing"
 )
 
-var _ = Describe("Validator", func() {
+var _ = Describe("Validator", Ordered, func() {
+	var logger *zap.Logger
+
+	BeforeAll(func() {
+		logger, _ = zap.NewDevelopment()
+	})
+
 	Context("NewValidator", func() {
 		It("should construct and return a new validator", func() {
-			v := NewValidator()
+			v := NewValidator(logger)
 			Expect(v).ToNot(BeNil())
 
 			vv, ok := v.(*validator)
@@ -53,7 +60,9 @@ var _ = Describe("Validator", func() {
 		Expect(err).To(BeNil())
 
 		BeforeEach(func() {
-			v = &validator{}
+			v = &validator{
+				logger: logger,
+			}
 		})
 
 		When("kubeconfig is valid", func() {

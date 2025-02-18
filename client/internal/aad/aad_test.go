@@ -51,7 +51,7 @@ var _ = Describe("AAD", Ordered, func() {
 						},
 					}, nil
 				},
-				httpClient: internalhttp.NewClient(),
+				httpClient: internalhttp.NewClient(logger),
 				logger:     logger,
 			}
 		})

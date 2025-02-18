@@ -45,7 +45,7 @@ type client struct {
 func NewClient(logger *zap.Logger) Client {
 	return &client{
 		getTokenAcquirer: getConfidentialAcquirer,
-		httpClient:       internalhttp.NewClient(),
+		httpClient:       internalhttp.NewClient(logger),
 		logger:           logger,
 	}
 }
