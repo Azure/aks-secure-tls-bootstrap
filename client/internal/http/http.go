@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
 package http
 
 import (
@@ -7,6 +10,7 @@ import (
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/build"
 	"github.com/hashicorp/go-retryablehttp"
+	"go.uber.org/zap"
 )
 
 const (
@@ -19,12 +23,12 @@ func GetUserAgentValue() string {
 }
 
 // NewClient returns an http.Client shimed into a *retryablehttp.Client with a custom transport.
-func NewClient() *http.Client {
-	return NewRetryableClient().StandardClient()
+func NewClient(logger *zap.Logger) *http.Client {
+	return NewRetryableClient(logger).StandardClient()
 }
 
 // NewRetryableClient returns a *retryablehttp.Client with a custom transport.
-func NewRetryableClient() *retryablehttp.Client {
+func NewRetryableClient(logger *zap.Logger) *retryablehttp.Client {
 	c := retryablehttp.NewClient()
 	c.RetryMax = 5
 	c.RetryWaitMin = 300 * time.Millisecond
@@ -32,6 +36,9 @@ func NewRetryableClient() *retryablehttp.Client {
 	transport := c.HTTPClient.Transport
 	c.HTTPClient.Transport = &customTransport{
 		base: transport,
+	}
+	c.Logger = &leveledLoggerShim{
+		logger: logger,
 	}
 	return c
 }

@@ -30,7 +30,7 @@ func NewClient(logger *zap.Logger) (*Client, error) {
 		getServiceClient:    serviceClientFactory,
 		imdsClient:          imds.NewClient(logger),
 		aadClient:           aad.NewClient(logger),
-		kubeconfigValidator: kubeconfig.NewValidator(),
+		kubeconfigValidator: kubeconfig.NewValidator(logger),
 	}, nil
 }
 

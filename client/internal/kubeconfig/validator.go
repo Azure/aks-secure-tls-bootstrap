@@ -13,6 +13,7 @@ import (
 
 	internalhttp "github.com/Azure/aks-secure-tls-bootstrap/client/internal/http"
 	"github.com/hashicorp/go-retryablehttp"
+	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -36,11 +37,12 @@ type Validator interface {
 type validator struct {
 	clientConfigLoader clientConfigLoaderFunc
 	clientsetLoader    clientsetLoaderFunc
+	logger             *zap.Logger
 }
 
 var _ Validator = (*validator)(nil)
 
-func NewValidator() Validator {
+func NewValidator(logger *zap.Logger) Validator {
 	return &validator{
 		clientConfigLoader: func(kubeconfigPath string) (*restclient.Config, error) {
 			if _, err := os.Stat(kubeconfigPath); err != nil {
@@ -63,6 +65,7 @@ func NewValidator() Validator {
 		clientsetLoader: func(clientConfig *restclient.Config) (kubernetes.Interface, error) {
 			return kubernetes.NewForConfig(clientConfig)
 		},
+		logger: logger,
 	}
 }
 
@@ -79,7 +82,7 @@ func (v *validator) Validate(kubeconfigPath string, ensureAuthorizedClient bool)
 	}
 	restclient.AddUserAgent(clientConfig, internalhttp.GetUserAgentValue())
 	clientConfig.Wrap(func(rt http.RoundTripper) http.RoundTripper {
-		c := internalhttp.NewRetryableClient()
+		c := internalhttp.NewRetryableClient(v.logger)
 		c.HTTPClient = &http.Client{Transport: rt}
 		return &retryablehttp.RoundTripper{Client: c}
 	})

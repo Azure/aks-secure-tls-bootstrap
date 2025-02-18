@@ -34,7 +34,7 @@ var _ Client = (*client)(nil)
 func NewClient(logger *zap.Logger) Client {
 	return &client{
 		baseURL:    imdsURL,
-		httpClient: internalhttp.NewClient(),
+		httpClient: internalhttp.NewClient(logger),
 		logger:     logger,
 	}
 }
