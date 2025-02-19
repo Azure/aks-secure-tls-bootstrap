@@ -111,7 +111,7 @@ func validateClientConfig(clientConfig *restclient.Config) error {
 		return fmt.Errorf("unable to load TLS certificates from existing kubeconfig: %w", err)
 	}
 	if len(certs) == 0 {
-		return fmt.Errorf("no client certificates found within kubeconfig: %w", err)
+		return fmt.Errorf("no client certificates found within kubeconfig")
 	}
 	now := time.Now()
 	for _, cert := range certs {
