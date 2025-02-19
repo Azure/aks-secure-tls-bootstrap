@@ -21,32 +21,6 @@ type AzureConfig struct {
 	UserAssignedIdentityID string `json:"userAssignedIdentityID,omitempty"`
 }
 
-// ExecCredential represents cluster-related data supplied to the client plugin
-// by kubelet when invoked for generating bootstrap tokens.
-type ExecCredential struct {
-	APIVersion string `json:"apiVersion"`
-	Kind       string `json:"kind"`
-	Spec       struct {
-		Cluster struct {
-			CertificateAuthorityData string      `json:"certificate-authority-data,omitempty"`
-			Config                   interface{} `json:"config,omitempty"`
-			InsecureSkipTLSVerify    bool        `json:"insecure-skip-tls-verify,omitempty"`
-			ProxyURL                 string      `json:"proxy-url,omitempty"`
-			Server                   string      `json:"server,omitempty"`
-			TLSServerName            string      `json:"tls-server-name,omitempty"`
-		} `json:"cluster,omitempty"`
-		Interactive bool `json:"interactive,omitempty"`
-	} `json:"spec,omitempty"`
-	Status ExecCredentialStatus `json:"status,omitempty"`
-}
-
-type ExecCredentialStatus struct {
-	ClientCertificateData string `json:"clientCertificateData,omitempty"`
-	ClientKeyData         string `json:"clientKeyData,omitempty"`
-	ExpirationTimestamp   string `json:"expirationTimestamp,omitempty"`
-	Token                 string `json:"token,omitempty"`
-}
-
 // Compute represents the compute-related fields we need from VMSS-related instance data.
 type Compute struct {
 	ResourceID string `json:"resourceId,omitempty"`
@@ -61,6 +35,5 @@ type VMSSInstanceData struct {
 // VMSSAttestedData represents the fields we need the attested data
 // response retrieved from IMDS.
 type VMSSAttestedData struct {
-	Encoding  string `json:"encoding,omitempty"`
 	Signature string `json:"signature,omitempty"`
 }
