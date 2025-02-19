@@ -11,7 +11,7 @@ function build_and_upload_linux_amd64() {
     make build OS=linux ARCH=amd64
     client_path="$(pwd)/bin/aks-secure-tls-bootstrap-client-amd64"
     [ ! -f "$client_path" ] && echo "could not find client binary for upload at $client_path" && exit 1
-    az storage blob upload -f "$client_path" --auth-mode login --blob-url "https://${STORAGE_ACCOUNT_NAME}.blob.core.windows.net/\$web/client/amd64/${VERSION}"
+    az storage blob upload -f "$client_path" --auth-mode login --blob-url "https://${STORAGE_ACCOUNT_NAME}.blob.core.windows.net/\$web/client/linux/amd64/${VERSION}"
 }
 
 build_and_upload_linux_amd64
