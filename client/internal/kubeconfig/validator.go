@@ -83,7 +83,7 @@ func (v *validator) Validate(kubeconfigPath string, ensureAuthorizedClient bool)
 	restclient.AddUserAgent(clientConfig, internalhttp.GetUserAgentValue())
 	clientConfig.Wrap(func(rt http.RoundTripper) http.RoundTripper {
 		c := internalhttp.NewRetryableClient(v.logger)
-		c.HTTPClient = &http.Client{Transport: rt}
+		c.HTTPClient.Transport = rt
 		return &retryablehttp.RoundTripper{Client: c}
 	})
 	clientset, err := v.clientsetLoader(clientConfig)
@@ -93,6 +93,7 @@ func (v *validator) Validate(kubeconfigPath string, ensureAuthorizedClient bool)
 	if err := ensureAuthorized(clientset); err != nil {
 		return fmt.Errorf("failed to ensure client authorization: %w", err)
 	}
+	v.logger.Info("ensured existing clientset is authorized", zap.String("kubeconfig", kubeconfigPath))
 	return nil
 }
 
