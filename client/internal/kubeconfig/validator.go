@@ -83,7 +83,7 @@ func (v *validator) Validate(kubeconfigPath string, ensureAuthorizedClient bool)
 	restclient.AddUserAgent(clientConfig, internalhttp.GetUserAgentValue())
 	clientConfig.Wrap(func(rt http.RoundTripper) http.RoundTripper {
 		c := internalhttp.NewRetryableClient(v.logger)
-		c.HTTPClient.Transport = rt
+		c.HTTPClient = &http.Client{Transport: rt}
 		return &retryablehttp.RoundTripper{Client: c}
 	})
 	clientset, err := v.clientsetLoader(clientConfig)
