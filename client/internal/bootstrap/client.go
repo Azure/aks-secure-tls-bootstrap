@@ -37,10 +37,10 @@ func NewClient(logger *zap.Logger) (*Client, error) {
 func (c *Client) GetKubeletClientCredential(ctx context.Context, cfg *Config) (*clientcmdapi.Config, error) {
 	err := c.kubeconfigValidator.Validate(cfg.KubeconfigPath, cfg.EnsureAuthorizedClient)
 	if err == nil {
-		c.logger.Info("existing kubeconfig is valid, exiting without bootstrapping")
+		c.logger.Info("existing kubeconfig is valid, will skip bootstrapping", zap.String("kubeconfig", cfg.KubeconfigPath))
 		return nil, nil
 	}
-	c.logger.Info("failed to validate existing kubeconfig, will continue to bootstrap", zap.String("kubeconfig", cfg.KubeconfigPath), zap.Error(err))
+	c.logger.Info("failed to validate existing kubeconfig, will bootstrap a new client credential", zap.String("kubeconfig", cfg.KubeconfigPath), zap.Error(err))
 
 	token, err := c.getAuthToken(ctx, cfg.CustomClientID, cfg.AADResource, &cfg.AzureConfig)
 	if err != nil {

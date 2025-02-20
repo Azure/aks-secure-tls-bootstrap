@@ -78,9 +78,11 @@ func run(ctx context.Context, logger *zap.Logger) int {
 		logger.Error("error generating kubelet client credential", zap.Error(err))
 		return 1
 	}
-	if err := clientcmd.WriteToFile(*kubeconfigData, bootstrapConfig.KubeconfigPath); err != nil {
-		logger.Error("error writing generated kubeconfig to disk", zap.Error(err))
-		return 1
+	if kubeconfigData != nil {
+		if err := clientcmd.WriteToFile(*kubeconfigData, bootstrapConfig.KubeconfigPath); err != nil {
+			logger.Error("error writing generated kubeconfig to disk", zap.Error(err))
+			return 1
+		}
 	}
 	return 0
 }
