@@ -15,7 +15,6 @@ import (
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/bootstrap"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
 var (
@@ -65,24 +64,6 @@ func main() {
 	cancel()
 	flush(logger)
 	os.Exit(exitCode)
-}
-
-func run(ctx context.Context, logger *zap.Logger) int {
-	client, err := bootstrap.NewClient(logger)
-	if err != nil {
-		logger.Error("error constructing bootstrap client", zap.Error(err))
-		return 1
-	}
-	kubeconfigData, err := client.GetKubeletClientCredential(ctx, &bootstrapConfig)
-	if err != nil {
-		logger.Error("error generating kubelet client credential", zap.Error(err))
-		return 1
-	}
-	if err := clientcmd.WriteToFile(*kubeconfigData, bootstrapConfig.KubeconfigPath); err != nil {
-		logger.Error("error writing generated kubeconfig to disk", zap.Error(err))
-		return 1
-	}
-	return 0
 }
 
 func configureLogging(logFile string, verbose bool) (*zap.Logger, error) {
