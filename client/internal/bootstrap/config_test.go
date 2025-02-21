@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/datamodel"
 	"github.com/Azure/go-autorest/autorest/azure"
@@ -30,6 +31,7 @@ var _ = Describe("config tests", func() {
 					KubeconfigPath:    "path",
 					CertFilePath:      "path",
 					KeyFilePath:       "path",
+					Deadline:          time.Second,
 				}
 			})
 

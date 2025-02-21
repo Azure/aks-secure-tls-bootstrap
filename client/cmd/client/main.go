@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"syscall"
+	"time"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/bootstrap"
 	"go.uber.org/zap"
@@ -39,6 +40,7 @@ func init() {
 	flag.StringVar(&bootstrapConfig.KeyFilePath, "key-file", "", "path to the file which will contain the PEM-encoded client key, referenced by the generated kubeconfig.")
 	flag.BoolVar(&bootstrapConfig.InsecureSkipTLSVerify, "insecure-skip-tls-verify", false, "skip TLS verification when connecting to the control plane")
 	flag.BoolVar(&bootstrapConfig.EnsureAuthorizedClient, "ensure-authorized", false, "ensure the specified kubeconfig contains an authorized clientset before bootstrapping")
+	flag.DurationVar(&bootstrapConfig.Deadline, "deadline", 3*time.Minute, "deadline within which bootstrapping must succeed")
 	flag.Parse()
 }
 

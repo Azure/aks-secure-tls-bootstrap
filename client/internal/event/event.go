@@ -2,7 +2,16 @@ package event
 
 import (
 	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
 	"time"
+)
+
+const (
+	GuestAgentEventsPathLinux   = "/var/log/azure/Microsoft.Azure.Extensions.CustomScript/events"
+	GuestAgentEventsPathWindows = "C:\\WindowsAzure\\Logs\\Plugins\\Microsoft.Compute.CustomScriptExtension\\Events"
 )
 
 type Event struct {
@@ -34,4 +43,26 @@ func (e *Event) MarshalJSON() ([]byte, error) {
 		EventPID:    "0",
 		EventTID:    "0",
 	})
+}
+
+func (e *Event) Write() error {
+	path := GuestAgentEventsPathLinux
+	if runtime.GOOS == "windows" {
+		path = GuestAgentEventsPathWindows
+	}
+	path = filepath.Join(path, fmt.Sprintf("%d.json", time.Now().UnixNano()))
+	data, err := json.Marshal(e)
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(path, data, os.ModePerm); err != nil {
+		return err
+	}
+	return nil
+}
+
+type BootstrapResult struct {
+	Status   string `json:"Status,omitempty"`
+	Hostname string `json:"Hostname,omitempty"`
+	Log      string `json:"Log,omitempty"`
 }
