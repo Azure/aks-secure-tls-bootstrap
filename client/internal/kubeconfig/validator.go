@@ -93,6 +93,7 @@ func (v *validator) Validate(kubeconfigPath string, ensureAuthorizedClient bool)
 	if err := ensureAuthorized(clientset); err != nil {
 		return fmt.Errorf("failed to ensure client authorization: %w", err)
 	}
+	v.logger.Info("ensured existing clientset is authorized", zap.String("kubeconfig", kubeconfigPath))
 	return nil
 }
 
