@@ -7,23 +7,25 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/datamodel"
 )
 
 type Config struct {
 	datamodel.AzureConfig
-	AzureConfigPath        string `json:"azureConfigPath"`
-	APIServerFQDN          string `json:"apiServerFqdn"`
-	CustomClientID         string `json:"customClientId"`
-	NextProto              string `json:"nextProto"`
-	AADResource            string `json:"aadResource"`
-	ClusterCAFilePath      string `json:"clusterCaFilePath"`
-	KubeconfigPath         string `json:"kubeconfigPath"`
-	CertFilePath           string `json:"certFilePath"`
-	KeyFilePath            string `json:"keyFilePath"`
-	InsecureSkipTLSVerify  bool   `json:"insecureSkipTlsVerify"`
-	EnsureAuthorizedClient bool   `json:"ensureAuthorizedClient"`
+	AzureConfigPath        string        `json:"azureConfigPath"`
+	APIServerFQDN          string        `json:"apiServerFqdn"`
+	CustomClientID         string        `json:"customClientId"`
+	NextProto              string        `json:"nextProto"`
+	AADResource            string        `json:"aadResource"`
+	ClusterCAFilePath      string        `json:"clusterCaFilePath"`
+	KubeconfigPath         string        `json:"kubeconfigPath"`
+	CertFilePath           string        `json:"certFilePath"`
+	KeyFilePath            string        `json:"keyFilePath"`
+	InsecureSkipTLSVerify  bool          `json:"insecureSkipTlsVerify"`
+	EnsureAuthorizedClient bool          `json:"ensureAuthorizedClient"`
+	Deadline               time.Duration `json:"deadline"`
 }
 
 func (c *Config) Validate() error {
@@ -50,6 +52,9 @@ func (c *Config) Validate() error {
 	}
 	if c.KeyFilePath == "" {
 		return fmt.Errorf("key file path must be specified")
+	}
+	if c.Deadline == 0 {
+		return fmt.Errorf("deadline must be specified")
 	}
 	return c.loadAzureConfig()
 }
