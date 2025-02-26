@@ -65,7 +65,7 @@ var _ = Describe("Auth", Ordered, func() {
 					return nil, fmt.Errorf("cannot generate MSI token")
 				}
 
-				token, err := bootstrapClient.getAuthToken("", testResource, azureConfig)
+				token, err := bootstrapClient.getAccessToken("", testResource, azureConfig)
 				Expect(token).To(BeEmpty())
 				Expect(err).To(MatchError("generating MSI access token: cannot generate MSI token"))
 			})
@@ -80,7 +80,7 @@ var _ = Describe("Auth", Ordered, func() {
 					TenantID:     testTenantID,
 				}
 
-				token, err := bootstrapClient.getAuthToken("", testResource, azureConfig)
+				token, err := bootstrapClient.getAccessToken("", testResource, azureConfig)
 				Expect(token).To(BeEmpty())
 				Expect(err).To(MatchError(ContainSubstring(`getting azure environment config for cloud "invalid"`)))
 			})
@@ -102,7 +102,7 @@ var _ = Describe("Auth", Ordered, func() {
 					return nil, fmt.Errorf("cannot generate SPN token with username and password")
 				}
 
-				token, err := bootstrapClient.getAuthToken("", testResource, azureConfig)
+				token, err := bootstrapClient.getAccessToken("", testResource, azureConfig)
 				Expect(token).To(BeEmpty())
 				Expect(err).To(MatchError("generating SPN access token with username and password: cannot generate SPN token with username and password"))
 			})
@@ -117,7 +117,7 @@ var _ = Describe("Auth", Ordered, func() {
 					TenantID:     testTenantID,
 				}
 
-				token, err := bootstrapClient.getAuthToken("", testResource, azureConfig)
+				token, err := bootstrapClient.getAccessToken("", testResource, azureConfig)
 				Expect(token).To(BeEmpty())
 				Expect(err).To(MatchError(ContainSubstring("b64-decoding certificate data in client secret")))
 			})
@@ -132,7 +132,7 @@ var _ = Describe("Auth", Ordered, func() {
 					TenantID:     testTenantID,
 				}
 
-				token, err := bootstrapClient.getAuthToken("", testResource, azureConfig)
+				token, err := bootstrapClient.getAccessToken("", testResource, azureConfig)
 				Expect(token).To(BeEmpty())
 				Expect(err).To(MatchError(ContainSubstring("decoding pfx certificate data in client secret")))
 			})
@@ -162,7 +162,7 @@ var _ = Describe("Auth", Ordered, func() {
 					return nil, fmt.Errorf("cannot generate SPN token with cert data")
 				}
 
-				token, err := bootstrapClient.getAuthToken("", testResource, azureConfig)
+				token, err := bootstrapClient.getAccessToken("", testResource, azureConfig)
 				Expect(token).To(BeEmpty())
 				Expect(err).To(MatchError("generating SPN access token with certificate: cannot generate SPN token with cert data"))
 			})
@@ -189,7 +189,7 @@ var _ = Describe("Auth", Ordered, func() {
 					return nil, nil
 				}
 
-				token, err := bootstrapClient.getAuthToken("", testResource, azureConfig)
+				token, err := bootstrapClient.getAccessToken("", testResource, azureConfig)
 				Expect(err).To(BeNil())
 				Expect(token).To(Equal("token"))
 			})
@@ -217,7 +217,7 @@ var _ = Describe("Auth", Ordered, func() {
 					return nil, nil
 				}
 
-				token, err := bootstrapClient.getAuthToken(customClientID, testResource, azureConfig)
+				token, err := bootstrapClient.getAccessToken(customClientID, testResource, azureConfig)
 				Expect(err).To(BeNil())
 				Expect(token).To(Equal("token"))
 			})
@@ -247,7 +247,7 @@ var _ = Describe("Auth", Ordered, func() {
 					return nil, nil
 				}
 
-				token, err := bootstrapClient.getAuthToken("", testResource, azureConfig)
+				token, err := bootstrapClient.getAccessToken("", testResource, azureConfig)
 				Expect(err).To(BeNil())
 				Expect(token).To(Equal("token"))
 			})
@@ -285,7 +285,7 @@ var _ = Describe("Auth", Ordered, func() {
 					return &adal.ServicePrincipalToken{}, nil
 				}
 
-				token, err := bootstrapClient.getAuthToken("", testResource, azureConfig)
+				token, err := bootstrapClient.getAccessToken("", testResource, azureConfig)
 				Expect(err).To(BeNil())
 				Expect(token).To(Equal("token"))
 			})

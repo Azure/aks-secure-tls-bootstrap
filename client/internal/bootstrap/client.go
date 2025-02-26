@@ -48,7 +48,7 @@ func (c *Client) GetKubeletClientCredential(ctx context.Context, cfg *Config) (*
 	}
 	c.logger.Info("failed to validate existing kubeconfig, will bootstrap a new client credential", zap.String("kubeconfig", cfg.KubeconfigPath), zap.Error(err))
 
-	token, err := c.getAuthToken(cfg.CustomClientID, cfg.AADResource, &cfg.AzureConfig)
+	token, err := c.getAccessToken(cfg.CustomClientID, cfg.AADResource, &cfg.AzureConfig)
 	if err != nil {
 		c.logger.Error("failed to generate access token for gRPC connection", zap.Error(err))
 		return nil, fmt.Errorf("failed to generate access token for gRPC connection: %w", err)

@@ -36,9 +36,9 @@ func extractAccessToken(servicePrincipalToken *adal.ServicePrincipalToken) strin
 	return servicePrincipalToken.OAuthToken()
 }
 
-// getAuthToken retrieves an AAD access token (JWT) using the specified custom client ID, resource, and azure config.
+// getAccessToken retrieves an AAD access token (JWT) using the specified custom client ID, resource, and azure config.
 // MSI access tokens are retrieved from IMDS, while service principal tokens are retrieved directly from AAD.
-func (c *Client) getAuthToken(customClientID, resource string, azureConfig *datamodel.AzureConfig) (string, error) {
+func (c *Client) getAccessToken(customClientID, resource string, azureConfig *datamodel.AzureConfig) (string, error) {
 	userAssignedID := azureConfig.UserAssignedIdentityID
 	if customClientID != "" {
 		userAssignedID = customClientID
