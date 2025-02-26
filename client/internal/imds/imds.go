@@ -18,7 +18,6 @@ import (
 )
 
 type Client interface {
-	GetMSIToken(ctx context.Context, clientID, aadResource string) (string, error)
 	GetInstanceData(ctx context.Context) (*datamodel.VMSSInstanceData, error)
 	GetAttestedData(ctx context.Context, nonce string) (*datamodel.VMSSAttestedData, error)
 }
@@ -37,27 +36,6 @@ func NewClient(logger *zap.Logger) Client {
 		httpClient: internalhttp.NewClient(logger),
 		logger:     logger,
 	}
-}
-
-func (c *client) GetMSIToken(ctx context.Context, clientID, aadResource string) (string, error) {
-	url := fmt.Sprintf("%s/%s", c.baseURL, tokenEndpoint)
-	c.logger.Info("calling IMDS MSI token endpoint", zap.String("url", url))
-
-	params := getCommonParameters()
-	params[resourceParameterKey] = aadResource
-	if clientID != "" {
-		params[clientIDParameterKey] = clientID
-	}
-
-	var response datamodel.AADTokenResponse
-	if err := c.callIMDS(ctx, url, params, &response); err != nil {
-		return "", fmt.Errorf("failed to retrieve MSI token: %w", err)
-	}
-	if response.Error != "" {
-		return "", fmt.Errorf("failed to retrieve MSI token: %s: %s", response.Error, response.ErrorDescription)
-	}
-
-	return response.AccessToken, nil
 }
 
 func (c *client) GetInstanceData(ctx context.Context) (*datamodel.VMSSInstanceData, error) {

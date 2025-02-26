@@ -27,7 +27,6 @@ var _ = Describe("Client Tests", Ordered, func() {
 	var (
 		logger     *zap.Logger
 		imdsClient *client
-		resource   = "resource"
 	)
 
 	BeforeAll(func() {
@@ -90,95 +89,6 @@ var _ = Describe("Client Tests", Ordered, func() {
 
 				err := imdsClient.callIMDS(ctx, imds.URL, params, &datamodel.VMSSInstanceData{})
 				Expect(err).To(BeNil())
-			})
-		})
-	})
-
-	Context("GetMSIToken tests", func() {
-		When("clientId is not included", func() {
-			It("should call the correct IMDS endpoint with the correct query parameters", func() {
-				imds := mockIMDSWithAssertions(mockMSITokenResponseJSON, func(r *http.Request) {
-					Expect(r.URL.Path).To(Equal("/metadata/identity/oauth2/token"))
-					queryParameters := r.URL.Query()
-					Expect(queryParameters.Get("api-version")).To(Equal(apiVersion))
-					Expect(queryParameters.Get("resource")).To(Equal("resource"))
-					Expect(queryParameters.Has("client_id")).To(BeFalse())
-				})
-				defer imds.Close()
-				imdsClient.baseURL = imds.URL
-
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
-
-				token, err := imdsClient.GetMSIToken(ctx, "", resource)
-				Expect(err).To(BeNil())
-				Expect(token).To(Equal("accesstoken"))
-			})
-		})
-
-		When("clientId is included", func() {
-			It("should call the correct IMDS endpoint with the correct query parameters", func() {
-				imds := mockIMDSWithAssertions(mockMSITokenResponseJSON, func(r *http.Request) {
-					Expect(r.URL.Path).To(Equal("/metadata/identity/oauth2/token"))
-					queryParameters := r.URL.Query()
-					Expect(queryParameters.Get("api-version")).To(Equal(apiVersion))
-					Expect(queryParameters.Get("resource")).To(Equal("resource"))
-					Expect(queryParameters.Get("client_id")).To(Equal("clientId"))
-				})
-				defer imds.Close()
-				imdsClient.baseURL = imds.URL
-
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
-
-				clientID := "clientId"
-				token, err := imdsClient.GetMSIToken(ctx, clientID, resource)
-				Expect(err).To(BeNil())
-				Expect(token).To(Equal("accesstoken"))
-			})
-		})
-
-		When("the token response contains an error", func() {
-			It("should return an error with the relevant info", func() {
-				imds := mockIMDSWithAssertions(mockMSITokenResponseJSONWithError, func(r *http.Request) {
-					Expect(r.URL.Path).To(Equal("/metadata/identity/oauth2/token"))
-					queryParameters := r.URL.Query()
-					Expect(queryParameters.Get("api-version")).To(Equal(apiVersion))
-					Expect(queryParameters.Get("resource")).To(Equal("resource"))
-					Expect(queryParameters.Has("client_id")).To(BeFalse())
-				})
-				defer imds.Close()
-				imdsClient.baseURL = imds.URL
-
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
-
-				token, err := imdsClient.GetMSIToken(ctx, "", resource)
-				Expect(token).To(BeEmpty())
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("failed to retrieve MSI token: tokenError: error generating new JWT"))
-			})
-		})
-
-		When("unable to parse token response from IMDS", func() {
-			It("should return an error", func() {
-				imds := mockIMDSWithAssertions(malformedJSON, func(r *http.Request) {
-					Expect(r.URL.Path).To(Equal("/metadata/identity/oauth2/token"))
-					queryParameters := r.URL.Query()
-					Expect(queryParameters.Get("api-version")).To(Equal(apiVersion))
-					Expect(queryParameters.Get("resource")).To(Equal("resource"))
-					Expect(queryParameters.Has("client_id")).To(BeFalse())
-				})
-				defer imds.Close()
-				imdsClient.baseURL = imds.URL
-
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
-
-				token, err := imdsClient.GetMSIToken(ctx, "", resource)
-				Expect(token).To(BeEmpty())
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("failed to unmarshal IMDS data"))
 			})
 		})
 	})

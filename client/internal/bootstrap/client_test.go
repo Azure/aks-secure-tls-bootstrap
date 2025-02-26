@@ -82,6 +82,10 @@ var _ = Describe("Client tests", Ordered, func() {
 			Expect(c.getServiceClientFunc).ToNot(BeNil())
 			Expect(c.imdsClient).ToNot(BeNil())
 			Expect(c.kubeconfigValidator).ToNot(BeNil())
+			Expect(c.getMSITokenFunc).ToNot(BeNil())
+			Expect(c.getServicePrincipalTokenFunc).ToNot(BeNil())
+			Expect(c.getServicePrincipalTokenWithCertFunc).ToNot(BeNil())
+			Expect(c.extractAccessTokenFunc).ToNot(BeNil())
 		})
 	})
 
@@ -123,7 +127,6 @@ var _ = Describe("Client tests", Ordered, func() {
 				serviceClient.EXPECT().GetNonce(gomock.Any(), gomock.Any()).Times(0)
 				imdsClient.EXPECT().GetAttestedData(gomock.Any(), gomock.Any()).Times(0)
 				imdsClient.EXPECT().GetInstanceData(gomock.Any()).Times(0)
-				imdsClient.EXPECT().GetMSIToken(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
 				kubeconfigData, err := bootstrapClient.GetKubeletClientCredential(ctx, bootstrapConfig)
 				Expect(err).To(BeNil())
