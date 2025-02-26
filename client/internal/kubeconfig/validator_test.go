@@ -42,14 +42,14 @@ var _ = Describe("Validator", Ordered, func() {
 	Context("Validate", func() {
 		var v *validator
 
-		validCertPEM, validKeyPEM, err := testutil.GenerateCertPEMWithExpiration(testutil.CertTemplate{
+		validCertPEM, validKeyPEM, err := testutil.GenerateCertPEM(testutil.CertTemplate{
 			CommonName:   "cn",
 			Organization: "org",
 			Expiration:   time.Now().Add(time.Hour),
 		})
 		Expect(err).To(BeNil())
 
-		expiredCertPEM, expiredKeyPEM, err := testutil.GenerateCertPEMWithExpiration(testutil.CertTemplate{
+		expiredCertPEM, expiredKeyPEM, err := testutil.GenerateCertPEM(testutil.CertTemplate{
 			CommonName:   "cn",
 			Organization: "org",
 			Expiration:   time.Now().Add(-1 * time.Hour),

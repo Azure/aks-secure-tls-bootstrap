@@ -8,29 +8,35 @@ import (
 	"encoding/base64"
 	"fmt"
 
-	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/aad"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/imds"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/kubeconfig"
 	akssecuretlsbootstrapv1 "github.com/Azure/aks-secure-tls-bootstrap/service/pkg/gen/akssecuretlsbootstrap/v1"
+	"github.com/Azure/go-autorest/autorest/adal"
 	"go.uber.org/zap"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
 type Client struct {
-	logger              *zap.Logger
-	getServiceClient    serviceClientFactoryFunc
-	imdsClient          imds.Client
-	aadClient           aad.Client
-	kubeconfigValidator kubeconfig.Validator
+	logger                               *zap.Logger
+	imdsClient                           imds.Client
+	kubeconfigValidator                  kubeconfig.Validator
+	getServiceClientFunc                 getServiceClientFunc
+	getMSITokenFunc                      getMSITokenFunc
+	getServicePrincipalTokenFunc         getServicePrincipalTokenFunc
+	getServicePrincipalTokenWithCertFunc getServicePrincipalTokenWithCertFunc
+	extractAccessTokenFunc               extractAccessTokenFunc
 }
 
 func NewClient(logger *zap.Logger) (*Client, error) {
 	return &Client{
-		logger:              logger,
-		getServiceClient:    serviceClientFactory,
-		imdsClient:          imds.NewClient(logger),
-		aadClient:           aad.NewClient(logger),
-		kubeconfigValidator: kubeconfig.NewValidator(logger),
+		logger:                               logger,
+		imdsClient:                           imds.NewClient(logger),
+		kubeconfigValidator:                  kubeconfig.NewValidator(logger),
+		getServiceClientFunc:                 getServiceClient,
+		getMSITokenFunc:                      adal.NewServicePrincipalTokenFromManagedIdentity,
+		getServicePrincipalTokenFunc:         adal.NewServicePrincipalToken,
+		getServicePrincipalTokenWithCertFunc: adal.NewServicePrincipalTokenFromCertificate,
+		extractAccessTokenFunc:               extractAccessToken,
 	}, nil
 }
 
@@ -42,24 +48,24 @@ func (c *Client) GetKubeletClientCredential(ctx context.Context, cfg *Config) (*
 	}
 	c.logger.Info("failed to validate existing kubeconfig, will bootstrap a new client credential", zap.String("kubeconfig", cfg.KubeconfigPath), zap.Error(err))
 
-	token, err := c.getAuthToken(ctx, cfg.CustomClientID, cfg.AADResource, &cfg.AzureConfig)
+	token, err := c.getAuthToken(cfg.CustomClientID, cfg.AADResource, &cfg.AzureConfig)
 	if err != nil {
-		c.logger.Error("failed to generate JWT for GRPC connection", zap.Error(err))
-		return nil, fmt.Errorf("failed to generate JWT for GRPC connection: %w", err)
+		c.logger.Error("failed to generate access token for gRPC connection", zap.Error(err))
+		return nil, fmt.Errorf("failed to generate access token for gRPC connection: %w", err)
 	}
-	c.logger.Info("generated JWT for auth")
+	c.logger.Info("generated access token for gRPC connection")
 
-	serviceClient, close, err := c.getServiceClient(c.logger, token, cfg)
+	serviceClient, close, err := c.getServiceClientFunc(c.logger, token, cfg)
 	if err != nil {
 		c.logger.Error("failed to setup bootstrap service connection", zap.Error(err))
 		return nil, fmt.Errorf("failed to setup bootstrap service connection: %w", err)
 	}
 	defer func() {
 		if err := close(); err != nil {
-			c.logger.Error("failed to close GRPC client connection", zap.Error(err))
+			c.logger.Error("failed to close gRPC client connection", zap.Error(err))
 		}
 	}()
-	c.logger.Info("created GRPC connection and bootstrap service client")
+	c.logger.Info("created gRPC connection and bootstrap service client")
 
 	instanceData, err := c.imdsClient.GetInstanceData(ctx)
 	if err != nil {

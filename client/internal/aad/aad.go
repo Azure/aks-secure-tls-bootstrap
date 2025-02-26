@@ -7,14 +7,20 @@ package aad
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/datamodel"
 	internalhttp "github.com/Azure/aks-secure-tls-bootstrap/client/internal/http"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/confidential"
 	"go.uber.org/zap"
+)
+
+const (
+	certificateSecretPrefix = "certificate:"
 )
 
 // tokenAcquirer provides an interface for acquiring AAD tokens via a credential. Fake implementations provided in unit tests.
@@ -55,14 +61,14 @@ func (c *client) GetToken(ctx context.Context, azureConfig *datamodel.AzureConfi
 		fmt.Sprintf("%s/.default", resource),
 	}
 
-	credential, err := confidential.NewCredFromSecret(azureConfig.ClientSecret)
-	if err != nil {
-		return "", fmt.Errorf("creating credential from client secret: %w", err)
-	}
-
 	env, err := azure.EnvironmentFromName(azureConfig.Cloud)
 	if err != nil {
 		return "", fmt.Errorf("getting azure environment from cloud name %q: %w", azureConfig.Cloud, err)
+	}
+
+	credential, err := c.getCredential(azureConfig.ClientSecret)
+	if err != nil {
+		return "", fmt.Errorf("creating credential from client secret: %w", err)
 	}
 
 	acquirer, err := c.getTokenAcquirer(
@@ -86,4 +92,21 @@ func (c *client) GetToken(ctx context.Context, azureConfig *datamodel.AzureConfi
 	)
 
 	return result.AccessToken, nil
+}
+
+func (c *client) getCredential(secret string) (confidential.Credential, error) {
+	if !strings.HasPrefix(secret, certificateSecretPrefix) {
+		// password-based credential
+		return confidential.NewCredFromSecret(secret)
+	}
+	pemData, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(secret, certificateSecretPrefix))
+	if err != nil {
+		return confidential.Credential{}, fmt.Errorf("decoding SP certificate PEM: %w", err)
+	}
+	certs, key, err := confidential.CertFromPEM(pemData, "")
+	if err != nil {
+		return confidential.Credential{}, fmt.Errorf("extracting SP certificate(s) from PEM: %w", err)
+	}
+	// cert-based credential
+	return confidential.NewCredFromCert(certs, key)
 }

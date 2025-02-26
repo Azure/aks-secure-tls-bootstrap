@@ -12,13 +12,13 @@ import (
 	"path/filepath"
 	"time"
 
-	aadmocks "github.com/Azure/aks-secure-tls-bootstrap/client/internal/aad/mocks"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/datamodel"
 	imdsmocks "github.com/Azure/aks-secure-tls-bootstrap/client/internal/imds/mocks"
 	kubeconfigmocks "github.com/Azure/aks-secure-tls-bootstrap/client/internal/kubeconfig/mocks"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/testutil"
 	akssecuretlsbootstrapv1 "github.com/Azure/aks-secure-tls-bootstrap/service/pkg/gen/akssecuretlsbootstrap/v1"
 	akssecuretlsbootstrapv1_mocks "github.com/Azure/aks-secure-tls-bootstrap/service/pkg/gen/mocks/akssecuretlsbootstrap/v1"
+	"github.com/Azure/go-autorest/autorest/adal"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"go.uber.org/mock/gomock"
@@ -34,7 +34,6 @@ var _ = Describe("Client tests", Ordered, func() {
 		ctx                 context.Context
 		mockCtrl            *gomock.Controller
 		imdsClient          *imdsmocks.MockClient
-		aadClient           *aadmocks.MockClient
 		kubeconfigValidator *kubeconfigmocks.MockValidator
 		serviceClient       *akssecuretlsbootstrapv1_mocks.MockSecureTLSBootstrapServiceClient
 		bootstrapClient     *Client
@@ -45,7 +44,7 @@ var _ = Describe("Client tests", Ordered, func() {
 	BeforeAll(func() {
 		logger, _ = zap.NewDevelopment()
 
-		clusterCACertPEM, _, err := testutil.GenerateCertPEMWithExpiration(
+		clusterCACertPEM, _, err := testutil.GenerateCertPEM(
 			testutil.CertTemplate{
 				CommonName:   "hcp",
 				Organization: "aks",
@@ -68,9 +67,8 @@ var _ = Describe("Client tests", Ordered, func() {
 			APIServerFQDN:     apiServerFQDN,
 			KubeconfigPath:    kubeconfigPath,
 			AzureConfig: datamodel.AzureConfig{
-				ClientID:     "clientId",
-				ClientSecret: "clientSecret",
-				TenantID:     "tenantId",
+				UserAssignedIdentityID: "kubelet-identity-id",
+				TenantID:               "tenantId",
 			},
 		}
 	})
@@ -81,8 +79,7 @@ var _ = Describe("Client tests", Ordered, func() {
 			Expect(err).To(BeNil())
 			Expect(c).ToNot(BeNil())
 			Expect(c.logger).ToNot(BeNil())
-			Expect(c.getServiceClient).ToNot(BeNil())
-			Expect(c.aadClient).ToNot(BeNil())
+			Expect(c.getServiceClientFunc).ToNot(BeNil())
 			Expect(c.imdsClient).ToNot(BeNil())
 			Expect(c.kubeconfigValidator).ToNot(BeNil())
 		})
@@ -93,17 +90,22 @@ var _ = Describe("Client tests", Ordered, func() {
 			ctx = context.Background()
 			mockCtrl = gomock.NewController(GinkgoT())
 			imdsClient = imdsmocks.NewMockClient(mockCtrl)
-			aadClient = aadmocks.NewMockClient(mockCtrl)
 			kubeconfigValidator = kubeconfigmocks.NewMockValidator(mockCtrl)
 			serviceClient = akssecuretlsbootstrapv1_mocks.NewMockSecureTLSBootstrapServiceClient(mockCtrl)
 
 			bootstrapClient = &Client{
 				logger:              logger,
 				imdsClient:          imdsClient,
-				aadClient:           aadClient,
 				kubeconfigValidator: kubeconfigValidator,
-				getServiceClient: func(_ *zap.Logger, _ string, _ *Config) (akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient, func() error, error) {
+				getServiceClientFunc: func(_ *zap.Logger, _ string, _ *Config) (akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient, func() error, error) {
 					return serviceClient, func() error { return nil }, nil
+				},
+				getMSITokenFunc: func(resource string, options *adal.ManagedIdentityOptions, callbacks ...adal.TokenRefreshCallback) (*adal.ServicePrincipalToken, error) {
+					return &adal.ServicePrincipalToken{}, nil
+				},
+				extractAccessTokenFunc: func(servicePrincipalToken *adal.ServicePrincipalToken) string {
+					Expect(servicePrincipalToken).ToNot(BeNil())
+					return "token"
 				},
 			}
 		})
@@ -122,7 +124,6 @@ var _ = Describe("Client tests", Ordered, func() {
 				imdsClient.EXPECT().GetAttestedData(gomock.Any(), gomock.Any()).Times(0)
 				imdsClient.EXPECT().GetInstanceData(gomock.Any()).Times(0)
 				imdsClient.EXPECT().GetMSIToken(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
-				aadClient.EXPECT().GetToken(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
 				kubeconfigData, err := bootstrapClient.GetKubeletClientCredential(ctx, bootstrapConfig)
 				Expect(err).To(BeNil())
@@ -135,14 +136,14 @@ var _ = Describe("Client tests", Ordered, func() {
 				kubeconfigValidator.EXPECT().Validate(kubeconfigPath, false).
 					Return(fmt.Errorf("invalid kubeconfig")).
 					Times(1)
-				aadClient.EXPECT().GetToken(ctx, gomock.Any(), bootstrapConfig.AADResource).
-					Return("", fmt.Errorf("cannot retrieve AAD token")).
-					Times(1)
+				bootstrapClient.getMSITokenFunc = func(resource string, options *adal.ManagedIdentityOptions, callbacks ...adal.TokenRefreshCallback) (*adal.ServicePrincipalToken, error) {
+					return nil, fmt.Errorf("cannot retrieve AAD token")
+				}
 
 				kubeconfigData, err := bootstrapClient.GetKubeletClientCredential(ctx, bootstrapConfig)
 				Expect(kubeconfigData).To(BeNil())
 				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("unable to get SPN"))
+				Expect(err.Error()).To(ContainSubstring("failed to generate access token for gRPC connection"))
 				Expect(err.Error()).To(ContainSubstring("cannot retrieve AAD token"))
 			})
 		})
@@ -151,9 +152,6 @@ var _ = Describe("Client tests", Ordered, func() {
 			It("should return an error", func() {
 				kubeconfigValidator.EXPECT().Validate(kubeconfigPath, false).
 					Return(fmt.Errorf("invalid kubeconfig")).
-					Times(1)
-				aadClient.EXPECT().GetToken(ctx, gomock.Any(), bootstrapConfig.AADResource).
-					Return("spToken", nil).
 					Times(1)
 				imdsClient.EXPECT().GetInstanceData(ctx).
 					Return(nil, errors.New("cannot get VM instance data from IMDS")).
@@ -171,9 +169,6 @@ var _ = Describe("Client tests", Ordered, func() {
 			It("should return an error", func() {
 				kubeconfigValidator.EXPECT().Validate(kubeconfigPath, false).
 					Return(fmt.Errorf("invalid kubeconfig")).
-					Times(1)
-				aadClient.EXPECT().GetToken(ctx, gomock.Any(), bootstrapConfig.AADResource).
-					Return("spToken", nil).
 					Times(1)
 				imdsClient.EXPECT().GetInstanceData(ctx).
 					Return(&datamodel.VMSSInstanceData{}, nil).
@@ -194,9 +189,6 @@ var _ = Describe("Client tests", Ordered, func() {
 			It("should return an error", func() {
 				kubeconfigValidator.EXPECT().Validate(kubeconfigPath, false).
 					Return(fmt.Errorf("invalid kubeconfig")).
-					Times(1)
-				aadClient.EXPECT().GetToken(ctx, gomock.Any(), bootstrapConfig.AADResource).
-					Return("spToken", nil).
 					Times(1)
 				imdsClient.EXPECT().GetInstanceData(ctx).
 					Return(&datamodel.VMSSInstanceData{}, nil).
@@ -222,9 +214,6 @@ var _ = Describe("Client tests", Ordered, func() {
 			It("should return an error", func() {
 				kubeconfigValidator.EXPECT().Validate(kubeconfigPath, false).
 					Return(fmt.Errorf("invalid kubeconfig")).
-					Times(1)
-				aadClient.EXPECT().GetToken(ctx, gomock.Any(), bootstrapConfig.AADResource).
-					Return("spToken", nil).
 					Times(1)
 				imdsClient.EXPECT().GetInstanceData(ctx).
 					Return(&datamodel.VMSSInstanceData{}, nil).
@@ -255,9 +244,6 @@ var _ = Describe("Client tests", Ordered, func() {
 			It("should return an error", func() {
 				kubeconfigValidator.EXPECT().Validate(kubeconfigPath, false).
 					Return(fmt.Errorf("invalid kubeconfig")).
-					Times(1)
-				aadClient.EXPECT().GetToken(ctx, gomock.Any(), bootstrapConfig.AADResource).
-					Return("spToken", nil).
 					Times(1)
 				imdsClient.EXPECT().GetInstanceData(ctx).
 					Return(&datamodel.VMSSInstanceData{}, nil).
@@ -290,9 +276,6 @@ var _ = Describe("Client tests", Ordered, func() {
 				kubeconfigValidator.EXPECT().Validate(kubeconfigPath, false).
 					Return(fmt.Errorf("invalid kubeconfig")).
 					Times(1)
-				aadClient.EXPECT().GetToken(ctx, gomock.Any(), bootstrapConfig.AADResource).
-					Return("spToken", nil).
-					Times(1)
 				imdsClient.EXPECT().GetInstanceData(ctx).
 					Return(&datamodel.VMSSInstanceData{}, nil).
 					Times(1)
@@ -321,7 +304,7 @@ var _ = Describe("Client tests", Ordered, func() {
 
 		When("bootstrap server can generate a credential", func() {
 			It("should return a new kubeconfig object referencing the new credential", func() {
-				clientCertPEM, _, err := testutil.GenerateCertPEMWithExpiration(testutil.CertTemplate{
+				clientCertPEM, _, err := testutil.GenerateCertPEM(testutil.CertTemplate{
 					CommonName:   "system:node:node",
 					Organization: "system:nodes",
 					Expiration:   time.Now().Add(time.Hour),
@@ -330,9 +313,6 @@ var _ = Describe("Client tests", Ordered, func() {
 
 				kubeconfigValidator.EXPECT().Validate(kubeconfigPath, false).
 					Return(fmt.Errorf("invalid kubeconfig")).
-					Times(1)
-				aadClient.EXPECT().GetToken(ctx, gomock.Any(), bootstrapConfig.AADResource).
-					Return("spToken", nil).
 					Times(1)
 				imdsClient.EXPECT().GetInstanceData(ctx).
 					Return(&datamodel.VMSSInstanceData{

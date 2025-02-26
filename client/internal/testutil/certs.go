@@ -9,11 +9,15 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	cryptorand "crypto/rand"
+	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/base64"
 	"encoding/pem"
 	"math/big"
 	"time"
+
+	"software.sslmate.com/src/go-pkcs12"
 )
 
 type CertTemplate struct {
@@ -34,7 +38,37 @@ func (t CertTemplate) getX509Template() x509.Certificate {
 	}
 }
 
-func GenerateCertPEMWithExpiration(template CertTemplate) (certPEM []byte, keyPEM []byte, err error) {
+func GenerateCertAndKeyAsEncodedPFXData(template CertTemplate) (string, error) {
+	x509Template := template.getX509Template()
+	x509Template.SerialNumber = big.NewInt(1)
+	x509Template.NotBefore = time.Now()
+	x509Template.KeyUsage = x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature
+	x509Template.BasicConstraintsValid = true
+
+	privateKey, err := rsa.GenerateKey(cryptorand.Reader, 1024)
+	if err != nil {
+		return "", err
+	}
+
+	certBytes, err := x509.CreateCertificate(cryptorand.Reader, &x509Template, &x509Template, &privateKey.PublicKey, privateKey)
+	if err != nil {
+		return "", err
+	}
+
+	cert, err := x509.ParseCertificate(certBytes)
+	if err != nil {
+		return "", err
+	}
+
+	pfxBytes, err := pkcs12.Legacy.Encode(privateKey, cert, []*x509.Certificate{}, "")
+	if err != nil {
+		return "", err
+	}
+
+	return base64.StdEncoding.EncodeToString(pfxBytes), nil
+}
+
+func GenerateCertPEM(template CertTemplate) (certPEM []byte, keyPEM []byte, err error) {
 	x509Template := template.getX509Template()
 	x509Template.SerialNumber = big.NewInt(1)
 	x509Template.NotBefore = time.Now()
