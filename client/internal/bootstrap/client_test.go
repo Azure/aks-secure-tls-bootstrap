@@ -107,9 +107,9 @@ var _ = Describe("Client tests", Ordered, func() {
 				getMSITokenFunc: func(resource string, options *adal.ManagedIdentityOptions, callbacks ...adal.TokenRefreshCallback) (*adal.ServicePrincipalToken, error) {
 					return &adal.ServicePrincipalToken{}, nil
 				},
-				extractAccessTokenFunc: func(servicePrincipalToken *adal.ServicePrincipalToken) string {
-					Expect(servicePrincipalToken).ToNot(BeNil())
-					return "token"
+				extractAccessTokenFunc: func(token *adal.ServicePrincipalToken) (string, error) {
+					Expect(token).ToNot(BeNil())
+					return "token", nil
 				},
 			}
 		})

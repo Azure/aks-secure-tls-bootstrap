@@ -41,9 +41,9 @@ var _ = Describe("Auth", Ordered, func() {
 			getServicePrincipalTokenWithCertFunc: func(oauthConfig adal.OAuthConfig, clientID string, certificate *x509.Certificate, privateKey *rsa.PrivateKey, resource string, callbacks ...adal.TokenRefreshCallback) (*adal.ServicePrincipalToken, error) {
 				return nil, nil
 			},
-			extractAccessTokenFunc: func(servicePrincipalToken *adal.ServicePrincipalToken) string {
-				Expect(servicePrincipalToken).ToNot(BeNil())
-				return "token"
+			extractAccessTokenFunc: func(token *adal.ServicePrincipalToken) (string, error) {
+				Expect(token).ToNot(BeNil())
+				return "token", nil
 			},
 		}
 	})

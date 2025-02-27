@@ -29,11 +29,14 @@ type getServicePrincipalTokenFunc func(oauthConfig adal.OAuthConfig, clientID st
 // getServicePrincipalTokenWithCertFunc returns a service principal access token using a certificate with the specified options, fake implementations given in unit tests.
 type getServicePrincipalTokenWithCertFunc func(oauthConfig adal.OAuthConfig, clientID string, certificate *x509.Certificate, privateKey *rsa.PrivateKey, resource string, callbacks ...adal.TokenRefreshCallback) (*adal.ServicePrincipalToken, error)
 
-// extractAccessTokenFunc extracts an oauth access token from the specified service principal token, fake implementations given in unit tests.
-type extractAccessTokenFunc func(servicePrincipalToken *adal.ServicePrincipalToken) string
+// extractAccessTokenFunc extracts an oauth access token from the specified service principal token after a refresh, fake implementations given in unit tests.
+type extractAccessTokenFunc func(token *adal.ServicePrincipalToken) (string, error)
 
-func extractAccessToken(servicePrincipalToken *adal.ServicePrincipalToken) string {
-	return servicePrincipalToken.OAuthToken()
+func extractAccessToken(token *adal.ServicePrincipalToken) (string, error) {
+	if err := token.Refresh(); err != nil {
+		return "", fmt.Errorf("obtaining fresh access token: %w", err)
+	}
+	return token.OAuthToken(), nil
 }
 
 // getAccessToken retrieves an AAD access token (JWT) using the specified custom client ID, resource, and azure config.
@@ -52,7 +55,7 @@ func (c *Client) getAccessToken(customClientID, resource string, azureConfig *da
 		if err != nil {
 			return "", fmt.Errorf("generating MSI access token: %w", err)
 		}
-		return c.extractAccessTokenFunc(token), nil
+		return c.extractAccessTokenFunc(token)
 	}
 
 	env, err := azure.EnvironmentFromName(azureConfig.Cloud)
@@ -70,7 +73,7 @@ func (c *Client) getAccessToken(customClientID, resource string, azureConfig *da
 		if err != nil {
 			return "", fmt.Errorf("generating SPN access token with username and password: %w", err)
 		}
-		return c.extractAccessTokenFunc(token), nil
+		return c.extractAccessTokenFunc(token)
 	}
 
 	c.logger.Info("client secret contains certificate data, using certificate to generate SPN access token", zap.String("clientId", azureConfig.ClientID))
@@ -89,5 +92,6 @@ func (c *Client) getAccessToken(customClientID, resource string, azureConfig *da
 	if err != nil {
 		return "", fmt.Errorf("generating SPN access token with certificate: %w", err)
 	}
-	return c.extractAccessTokenFunc(token), nil
+
+	return c.extractAccessTokenFunc(token)
 }
