@@ -11,32 +11,25 @@ import (
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/imds"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/kubeconfig"
 	akssecuretlsbootstrapv1 "github.com/Azure/aks-secure-tls-bootstrap/service/pkg/gen/akssecuretlsbootstrap/v1"
-	"github.com/Azure/go-autorest/autorest/adal"
 	"go.uber.org/zap"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
 type Client struct {
-	logger                               *zap.Logger
-	imdsClient                           imds.Client
-	kubeconfigValidator                  kubeconfig.Validator
-	getServiceClientFunc                 getServiceClientFunc
-	getMSITokenFunc                      getMSITokenFunc
-	getServicePrincipalTokenFunc         getServicePrincipalTokenFunc
-	getServicePrincipalTokenWithCertFunc getServicePrincipalTokenWithCertFunc
-	extractAccessTokenFunc               extractAccessTokenFunc
+	logger                 *zap.Logger
+	imdsClient             imds.Client
+	kubeconfigValidator    kubeconfig.Validator
+	getServiceClientFunc   getServiceClientFunc
+	extractAccessTokenFunc extractAccessTokenFunc
 }
 
 func NewClient(logger *zap.Logger) (*Client, error) {
 	return &Client{
-		logger:                               logger,
-		imdsClient:                           imds.NewClient(logger),
-		kubeconfigValidator:                  kubeconfig.NewValidator(logger),
-		getServiceClientFunc:                 getServiceClient,
-		getMSITokenFunc:                      adal.NewServicePrincipalTokenFromManagedIdentity,
-		getServicePrincipalTokenFunc:         adal.NewServicePrincipalToken,
-		getServicePrincipalTokenWithCertFunc: adal.NewServicePrincipalTokenFromCertificate,
-		extractAccessTokenFunc:               extractAccessToken,
+		logger:                 logger,
+		imdsClient:             imds.NewClient(logger),
+		kubeconfigValidator:    kubeconfig.NewValidator(logger),
+		getServiceClientFunc:   getServiceClient,
+		extractAccessTokenFunc: extractAccessToken,
 	}, nil
 }
 

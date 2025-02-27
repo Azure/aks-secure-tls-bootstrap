@@ -19,6 +19,7 @@ import (
 	akssecuretlsbootstrapv1 "github.com/Azure/aks-secure-tls-bootstrap/service/pkg/gen/akssecuretlsbootstrap/v1"
 	akssecuretlsbootstrapv1_mocks "github.com/Azure/aks-secure-tls-bootstrap/service/pkg/gen/mocks/akssecuretlsbootstrap/v1"
 	"github.com/Azure/go-autorest/autorest/adal"
+	"github.com/Azure/go-autorest/autorest/azure"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"go.uber.org/mock/gomock"
@@ -39,6 +40,10 @@ var _ = Describe("Client tests", Ordered, func() {
 		bootstrapClient     *Client
 		bootstrapConfig     *Config
 		logger              *zap.Logger
+
+		clusterCAFilePath string
+		certFilePath      string
+		keyFilePath       string
 	)
 
 	BeforeAll(func() {
@@ -55,20 +60,28 @@ var _ = Describe("Client tests", Ordered, func() {
 		Expect(err).To(BeNil())
 
 		tempDir := GinkgoT().TempDir()
-		clusterCAFilePath := filepath.Join(tempDir, "ca.crt")
+		clusterCAFilePath = filepath.Join(tempDir, "ca.crt")
+		certFilePath = filepath.Join(tempDir, "client.crt")
+		keyFilePath = filepath.Join(tempDir, "client.key")
+
 		err = os.WriteFile(clusterCAFilePath, clusterCACertPEM, os.ModePerm)
 		Expect(err).To(BeNil())
+	})
 
+	BeforeEach(func() {
 		bootstrapConfig = &Config{
 			NextProto:         "bootstrap",
+			AADResource:       "resource",
 			ClusterCAFilePath: clusterCAFilePath,
-			CertFilePath:      filepath.Join(tempDir, "client.crt"),
-			KeyFilePath:       filepath.Join(tempDir, "client.key"),
+			CertFilePath:      certFilePath,
+			KeyFilePath:       keyFilePath,
 			APIServerFQDN:     apiServerFQDN,
 			KubeconfigPath:    kubeconfigPath,
 			AzureConfig: datamodel.AzureConfig{
-				UserAssignedIdentityID: "kubelet-identity-id",
-				TenantID:               "tenantId",
+				Cloud:        azure.PublicCloud.Name,
+				ClientID:     "service-principal-id",
+				ClientSecret: "service-principal-secret",
+				TenantID:     "tenantId",
 			},
 		}
 	})
@@ -82,9 +95,6 @@ var _ = Describe("Client tests", Ordered, func() {
 			Expect(c.getServiceClientFunc).ToNot(BeNil())
 			Expect(c.imdsClient).ToNot(BeNil())
 			Expect(c.kubeconfigValidator).ToNot(BeNil())
-			Expect(c.getMSITokenFunc).ToNot(BeNil())
-			Expect(c.getServicePrincipalTokenFunc).ToNot(BeNil())
-			Expect(c.getServicePrincipalTokenWithCertFunc).ToNot(BeNil())
 			Expect(c.extractAccessTokenFunc).ToNot(BeNil())
 		})
 	})
@@ -103,9 +113,6 @@ var _ = Describe("Client tests", Ordered, func() {
 				kubeconfigValidator: kubeconfigValidator,
 				getServiceClientFunc: func(_ *zap.Logger, _ string, _ *Config) (akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient, func() error, error) {
 					return serviceClient, func() error { return nil }, nil
-				},
-				getMSITokenFunc: func(resource string, options *adal.ManagedIdentityOptions, callbacks ...adal.TokenRefreshCallback) (*adal.ServicePrincipalToken, error) {
-					return &adal.ServicePrincipalToken{}, nil
 				},
 				extractAccessTokenFunc: func(token *adal.ServicePrincipalToken) (string, error) {
 					Expect(token).ToNot(BeNil())
@@ -134,20 +141,18 @@ var _ = Describe("Client tests", Ordered, func() {
 			})
 		})
 
-		When("an auth token cannot be retrieved", func() {
+		When("an access token cannot be retrieved", func() {
 			It("return an error", func() {
+				bootstrapConfig.AzureConfig.ClientSecret = "" // force a failure to generate service principal access token
 				kubeconfigValidator.EXPECT().Validate(kubeconfigPath, false).
 					Return(fmt.Errorf("invalid kubeconfig")).
 					Times(1)
-				bootstrapClient.getMSITokenFunc = func(resource string, options *adal.ManagedIdentityOptions, callbacks ...adal.TokenRefreshCallback) (*adal.ServicePrincipalToken, error) {
-					return nil, fmt.Errorf("cannot retrieve AAD token")
-				}
 
 				kubeconfigData, err := bootstrapClient.GetKubeletClientCredential(ctx, bootstrapConfig)
 				Expect(kubeconfigData).To(BeNil())
 				Expect(err).ToNot(BeNil())
 				Expect(err.Error()).To(ContainSubstring("failed to generate access token for gRPC connection"))
-				Expect(err.Error()).To(ContainSubstring("cannot retrieve AAD token"))
+				Expect(err.Error()).To(ContainSubstring("generating SPN access token with username and password"))
 			})
 		})
 

@@ -4,8 +4,6 @@
 package bootstrap
 
 import (
-	"crypto/rsa"
-	"crypto/x509"
 	"encoding/base64"
 	"fmt"
 	"strings"
@@ -19,15 +17,6 @@ import (
 const (
 	certificateSecretPrefix = "certificate:"
 )
-
-// getMSITokenFunc returns an MSI access token with the specified options, fake implementations given in unit tests.
-type getMSITokenFunc func(resource string, options *adal.ManagedIdentityOptions, callbacks ...adal.TokenRefreshCallback) (*adal.ServicePrincipalToken, error)
-
-// getServicePrincipalTokenFunc returns a service principal access token with the specified options, fake implementations given in unit tests.
-type getServicePrincipalTokenFunc func(oauthConfig adal.OAuthConfig, clientID string, secret string, resource string, callbacks ...adal.TokenRefreshCallback) (*adal.ServicePrincipalToken, error)
-
-// getServicePrincipalTokenWithCertFunc returns a service principal access token using a certificate with the specified options, fake implementations given in unit tests.
-type getServicePrincipalTokenWithCertFunc func(oauthConfig adal.OAuthConfig, clientID string, certificate *x509.Certificate, privateKey *rsa.PrivateKey, resource string, callbacks ...adal.TokenRefreshCallback) (*adal.ServicePrincipalToken, error)
 
 // extractAccessTokenFunc extracts an oauth access token from the specified service principal token after a refresh, fake implementations given in unit tests.
 type extractAccessTokenFunc func(token *adal.ServicePrincipalToken) (string, error)
@@ -49,7 +38,7 @@ func (c *Client) getAccessToken(customClientID, resource string, azureConfig *da
 
 	if userAssignedID != "" {
 		c.logger.Info("generating MSI access token", zap.String("clientId", userAssignedID))
-		token, err := c.getMSITokenFunc(resource, &adal.ManagedIdentityOptions{
+		token, err := adal.NewServicePrincipalTokenFromManagedIdentity(resource, &adal.ManagedIdentityOptions{
 			ClientID: userAssignedID,
 		})
 		if err != nil {
@@ -69,7 +58,7 @@ func (c *Client) getAccessToken(customClientID, resource string, azureConfig *da
 
 	if !strings.HasPrefix(azureConfig.ClientSecret, certificateSecretPrefix) {
 		c.logger.Info("generating SPN access token with username and password", zap.String("clientId", azureConfig.ClientID))
-		token, err := c.getServicePrincipalTokenFunc(*oauthConfig, azureConfig.ClientID, azureConfig.ClientSecret, resource)
+		token, err := adal.NewServicePrincipalToken(*oauthConfig, azureConfig.ClientID, azureConfig.ClientSecret, resource)
 		if err != nil {
 			return "", fmt.Errorf("generating SPN access token with username and password: %w", err)
 		}
@@ -88,7 +77,7 @@ func (c *Client) getAccessToken(customClientID, resource string, azureConfig *da
 	}
 
 	c.logger.Info("generating SPN access token with certificate", zap.String("clientId", azureConfig.ClientID))
-	token, err := c.getServicePrincipalTokenWithCertFunc(*oauthConfig, azureConfig.ClientID, certificate, privateKey, resource)
+	token, err := adal.NewServicePrincipalTokenFromCertificate(*oauthConfig, azureConfig.ClientID, certificate, privateKey, resource)
 	if err != nil {
 		return "", fmt.Errorf("generating SPN access token with certificate: %w", err)
 	}

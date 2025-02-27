@@ -4,9 +4,6 @@
 package bootstrap
 
 import (
-	"crypto/rsa"
-	"crypto/x509"
-	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -32,15 +29,6 @@ var _ = Describe("Auth", Ordered, func() {
 	BeforeEach(func() {
 		bootstrapClient = &Client{
 			logger: logger,
-			getMSITokenFunc: func(resource string, options *adal.ManagedIdentityOptions, callbacks ...adal.TokenRefreshCallback) (*adal.ServicePrincipalToken, error) {
-				return nil, nil
-			},
-			getServicePrincipalTokenFunc: func(oauthConfig adal.OAuthConfig, clientID, secret, resource string, callbacks ...adal.TokenRefreshCallback) (*adal.ServicePrincipalToken, error) {
-				return nil, nil
-			},
-			getServicePrincipalTokenWithCertFunc: func(oauthConfig adal.OAuthConfig, clientID string, certificate *x509.Certificate, privateKey *rsa.PrivateKey, resource string, callbacks ...adal.TokenRefreshCallback) (*adal.ServicePrincipalToken, error) {
-				return nil, nil
-			},
 			extractAccessTokenFunc: func(token *adal.ServicePrincipalToken) (string, error) {
 				Expect(token).ToNot(BeNil())
 				return "token", nil
@@ -58,16 +46,10 @@ var _ = Describe("Auth", Ordered, func() {
 					UserAssignedIdentityID: "kubelet-identity-id",
 					TenantID:               testTenantID,
 				}
-				bootstrapClient.getMSITokenFunc = func(resource string, options *adal.ManagedIdentityOptions, callbacks ...adal.TokenRefreshCallback) (*adal.ServicePrincipalToken, error) {
-					Expect(testResource).To(Equal(resource))
-					Expect(options).ToNot(BeNil())
-					Expect(options.ClientID).To(Equal(azureConfig.UserAssignedIdentityID))
-					return nil, fmt.Errorf("cannot generate MSI token")
-				}
 
-				token, err := bootstrapClient.getAccessToken("", testResource, azureConfig)
+				token, err := bootstrapClient.getAccessToken("", "", azureConfig) // pass an empty resource to force a failure
 				Expect(token).To(BeEmpty())
-				Expect(err).To(MatchError("generating MSI access token: cannot generate MSI token"))
+				Expect(err).To(MatchError(ContainSubstring("generating MSI access token")))
 			})
 		})
 
@@ -91,20 +73,13 @@ var _ = Describe("Auth", Ordered, func() {
 				azureConfig := &datamodel.AzureConfig{
 					Cloud:        azure.PublicCloud.Name,
 					ClientID:     "service-principal-id",
-					ClientSecret: "secret",
+					ClientSecret: "", // empty secret to force a failure
 					TenantID:     testTenantID,
-				}
-				bootstrapClient.getServicePrincipalTokenFunc = func(oauthConfig adal.OAuthConfig, clientID, secret, resource string, callbacks ...adal.TokenRefreshCallback) (*adal.ServicePrincipalToken, error) {
-					Expect(oauthConfig).ToNot(BeNil())
-					Expect(clientID).To(Equal(azureConfig.ClientID))
-					Expect(secret).To(Equal(azureConfig.ClientSecret))
-					Expect(resource).To(Equal(testResource))
-					return nil, fmt.Errorf("cannot generate SPN token with username and password")
 				}
 
 				token, err := bootstrapClient.getAccessToken("", testResource, azureConfig)
 				Expect(token).To(BeEmpty())
-				Expect(err).To(MatchError("generating SPN access token with username and password: cannot generate SPN token with username and password"))
+				Expect(err).To(MatchError(ContainSubstring("generating SPN access token with username and password")))
 			})
 		})
 
@@ -153,18 +128,10 @@ var _ = Describe("Auth", Ordered, func() {
 					ClientSecret: "certificate:" + certData,
 					TenantID:     testTenantID,
 				}
-				bootstrapClient.getServicePrincipalTokenWithCertFunc = func(oauthConfig adal.OAuthConfig, clientID string, certificate *x509.Certificate, privateKey *rsa.PrivateKey, resource string, callbacks ...adal.TokenRefreshCallback) (*adal.ServicePrincipalToken, error) {
-					Expect(oauthConfig).ToNot(BeNil())
-					Expect(clientID).To(Equal(azureConfig.ClientID))
-					Expect(certificate).ToNot(BeNil())
-					Expect(privateKey).ToNot(BeNil())
-					Expect(resource).To(Equal(testResource))
-					return nil, fmt.Errorf("cannot generate SPN token with cert data")
-				}
 
-				token, err := bootstrapClient.getAccessToken("", testResource, azureConfig)
+				token, err := bootstrapClient.getAccessToken("", "", azureConfig) // pass an empty resource to force a failure
 				Expect(token).To(BeEmpty())
-				Expect(err).To(MatchError("generating SPN access token with certificate: cannot generate SPN token with cert data"))
+				Expect(err).To(MatchError(ContainSubstring("generating SPN access token with certificate")))
 			})
 		})
 
@@ -173,20 +140,6 @@ var _ = Describe("Auth", Ordered, func() {
 				azureConfig := &datamodel.AzureConfig{
 					UserAssignedIdentityID: "kubelet-identity-id",
 					TenantID:               testTenantID,
-				}
-				bootstrapClient.getMSITokenFunc = func(resource string, options *adal.ManagedIdentityOptions, callbacks ...adal.TokenRefreshCallback) (*adal.ServicePrincipalToken, error) {
-					Expect(testResource).To(Equal(resource))
-					Expect(options).ToNot(BeNil())
-					Expect(options.ClientID).To(Equal(azureConfig.UserAssignedIdentityID))
-					return &adal.ServicePrincipalToken{}, nil
-				}
-				bootstrapClient.getServicePrincipalTokenFunc = func(oauthConfig adal.OAuthConfig, clientID, secret, resource string, callbacks ...adal.TokenRefreshCallback) (*adal.ServicePrincipalToken, error) {
-					Expect(false).To(BeTrue(), "getServicePrincipalToken should not have been called")
-					return nil, nil
-				}
-				bootstrapClient.getServicePrincipalTokenWithCertFunc = func(oauthConfig adal.OAuthConfig, clientID string, certificate *x509.Certificate, privateKey *rsa.PrivateKey, resource string, callbacks ...adal.TokenRefreshCallback) (*adal.ServicePrincipalToken, error) {
-					Expect(false).To(BeTrue(), "getServicePrincipalTokenWithCert should not have been called")
-					return nil, nil
 				}
 
 				token, err := bootstrapClient.getAccessToken("", testResource, azureConfig)
@@ -202,20 +155,6 @@ var _ = Describe("Auth", Ordered, func() {
 					UserAssignedIdentityID: "kubelet-identity-id",
 					TenantID:               testTenantID,
 				}
-				bootstrapClient.getMSITokenFunc = func(resource string, options *adal.ManagedIdentityOptions, callbacks ...adal.TokenRefreshCallback) (*adal.ServicePrincipalToken, error) {
-					Expect(testResource).To(Equal(resource))
-					Expect(options).ToNot(BeNil())
-					Expect(options.ClientID).To(Equal(customClientID))
-					return &adal.ServicePrincipalToken{}, nil
-				}
-				bootstrapClient.getServicePrincipalTokenFunc = func(oauthConfig adal.OAuthConfig, clientID, secret, resource string, callbacks ...adal.TokenRefreshCallback) (*adal.ServicePrincipalToken, error) {
-					Expect(false).To(BeTrue(), "getServicePrincipalToken should not have been called")
-					return nil, nil
-				}
-				bootstrapClient.getServicePrincipalTokenWithCertFunc = func(oauthConfig adal.OAuthConfig, clientID string, certificate *x509.Certificate, privateKey *rsa.PrivateKey, resource string, callbacks ...adal.TokenRefreshCallback) (*adal.ServicePrincipalToken, error) {
-					Expect(false).To(BeTrue(), "getServicePrincipalTokenWithCert should not have been called")
-					return nil, nil
-				}
 
 				token, err := bootstrapClient.getAccessToken(customClientID, testResource, azureConfig)
 				Expect(err).To(BeNil())
@@ -230,21 +169,6 @@ var _ = Describe("Auth", Ordered, func() {
 					ClientID:     "service-principal-id",
 					ClientSecret: "secret",
 					TenantID:     testTenantID,
-				}
-				bootstrapClient.getMSITokenFunc = func(resource string, options *adal.ManagedIdentityOptions, callbacks ...adal.TokenRefreshCallback) (*adal.ServicePrincipalToken, error) {
-					Expect(false).To(BeTrue(), "getMSIToken should not have been called")
-					return nil, nil
-				}
-				bootstrapClient.getServicePrincipalTokenFunc = func(oauthConfig adal.OAuthConfig, clientID, secret, resource string, callbacks ...adal.TokenRefreshCallback) (*adal.ServicePrincipalToken, error) {
-					Expect(oauthConfig).ToNot(BeNil())
-					Expect(clientID).To(Equal(azureConfig.ClientID))
-					Expect(secret).To(Equal(azureConfig.ClientSecret))
-					Expect(resource).To(Equal(testResource))
-					return &adal.ServicePrincipalToken{}, nil
-				}
-				bootstrapClient.getServicePrincipalTokenWithCertFunc = func(oauthConfig adal.OAuthConfig, clientID string, certificate *x509.Certificate, privateKey *rsa.PrivateKey, resource string, callbacks ...adal.TokenRefreshCallback) (*adal.ServicePrincipalToken, error) {
-					Expect(false).To(BeTrue(), "getServicePrincipalTokenWithCert should not have been called")
-					return nil, nil
 				}
 
 				token, err := bootstrapClient.getAccessToken("", testResource, azureConfig)
@@ -267,22 +191,6 @@ var _ = Describe("Auth", Ordered, func() {
 					ClientID:     "service-principal-id",
 					ClientSecret: "certificate:" + certData,
 					TenantID:     testTenantID,
-				}
-				bootstrapClient.getMSITokenFunc = func(resource string, options *adal.ManagedIdentityOptions, callbacks ...adal.TokenRefreshCallback) (*adal.ServicePrincipalToken, error) {
-					Expect(false).To(BeTrue(), "getMSIToken should not have been called")
-					return nil, nil
-				}
-				bootstrapClient.getServicePrincipalTokenFunc = func(oauthConfig adal.OAuthConfig, clientID, secret, resource string, callbacks ...adal.TokenRefreshCallback) (*adal.ServicePrincipalToken, error) {
-					Expect(false).To(BeTrue(), "getServicePrincipalToken should not have been called")
-					return nil, nil
-				}
-				bootstrapClient.getServicePrincipalTokenWithCertFunc = func(oauthConfig adal.OAuthConfig, clientID string, certificate *x509.Certificate, privateKey *rsa.PrivateKey, resource string, callbacks ...adal.TokenRefreshCallback) (*adal.ServicePrincipalToken, error) {
-					Expect(oauthConfig).ToNot(BeNil())
-					Expect(clientID).To(Equal(azureConfig.ClientID))
-					Expect(certificate).ToNot(BeNil())
-					Expect(privateKey).ToNot(BeNil())
-					Expect(resource).To(Equal(testResource))
-					return &adal.ServicePrincipalToken{}, nil
 				}
 
 				token, err := bootstrapClient.getAccessToken("", testResource, azureConfig)
