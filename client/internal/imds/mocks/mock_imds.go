@@ -73,18 +73,3 @@ func (mr *MockClientMockRecorder) GetInstanceData(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetInstanceData", reflect.TypeOf((*MockClient)(nil).GetInstanceData), ctx)
 }
-
-// GetMSIToken mocks base method.
-func (m *MockClient) GetMSIToken(ctx context.Context, clientID, aadResource string) (string, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetMSIToken", ctx, clientID, aadResource)
-	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetMSIToken indicates an expected call of GetMSIToken.
-func (mr *MockClientMockRecorder) GetMSIToken(ctx, clientID, aadResource any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMSIToken", reflect.TypeOf((*MockClient)(nil).GetMSIToken), ctx, clientID, aadResource)
-}

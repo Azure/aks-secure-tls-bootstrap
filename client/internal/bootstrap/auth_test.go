@@ -4,25 +4,22 @@
 package bootstrap
 
 import (
-	"context"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"go.uber.org/mock/gomock"
 	"go.uber.org/zap"
 
-	aadmocks "github.com/Azure/aks-secure-tls-bootstrap/client/internal/aad/mocks"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/datamodel"
-	imdsmocks "github.com/Azure/aks-secure-tls-bootstrap/client/internal/imds/mocks"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/testutil"
+	"github.com/Azure/go-autorest/autorest/adal"
+	"github.com/Azure/go-autorest/autorest/azure"
 )
 
 var _ = Describe("Auth", Ordered, func() {
 	var (
-		mockCtrl        *gomock.Controller
-		imdsClient      *imdsmocks.MockClient
-		aadClient       *aadmocks.MockClient
-		bootstrapClient *Client
 		logger          *zap.Logger
+		bootstrapClient *Client
 	)
 
 	BeforeAll(func() {
@@ -30,208 +27,177 @@ var _ = Describe("Auth", Ordered, func() {
 	})
 
 	BeforeEach(func() {
-		mockCtrl = gomock.NewController(GinkgoT())
-		imdsClient = imdsmocks.NewMockClient(mockCtrl)
-		aadClient = aadmocks.NewMockClient(mockCtrl)
 		bootstrapClient = &Client{
-			logger:     logger,
-			imdsClient: imdsClient,
-			aadClient:  aadClient,
+			logger: logger,
+			extractAccessTokenFunc: func(token *adal.ServicePrincipalToken) (string, error) {
+				Expect(token).ToNot(BeNil())
+				return "token", nil
+			},
 		}
 	})
 
-	AfterEach(func() {
-		mockCtrl.Finish()
-	})
-
 	Context("getAuthToken", func() {
-		var (
-			emptyClientID = ""
-			resource      = "resource"
-		)
+		var testResource = "resource"
+		var testTenantID = "d87a2c3e-0c0c-42b2-a883-e48cd8723e22"
 
-		When("customClientID is not supplied", func() {
-			When("azure config is nil", func() {
-				It("should return an error", func() {
-					var azureConfig *datamodel.AzureConfig
-					ctx, cancel := context.WithCancel(context.Background())
-					defer cancel()
+		When("there is an error generating an MSI access token", func() {
+			It("should return an error", func() {
+				azureConfig := &datamodel.AzureConfig{
+					UserAssignedIdentityID: "kubelet-identity-id",
+					TenantID:               testTenantID,
+				}
 
-					token, err := bootstrapClient.getAuthToken(ctx, emptyClientID, resource, azureConfig)
-					Expect(token).To(BeEmpty())
-					Expect(err).ToNot(BeNil())
-					Expect(err.Error()).To(ContainSubstring("unable to get auth token: azure config is nil"))
-				})
-			})
-
-			When("azure config is missing clientId", func() {
-				It("should return an error", func() {
-					imdsClient.EXPECT().GetMSIToken(
-						gomock.Any(),
-						gomock.Any(),
-						gomock.Any(),
-					).Times(0)
-					aadClient.EXPECT().GetToken(
-						gomock.Any(),
-						gomock.Any(),
-						gomock.Any(),
-					).Times(0)
-					azureConfig := &datamodel.AzureConfig{
-						ClientSecret: "secret",
-						TenantID:     "tid",
-					}
-					ctx, cancel := context.WithCancel(context.Background())
-					defer cancel()
-
-					token, err := bootstrapClient.getAuthToken(ctx, emptyClientID, resource, azureConfig)
-					Expect(token).To(BeEmpty())
-					Expect(err).ToNot(BeNil())
-					Expect(err.Error()).To(ContainSubstring("unable to infer node identity type: client ID in azure.json is empty"))
-				})
-			})
-
-			When("azure config has clientId but is missing clientSecret", func() {
-				It("should return an error", func() {
-					imdsClient.EXPECT().GetMSIToken(
-						gomock.Any(),
-						gomock.Any(),
-						gomock.Any(),
-					).Times(0)
-					aadClient.EXPECT().GetToken(
-						gomock.Any(),
-						gomock.Any(),
-						gomock.Any(),
-					).Times(0)
-					azureConfig := &datamodel.AzureConfig{
-						ClientID: "cid",
-						TenantID: "tid",
-					}
-					ctx, cancel := context.WithCancel(context.Background())
-					defer cancel()
-
-					token, err := bootstrapClient.getAuthToken(ctx, emptyClientID, resource, azureConfig)
-					Expect(token).To(BeEmpty())
-					Expect(err).ToNot(BeNil())
-					Expect(err.Error()).To(ContainSubstring("cannot retrieve SP token from AAD: azure.json missing clientSecret"))
-				})
-			})
-
-			When("azure config has clientId and clientSecret but is missing tenantId", func() {
-				It("should return an error", func() {
-					imdsClient.EXPECT().GetMSIToken(
-						gomock.Any(),
-						gomock.Any(),
-						gomock.Any(),
-					).Times(0)
-					aadClient.EXPECT().GetToken(
-						gomock.Any(),
-						gomock.Any(),
-						gomock.Any(),
-					).Times(0)
-					azureConfig := &datamodel.AzureConfig{
-						ClientID:     "cid",
-						ClientSecret: "secret",
-					}
-					ctx, cancel := context.WithCancel(context.Background())
-					defer cancel()
-
-					token, err := bootstrapClient.getAuthToken(ctx, emptyClientID, resource, azureConfig)
-					Expect(token).To(BeEmpty())
-					Expect(err).ToNot(BeNil())
-					Expect(err.Error()).To(ContainSubstring("cannot retrieve SP token from AAD: azure.json missing tenantId"))
-				})
-			})
-
-			When("azure config contains msi clientId and userAssignedIdentityId is non-empty", func() {
-				It("should acquire MSI token from IMDS using userAssignedIdentityId as clientId", func() {
-					userAssignedIdentityID := "uami"
-					imdsClient.EXPECT().GetMSIToken(gomock.Any(), userAssignedIdentityID, resource).
-						Return("mockMSIToken", nil).
-						Times(1)
-					aadClient.EXPECT().GetToken(
-						gomock.Any(),
-						gomock.Any(),
-						gomock.Any(),
-					).Times(0)
-					azureConfigWithMSI := &datamodel.AzureConfig{
-						ClientID:               "msi",
-						UserAssignedIdentityID: userAssignedIdentityID,
-					}
-					ctx, cancel := context.WithCancel(context.Background())
-					defer cancel()
-
-					msiToken, err := bootstrapClient.getAuthToken(ctx, emptyClientID, resource, azureConfigWithMSI)
-					Expect(err).To(BeNil())
-					Expect(msiToken).To(Equal("mockMSIToken"))
-				})
-			})
-
-			When("azure config contains msi clientId and userAssignedIdentityId is empty", func() {
-				It("should acquire MSI token from IMDS without specifying clientId", func() {
-					imdsClient.EXPECT().GetMSIToken(gomock.Any(), emptyClientID, resource).
-						Return("mockMSIToken", nil).
-						Times(1)
-					aadClient.EXPECT().GetToken(
-						gomock.Any(),
-						gomock.Any(),
-						gomock.Any(),
-					).Times(0)
-					azureConfigWithMSI := &datamodel.AzureConfig{
-						ClientID: "msi",
-					}
-					ctx, cancel := context.WithCancel(context.Background())
-					defer cancel()
-
-					msiToken, err := bootstrapClient.getAuthToken(ctx, emptyClientID, resource, azureConfigWithMSI)
-					Expect(err).To(BeNil())
-					Expect(msiToken).To(Equal("mockMSIToken"))
-				})
-			})
-
-			When("azure config contains non-MSI clientId", func() {
-				It("should use service principal and acquire token from AAD", func() {
-					azureConfigSPN := &datamodel.AzureConfig{
-						ClientID:     "clientId",
-						ClientSecret: "clientSecret",
-						TenantID:     "tenantId",
-					}
-					aadClient.EXPECT().GetToken(gomock.Any(), azureConfigSPN, resource).
-						Return("spToken", nil).
-						Times(1)
-					imdsClient.EXPECT().GetMSIToken(
-						gomock.Any(),
-						gomock.Any(),
-						gomock.Any(),
-					).Times(0)
-					ctx, cancel := context.WithCancel(context.Background())
-					defer cancel()
-
-					spToken, err := bootstrapClient.getAuthToken(ctx, emptyClientID, resource, azureConfigSPN)
-					Expect(err).To(BeNil())
-					Expect(spToken).To(Equal("spToken"))
-				})
+				token, err := bootstrapClient.getAccessToken("", "", azureConfig) // pass an empty resource to force a failure
+				Expect(token).To(BeEmpty())
+				Expect(err).To(MatchError(ContainSubstring("generating MSI access token")))
 			})
 		})
 
-		When("customClientID is supplied", func() {
-			var nonEmptyClientID = "clientId"
+		When("there is an error getting the azure environment config for the specified cloud", func() {
+			It("should return an error", func() {
+				azureConfig := &datamodel.AzureConfig{
+					Cloud:        "invalid",
+					ClientID:     "service-principal-id",
+					ClientSecret: "secret",
+					TenantID:     testTenantID,
+				}
 
-			It("should acquire MSI token from IMDS", func() {
-				imdsClient.EXPECT().GetMSIToken(gomock.Any(), nonEmptyClientID, resource).
-					Return("mockMSIToken", nil).
-					Times(1)
-				aadClient.EXPECT().GetToken(
-					gomock.Any(),
-					gomock.Any(),
-					gomock.Any(),
-				).Times(0)
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
+				token, err := bootstrapClient.getAccessToken("", testResource, azureConfig)
+				Expect(token).To(BeEmpty())
+				Expect(err).To(MatchError(ContainSubstring(`getting azure environment config for cloud "invalid"`)))
+			})
+		})
 
-				token, err := bootstrapClient.getAuthToken(ctx, nonEmptyClientID, resource, nil)
+		When("there is an error generating a service principal access token with username and password", func() {
+			It("should return an error", func() {
+				azureConfig := &datamodel.AzureConfig{
+					Cloud:        azure.PublicCloud.Name,
+					ClientID:     "service-principal-id",
+					ClientSecret: "", // empty secret to force a failure
+					TenantID:     testTenantID,
+				}
+
+				token, err := bootstrapClient.getAccessToken("", testResource, azureConfig)
+				Expect(token).To(BeEmpty())
+				Expect(err).To(MatchError(ContainSubstring("generating SPN access token with username and password")))
+			})
+		})
+
+		When("there is an error b64-decoding the certificate data", func() {
+			It("should return an error", func() {
+				azureConfig := &datamodel.AzureConfig{
+					Cloud:        azure.PublicCloud.Name,
+					ClientID:     "service-principal-id",
+					ClientSecret: "certificate:YW55IGNhcm5hbCBwbGVhc3U======", // invalid b64-encoding
+					TenantID:     testTenantID,
+				}
+
+				token, err := bootstrapClient.getAccessToken("", testResource, azureConfig)
+				Expect(token).To(BeEmpty())
+				Expect(err).To(MatchError(ContainSubstring("b64-decoding certificate data in client secret")))
+			})
+		})
+
+		When("there is an error decoding the pfx certificate data", func() {
+			It("should return an error", func() {
+				azureConfig := &datamodel.AzureConfig{
+					Cloud:        azure.PublicCloud.Name,
+					ClientID:     "service-principal-id",
+					ClientSecret: "certificate:dGVzdAo=", // b64-encoding of "test"
+					TenantID:     testTenantID,
+				}
+
+				token, err := bootstrapClient.getAccessToken("", testResource, azureConfig)
+				Expect(token).To(BeEmpty())
+				Expect(err).To(MatchError(ContainSubstring("decoding pfx certificate data in client secret")))
+			})
+		})
+
+		When("there is an error generating a service principal token with certificate data", func() {
+			It("should return an error", func() {
+				certData, err := testutil.GenerateCertAndKeyAsEncodedPFXData(testutil.CertTemplate{
+					CommonName:   "aad",
+					Organization: "azure",
+					Expiration:   time.Now().Add(time.Hour),
+				})
 				Expect(err).To(BeNil())
-				Expect(token).To(Equal("mockMSIToken"))
+
+				azureConfig := &datamodel.AzureConfig{
+					Cloud:        azure.PublicCloud.Name,
+					ClientID:     "service-principal-id",
+					ClientSecret: "certificate:" + certData,
+					TenantID:     testTenantID,
+				}
+
+				token, err := bootstrapClient.getAccessToken("", "", azureConfig) // pass an empty resource to force a failure
+				Expect(token).To(BeEmpty())
+				Expect(err).To(MatchError(ContainSubstring("generating SPN access token with certificate")))
 			})
 		})
+
+		When("UserAssignedIdentityID is specified in azure config", func() {
+			It("should return a corresponding MSI access token", func() {
+				azureConfig := &datamodel.AzureConfig{
+					UserAssignedIdentityID: "kubelet-identity-id",
+					TenantID:               testTenantID,
+				}
+
+				token, err := bootstrapClient.getAccessToken("", testResource, azureConfig)
+				Expect(err).To(BeNil())
+				Expect(token).To(Equal("token"))
+			})
+		})
+
+		When("a custom client ID is specified", func() {
+			It("should return a corresponding MSI access token from IMDS", func() {
+				customClientID := "custom"
+				azureConfig := &datamodel.AzureConfig{
+					UserAssignedIdentityID: "kubelet-identity-id",
+					TenantID:               testTenantID,
+				}
+
+				token, err := bootstrapClient.getAccessToken(customClientID, testResource, azureConfig)
+				Expect(err).To(BeNil())
+				Expect(token).To(Equal("token"))
+			})
+		})
+
+		When("service principal client secret does not contain certificate data", func() {
+			It("should return a corresponding SPN access token using username + password auth", func() {
+				azureConfig := &datamodel.AzureConfig{
+					Cloud:        azure.PublicCloud.Name,
+					ClientID:     "service-principal-id",
+					ClientSecret: "secret",
+					TenantID:     testTenantID,
+				}
+
+				token, err := bootstrapClient.getAccessToken("", testResource, azureConfig)
+				Expect(err).To(BeNil())
+				Expect(token).To(Equal("token"))
+			})
+		})
+
+		When("service principal client secret contains certificate data", func() {
+			It("should return a corresponding SPN access token using certificate auth", func() {
+				certData, err := testutil.GenerateCertAndKeyAsEncodedPFXData(testutil.CertTemplate{
+					CommonName:   "aad",
+					Organization: "azure",
+					Expiration:   time.Now().Add(time.Hour),
+				})
+				Expect(err).To(BeNil())
+
+				azureConfig := &datamodel.AzureConfig{
+					Cloud:        azure.PublicCloud.Name,
+					ClientID:     "service-principal-id",
+					ClientSecret: "certificate:" + certData,
+					TenantID:     testTenantID,
+				}
+
+				token, err := bootstrapClient.getAccessToken("", testResource, azureConfig)
+				Expect(err).To(BeNil())
+				Expect(token).To(Equal("token"))
+			})
+		})
+
 	})
 })
