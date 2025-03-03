@@ -12,6 +12,7 @@ generate: proto-generate proto-lint mock-generate
 
 .PHONY: proto-generate
 proto-generate:
+	$(MAKE) proto-deps
 	@($(BUF) format -w)
 	rm -rf pkg/gen/service/v1
 	docker build --platform $(shell uname -m) -t protoc-docker - < protoc.Dockerfile
@@ -20,13 +21,18 @@ proto-generate:
 		--go_out=. \
 		--go-grpc_opt=module=github.com/Azure/aks-secure-tls-bootstrap/service \
 		--go-grpc_out=. \
-		--proto_path=proto  $(shell find proto/akssecuretlsbootstrap/v1 -name '*.proto')
+		--proto_path=proto $(shell find proto/akssecuretlsbootstrap/v1 -name '*.proto')
 	$(MAKE) proto-lint
 
 .PHONY: proto-lint
 proto-lint:
 	@($(BUF) lint)
 	@($(BUF) breaking --against '../.git#branch=main,subdir=service')
+
+.PHONY: proto-deps
+proto-deps:
+	@($(BUF) dep update)
+	@($(BUF) dep prune)
 
 .PHONY: mock-generate
 mock-generate: mockgen
