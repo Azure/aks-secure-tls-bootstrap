@@ -1,0 +1,18 @@
+version: v2
+clean: true
+managed:
+  enabled: true
+  disable:
+    - module: buf.build/service-hub/loggable
+      path: proto/log.proto
+      file_option: go_package
+  override:
+    - file_option: go_package_prefix
+      value: "github.com/Azure/aks-secure-tls-bootstrap/service/pkg/gen/akssecuretlsbootstrap/v1"
+plugins:
+  - remote: buf.build/protocolbuffers/go
+    out: pkg/gen
+    opt: paths=source_relative
+  - remote: buf.build/grpc/go
+    out: pkg/gen
+    opt: paths=source_relative

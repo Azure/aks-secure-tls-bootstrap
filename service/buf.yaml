@@ -6,6 +6,6 @@ lint:
     - STANDARD
 breaking:
   use:
-    - WIRE_JSON
+    - FILE
 deps:
   - buf.build/service-hub/loggable
