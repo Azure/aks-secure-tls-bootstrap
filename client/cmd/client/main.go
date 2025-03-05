@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"syscall"
+	"time"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/bootstrap"
 	"go.uber.org/zap"
@@ -40,6 +41,7 @@ func init() {
 	flag.StringVar(&bootstrapConfig.KeyFilePath, "key-file", "", "path to the file which will contain the PEM-encoded client key, referenced by the generated kubeconfig.")
 	flag.BoolVar(&bootstrapConfig.InsecureSkipTLSVerify, "insecure-skip-tls-verify", false, "skip TLS verification when connecting to the control plane")
 	flag.BoolVar(&bootstrapConfig.EnsureAuthorizedClient, "ensure-authorized", false, "ensure the specified kubeconfig contains an authorized clientset before bootstrapping")
+	flag.DurationVar(&bootstrapConfig.Timeout, "deadline", time.Minute, "deadline within which bootstrapping must succeed")
 	flag.Parse()
 }
 
@@ -73,11 +75,15 @@ func run(ctx context.Context, logger *zap.Logger) int {
 		logger.Error("error constructing bootstrap client", zap.Error(err))
 		return 1
 	}
-	kubeconfigData, err := client.GetKubeletClientCredential(ctx, &bootstrapConfig)
+
+	timeoutCtx, cancel := context.WithTimeout(ctx, bootstrapConfig.Timeout)
+	defer cancel()
+	kubeconfigData, err := client.GetKubeletClientCredential(timeoutCtx, &bootstrapConfig)
 	if err != nil {
 		logger.Error("error generating kubelet client credential", zap.Error(err))
 		return 1
 	}
+
 	if kubeconfigData != nil {
 		if err := clientcmd.WriteToFile(*kubeconfigData, bootstrapConfig.KubeconfigPath); err != nil {
 			logger.Error("error writing generated kubeconfig to disk", zap.Error(err))

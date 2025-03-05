@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/datamodel"
 	"github.com/Azure/go-autorest/autorest/azure"
@@ -30,6 +31,7 @@ var _ = Describe("config tests", func() {
 					KubeconfigPath:    "path",
 					CertFilePath:      "path",
 					KeyFilePath:       "path",
+					Timeout:           time.Minute,
 				}
 			})
 
@@ -105,12 +107,22 @@ var _ = Describe("config tests", func() {
 				})
 			})
 
+			When("timeout is not specified", func() {
+				It("should return an error", func() {
+					cfg.Timeout = 0
+					err := cfg.Validate()
+					Expect(err).ToNot(BeNil())
+					Expect(err.Error()).To(ContainSubstring("timeout must be specified"))
+				})
+			})
+
 			When("azure config path does not exist", func() {
 				It("should return an error", func() {
 					cfg.AzureConfigPath = "does/not/exist.json"
 					err := cfg.Validate()
 					Expect(err).ToNot(BeNil())
-					Expect(err.Error()).To(ContainSubstring("reading azure config data"))
+					Expect(err.Error()).To(ContainSubstring("loading azure config file"))
+					Expect(err.Error()).To(ContainSubstring("reading file"))
 				})
 			})
 
@@ -123,7 +135,8 @@ var _ = Describe("config tests", func() {
 					cfg.AzureConfigPath = path
 					err = cfg.Validate()
 					Expect(err).ToNot(BeNil())
-					Expect(err.Error()).To(ContainSubstring("unmarshalling azure config data"))
+					Expect(err.Error()).To(ContainSubstring("loading azure config file"))
+					Expect(err.Error()).To(ContainSubstring("unmarshalling json data"))
 				})
 			})
 
@@ -162,7 +175,8 @@ var _ = Describe("config tests", func() {
 					path := "does/not/exist.json"
 					err := cfg.LoadFromFile(path)
 					Expect(err).ToNot(BeNil())
-					Expect(err.Error()).To(ContainSubstring("reading config file"))
+					Expect(err.Error()).To(ContainSubstring("loading bootstrap config file"))
+					Expect(err.Error()).To(ContainSubstring("reading file"))
 				})
 			})
 
@@ -174,7 +188,8 @@ var _ = Describe("config tests", func() {
 					Expect(err).To(BeNil())
 					err = cfg.LoadFromFile(path)
 					Expect(err).ToNot(BeNil())
-					Expect(err.Error()).To(ContainSubstring("unmarshalling config file content"))
+					Expect(err.Error()).To(ContainSubstring("loading bootstrap config file"))
+					Expect(err.Error()).To(ContainSubstring("unmarshalling json data"))
 				})
 			})
 
