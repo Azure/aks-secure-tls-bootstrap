@@ -21,7 +21,7 @@ import (
 // closerFunc closes a gRPC connection.
 type closerFunc func() error
 
-func (c closerFunc) closeWithLogger(logger *zap.Logger) {
+func (c closerFunc) close(logger *zap.Logger) {
 	if err := c(); err != nil {
 		logger.Error("closing gRPC client connection: %s", zap.Error(err))
 	}

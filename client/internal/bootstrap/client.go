@@ -53,7 +53,7 @@ func (c *Client) GetKubeletClientCredential(ctx context.Context, config *Config)
 		c.logger.Error("failed to setup bootstrap service connection", zap.Error(err))
 		return nil, fmt.Errorf("failed to setup bootstrap service connection: %w", err)
 	}
-	defer closer.closeWithLogger(c.logger)
+	defer closer.close(c.logger)
 
 	c.logger.Info("created gRPC connection and bootstrap service client")
 
