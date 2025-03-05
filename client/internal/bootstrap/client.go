@@ -33,31 +33,28 @@ func NewClient(logger *zap.Logger) (*Client, error) {
 	}, nil
 }
 
-func (c *Client) GetKubeletClientCredential(ctx context.Context, cfg *Config) (*clientcmdapi.Config, error) {
-	err := c.kubeconfigValidator.Validate(cfg.KubeconfigPath, cfg.EnsureAuthorizedClient)
+func (c *Client) GetKubeletClientCredential(ctx context.Context, config *Config) (*clientcmdapi.Config, error) {
+	err := c.kubeconfigValidator.Validate(config.KubeconfigPath, config.EnsureAuthorizedClient)
 	if err == nil {
-		c.logger.Info("existing kubeconfig is valid, will skip bootstrapping", zap.String("kubeconfig", cfg.KubeconfigPath))
+		c.logger.Info("existing kubeconfig is valid, will skip bootstrapping", zap.String("kubeconfig", config.KubeconfigPath))
 		return nil, nil
 	}
-	c.logger.Info("failed to validate existing kubeconfig, will bootstrap a new client credential", zap.String("kubeconfig", cfg.KubeconfigPath), zap.Error(err))
+	c.logger.Info("failed to validate existing kubeconfig, will bootstrap a new client credential", zap.String("kubeconfig", config.KubeconfigPath), zap.Error(err))
 
-	token, err := c.getAccessToken(cfg.CustomClientID, cfg.AADResource, &cfg.AzureConfig)
+	token, err := c.getAccessToken(config.CustomClientID, config.AADResource, &config.AzureConfig)
 	if err != nil {
 		c.logger.Error("failed to generate access token for gRPC connection", zap.Error(err))
 		return nil, fmt.Errorf("failed to generate access token for gRPC connection: %w", err)
 	}
 	c.logger.Info("generated access token for gRPC connection")
 
-	serviceClient, close, err := c.getServiceClientFunc(c.logger, token, cfg)
+	serviceClient, close, err := c.getServiceClientFunc(token, config)
 	if err != nil {
 		c.logger.Error("failed to setup bootstrap service connection", zap.Error(err))
 		return nil, fmt.Errorf("failed to setup bootstrap service connection: %w", err)
 	}
-	defer func() {
-		if err := close(); err != nil {
-			c.logger.Error("failed to close gRPC client connection", zap.Error(err))
-		}
-	}()
+	defer close.closeWithLogger(c.logger)
+
 	c.logger.Info("created gRPC connection and bootstrap service client")
 
 	instanceData, err := c.imdsClient.GetInstanceData(ctx)
@@ -114,10 +111,10 @@ func (c *Client) GetKubeletClientCredential(ctx context.Context, cfg *Config) (*
 		return nil, fmt.Errorf("failed to decode cert data from bootstrap server: %w", err)
 	}
 	kubeconfigData, err := kubeconfig.GenerateForCertAndKey(certPEM, privateKey, &kubeconfig.Config{
-		APIServerFQDN:     cfg.APIServerFQDN,
-		ClusterCAFilePath: cfg.ClusterCAFilePath,
-		CertFilePath:      cfg.CertFilePath,
-		KeyFilePath:       cfg.KeyFilePath,
+		APIServerFQDN:     config.APIServerFQDN,
+		ClusterCAFilePath: config.ClusterCAFilePath,
+		CertFilePath:      config.CertFilePath,
+		KeyFilePath:       config.KeyFilePath,
 	})
 	if err != nil {
 		c.logger.Error("failed to generate kubeconfig for new client cert and key", zap.Error(err))

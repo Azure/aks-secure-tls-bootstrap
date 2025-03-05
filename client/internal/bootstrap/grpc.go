@@ -18,23 +18,32 @@ import (
 	"google.golang.org/grpc/credentials/oauth"
 )
 
-// getServiceClientFunc returns a new SecureTLSBootstrapServiceClient over a gRPC connection, fake implementations given in unit tests.
-type getServiceClientFunc func(logger *zap.Logger, token string, cfg *Config) (akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient, func() error, error)
+// closer closes a gRPC connection.
+type closer func() error
 
-func getServiceClient(logger *zap.Logger, token string, cfg *Config) (akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient, func() error, error) {
-	clusterCAData, err := os.ReadFile(cfg.ClusterCAFilePath)
-	if err != nil {
-		return nil, nil, fmt.Errorf("reading cluster CA data from %s: %w", cfg.ClusterCAFilePath, err)
+func (c closer) closeWithLogger(logger *zap.Logger) {
+	if err := c(); err != nil {
+		logger.Error("closing gRPC client connection: %s", zap.Error(err))
 	}
-	logger.Info("read cluster CA data", zap.String("path", cfg.ClusterCAFilePath))
+}
 
-	tlsConfig, err := getTLSConfig(clusterCAData, cfg.NextProto, cfg.InsecureSkipTLSVerify)
+// getServiceClientFunc returns a new SecureTLSBootstrapServiceClient over a gRPC connection, fake implementations given in unit tests.
+type getServiceClientFunc func(token string, config *Config) (akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient, closer, error)
+
+func getServiceClient(token string, config *Config) (akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient, closer, error) {
+	clusterCAData, err := os.ReadFile(config.ClusterCAFilePath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("reading cluster CA data from %s: %w", config.ClusterCAFilePath, err)
+	}
+
+	tlsConfig, err := getTLSConfig(clusterCAData, config.NextProto, config.InsecureSkipTLSVerify)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get TLS config: %w", err)
 	}
 
 	conn, err := grpc.NewClient(
-		fmt.Sprintf("%s:443", cfg.APIServerFQDN),
+		fmt.Sprintf("%s:443", config.APIServerFQDN),
+		grpc.WithDefaultCallOptions(grpc.WaitForReady(true)),
 		grpc.WithUserAgent(internalhttp.GetUserAgentValue()),
 		grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)),
 		grpc.WithPerRPCCredentials(oauth.TokenSource{
@@ -46,7 +55,6 @@ func getServiceClient(logger *zap.Logger, token string, cfg *Config) (akssecuret
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to dial client connection with context: %w", err)
 	}
-	logger.Info("dialed TLS bootstrap server and created GRPC connection")
 
 	return akssecuretlsbootstrapv1.NewSecureTLSBootstrapServiceClient(conn), conn.Close, nil
 }
