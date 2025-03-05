@@ -18,19 +18,19 @@ import (
 	"google.golang.org/grpc/credentials/oauth"
 )
 
-// closer closes a gRPC connection.
-type closer func() error
+// closerFunc closes a gRPC connection.
+type closerFunc func() error
 
-func (c closer) closeWithLogger(logger *zap.Logger) {
+func (c closerFunc) closeWithLogger(logger *zap.Logger) {
 	if err := c(); err != nil {
 		logger.Error("closing gRPC client connection: %s", zap.Error(err))
 	}
 }
 
 // getServiceClientFunc returns a new SecureTLSBootstrapServiceClient over a gRPC connection, fake implementations given in unit tests.
-type getServiceClientFunc func(token string, config *Config) (akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient, closer, error)
+type getServiceClientFunc func(token string, config *Config) (akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient, closerFunc, error)
 
-func getServiceClient(token string, config *Config) (akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient, closer, error) {
+func getServiceClient(token string, config *Config) (akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient, closerFunc, error) {
 	clusterCAData, err := os.ReadFile(config.ClusterCAFilePath)
 	if err != nil {
 		return nil, nil, fmt.Errorf("reading cluster CA data from %s: %w", config.ClusterCAFilePath, err)

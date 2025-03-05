@@ -111,7 +111,7 @@ var _ = Describe("Client tests", Ordered, func() {
 				logger:              logger,
 				imdsClient:          imdsClient,
 				kubeconfigValidator: kubeconfigValidator,
-				getServiceClientFunc: func(_ string, _ *Config) (akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient, closer, error) {
+				getServiceClientFunc: func(_ string, _ *Config) (akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient, closerFunc, error) {
 					return serviceClient, func() error { return nil }, nil
 				},
 				extractAccessTokenFunc: func(token *adal.ServicePrincipalToken) (string, error) {
