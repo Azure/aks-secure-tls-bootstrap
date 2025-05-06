@@ -7,23 +7,25 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/datamodel"
 )
 
 type Config struct {
 	datamodel.AzureConfig
-	AzureConfigPath        string `json:"azureConfigPath"`
-	APIServerFQDN          string `json:"apiServerFqdn"`
-	CustomClientID         string `json:"customClientId"`
-	NextProto              string `json:"nextProto"`
-	AADResource            string `json:"aadResource"`
-	ClusterCAFilePath      string `json:"clusterCaFilePath"`
-	KubeconfigPath         string `json:"kubeconfigPath"`
-	CertFilePath           string `json:"certFilePath"`
-	KeyFilePath            string `json:"keyFilePath"`
-	InsecureSkipTLSVerify  bool   `json:"insecureSkipTlsVerify"`
-	EnsureAuthorizedClient bool   `json:"ensureAuthorizedClient"`
+	AzureConfigPath        string        `json:"azureConfigPath"`
+	APIServerFQDN          string        `json:"apiServerFqdn"`
+	CustomClientID         string        `json:"customClientId"`
+	NextProto              string        `json:"nextProto"`
+	AADResource            string        `json:"aadResource"`
+	ClusterCAFilePath      string        `json:"clusterCaFilePath"`
+	KubeconfigPath         string        `json:"kubeconfigPath"`
+	CertFilePath           string        `json:"certFilePath"`
+	KeyFilePath            string        `json:"keyFilePath"`
+	InsecureSkipTLSVerify  bool          `json:"insecureSkipTlsVerify"`
+	EnsureAuthorizedClient bool          `json:"ensureAuthorizedClient"`
+	Timeout                time.Duration `json:"timeout"`
 }
 
 func (c *Config) Validate() error {
@@ -51,27 +53,33 @@ func (c *Config) Validate() error {
 	if c.KeyFilePath == "" {
 		return fmt.Errorf("key file path must be specified")
 	}
+	if c.Timeout == 0 {
+		return fmt.Errorf("timeout must be specified")
+	}
 	return c.loadAzureConfig()
 }
 
 func (c *Config) LoadFromFile(path string) error {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return fmt.Errorf("reading config file: %w", err)
-	}
-	if err := json.Unmarshal(data, c); err != nil {
-		return fmt.Errorf("unmarshalling config file content: %w", err)
+	if err := loadJSON(path, c); err != nil {
+		return fmt.Errorf("loading bootstrap config file: %w", err)
 	}
 	return nil
 }
 
 func (c *Config) loadAzureConfig() error {
-	data, err := os.ReadFile(c.AzureConfigPath)
-	if err != nil {
-		return fmt.Errorf("reading azure config data: %w", err)
+	if err := loadJSON(c.AzureConfigPath, &c.AzureConfig); err != nil {
+		return fmt.Errorf("loading azure config file: %w", err)
 	}
-	if err = json.Unmarshal(data, &c.AzureConfig); err != nil {
-		return fmt.Errorf("unmarshalling azure config data: %w", err)
+	return nil
+}
+
+func loadJSON(path string, out interface{}) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("reading file %s path: %w", path, err)
+	}
+	if err := json.Unmarshal(data, out); err != nil {
+		return fmt.Errorf("unmarshalling json data from %s: %w", path, err)
 	}
 	return nil
 }
