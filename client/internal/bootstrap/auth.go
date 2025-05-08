@@ -4,61 +4,83 @@
 package bootstrap
 
 import (
-	"context"
+	"encoding/base64"
 	"fmt"
+	"strings"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/datamodel"
+	"github.com/Azure/go-autorest/autorest/adal"
+	"github.com/Azure/go-autorest/autorest/azure"
+	"go.uber.org/zap"
 )
 
 const (
-	// The clientId used to denote Managed Service Identities (MSI).
-	managedServiceIdentity = "msi"
+	certificateSecretPrefix = "certificate:"
 )
 
-// getAuthToken retrieves the auth token (JWT) from AAD used to validate the node's identity with the bootstrap server.
-// If the user specifies their own client ID, meaning they've brought their own node, we assume that they're specifying
-// a user-assigned managed identity and thus fetch the corresponding MSI token from IMDS. Otherwise, the information specified
-// in the azure config read from azure.json to infer the identity type and either request the token from AAD directly, or from IMDS.
-// All tokens for MSIs will be fetched from IMDS, while all SPN tokens will be fetched from AAD directly.
-func (c *Client) getAuthToken(ctx context.Context, customClientID, aadResource string, azureConfig *datamodel.AzureConfig) (string, error) {
+// extractAccessTokenFunc extracts an oauth access token from the specified service principal token after a refresh, fake implementations given in unit tests.
+type extractAccessTokenFunc func(token *adal.ServicePrincipalToken) (string, error)
+
+func extractAccessToken(token *adal.ServicePrincipalToken) (string, error) {
+	if err := token.Refresh(); err != nil {
+		return "", fmt.Errorf("obtaining fresh access token: %w", err)
+	}
+	return token.OAuthToken(), nil
+}
+
+// getAccessToken retrieves an AAD access token (JWT) using the specified custom client ID, resource, and azure config.
+// MSI access tokens are retrieved from IMDS, while service principal tokens are retrieved directly from AAD.
+func (c *Client) getAccessToken(customClientID, resource string, azureConfig *datamodel.AzureConfig) (string, error) {
+	userAssignedID := azureConfig.UserAssignedIdentityID
 	if customClientID != "" {
-		c.logger.Info("retrieving MSI access token from IMDS using user-specified client ID for UAMI...")
-		token, err := c.imdsClient.GetMSIToken(ctx, customClientID, aadResource)
-		if err != nil {
-			return "", fmt.Errorf("unable to get MSI token for UAMI using user-specified client ID: %w", err)
-		}
-		return token, nil
+		userAssignedID = customClientID
 	}
 
-	if azureConfig == nil {
-		return "", fmt.Errorf("unable to get auth token: azure config is nil")
-	}
-	if azureConfig.ClientID == "" {
-		return "", fmt.Errorf("unable to infer node identity type: client ID in azure.json is empty")
-	}
-	if azureConfig.ClientID == managedServiceIdentity {
-		c.logger.Info("retrieving MSI access token from IMDS...")
-		var clientID string
-		if azureConfig.UserAssignedIdentityID != "" {
-			clientID = azureConfig.UserAssignedIdentityID
-		}
-		token, err := c.imdsClient.GetMSIToken(ctx, clientID, aadResource)
+	if userAssignedID != "" {
+		c.logger.Info("generating MSI access token", zap.String("clientId", userAssignedID))
+		token, err := adal.NewServicePrincipalTokenFromManagedIdentity(resource, &adal.ManagedIdentityOptions{
+			ClientID: userAssignedID,
+		})
 		if err != nil {
-			return "", fmt.Errorf("unable to get MSI token from IMDS: %w", err)
+			return "", fmt.Errorf("generating MSI access token: %w", err)
 		}
-		return token, nil
+		return c.extractAccessTokenFunc(token)
 	}
 
-	c.logger.Info("retrieving SP access token from AAD...")
-	if azureConfig.ClientSecret == "" {
-		return "", fmt.Errorf("cannot retrieve SP token from AAD: azure.json missing clientSecret")
-	}
-	if azureConfig.TenantID == "" {
-		return "", fmt.Errorf("cannot retrieve SP token from AAD: azure.json missing tenantId")
-	}
-	token, err := c.aadClient.GetToken(ctx, azureConfig, aadResource)
+	env, err := azure.EnvironmentFromName(azureConfig.Cloud)
 	if err != nil {
-		return "", fmt.Errorf("unable to get SPN token from AAD: %w", err)
+		return "", fmt.Errorf("getting azure environment config for cloud %q: %w", azureConfig.Cloud, err)
 	}
-	return token, nil
+	oauthConfig, err := adal.NewOAuthConfig(env.ActiveDirectoryEndpoint, azureConfig.TenantID)
+	if err != nil {
+		return "", fmt.Errorf("creating oauth config with azure environment: %w", err)
+	}
+
+	if !strings.HasPrefix(azureConfig.ClientSecret, certificateSecretPrefix) {
+		c.logger.Info("generating SPN access token with username and password", zap.String("clientId", azureConfig.ClientID))
+		token, err := adal.NewServicePrincipalToken(*oauthConfig, azureConfig.ClientID, azureConfig.ClientSecret, resource)
+		if err != nil {
+			return "", fmt.Errorf("generating SPN access token with username and password: %w", err)
+		}
+		return c.extractAccessTokenFunc(token)
+	}
+
+	c.logger.Info("client secret contains certificate data, using certificate to generate SPN access token", zap.String("clientId", azureConfig.ClientID))
+
+	certData, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(azureConfig.ClientSecret, certificateSecretPrefix))
+	if err != nil {
+		return "", fmt.Errorf("b64-decoding certificate data in client secret: %w", err)
+	}
+	certificate, privateKey, err := adal.DecodePfxCertificateData(certData, "")
+	if err != nil {
+		return "", fmt.Errorf("decoding pfx certificate data in client secret: %w", err)
+	}
+
+	c.logger.Info("generating SPN access token with certificate", zap.String("clientId", azureConfig.ClientID))
+	token, err := adal.NewServicePrincipalTokenFromCertificate(*oauthConfig, azureConfig.ClientID, certificate, privateKey, resource)
+	if err != nil {
+		return "", fmt.Errorf("generating SPN access token with certificate: %w", err)
+	}
+
+	return c.extractAccessTokenFunc(token)
 }

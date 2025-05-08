@@ -22,7 +22,7 @@ var _ = Describe("kubeconfig tests", func() {
 			certPath := filepath.Join(tempDir, "client.crt")
 			keyPath := filepath.Join(tempDir, "client.key")
 
-			certPEM, keyPEM, err := testutil.GenerateCertPEMWithExpiration(testutil.CertTemplate{
+			certPEM, keyPEM, err := testutil.GenerateCertPEM(testutil.CertTemplate{
 				CommonName:   "system:node:node",
 				Organization: "system:nodes",
 				Expiration:   time.Now().Add(time.Hour),

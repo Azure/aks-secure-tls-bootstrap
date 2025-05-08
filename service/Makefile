@@ -13,20 +13,14 @@ generate: proto-generate proto-lint mock-generate
 .PHONY: proto-generate
 proto-generate:
 	@($(BUF) format -w)
-	rm -rf pkg/gen/service/v1
-	docker build --platform $(shell uname -m) -t protoc-docker - < protoc.Dockerfile
-	docker run --rm -v $(shell pwd):/$(shell pwd) --workdir=$(shell pwd) protoc-docker protoc \
-		--go_opt=module=github.com/Azure/aks-secure-tls-bootstrap/service \
-		--go_out=. \
-		--go-grpc_opt=module=github.com/Azure/aks-secure-tls-bootstrap/service \
-		--go-grpc_out=. \
-		--proto_path=proto  $(shell find proto/akssecuretlsbootstrap/v1 -name '*.proto')
-	$(MAKE) proto-lint
+	@($(BUF) build)
+	@($(BUF) dep update)
+	@($(BUF) generate)
 
 .PHONY: proto-lint
 proto-lint:
 	@($(BUF) lint)
-	@($(BUF) breaking --against '../.git#branch=main,subdir=service')
+	@($(BUF) breaking --against '../.git#branch=main,subdir=service/proto')
 
 .PHONY: mock-generate
 mock-generate: mockgen
@@ -34,7 +28,7 @@ mock-generate: mockgen
 		-package=mocks \
 		-copyright_file=../hack/copyright_header.txt \
 		-source=pkg/gen/akssecuretlsbootstrap/v1/service_grpc.pb.go \
-		-destination=pkg/gen/mocks/akssecuretlsbootstrap/v1/service.go
+		-destination=pkg/gen/mock/akssecuretlsbootstrap/v1/service.go
 
 mockgen:
 	$(call go-install-tool,$(PROJECT_DIR)/bin/mockgen,go.uber.org/mock/mockgen@v0.5.0)
