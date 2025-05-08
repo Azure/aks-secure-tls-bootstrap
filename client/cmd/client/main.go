@@ -4,18 +4,26 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/bootstrap"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/event"
+	"github.com/avast/retry-go"
+	"github.com/samber/lo"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 var (
@@ -29,6 +37,7 @@ func init() {
 	flag.StringVar(&configFile, "config-file", "", "path to the configuration file, settings in this file will take priority over command line arguments")
 	flag.StringVar(&logFile, "log-file", "", "path to a file where logs will be written, will be created if it does not already exist")
 	flag.BoolVar(&verbose, "verbose", false, "enable verbose log output")
+
 	flag.StringVar(&bootstrapConfig.AzureConfigPath, "azure-config", "", "path to the azure config file")
 	flag.StringVar(&bootstrapConfig.APIServerFQDN, "apiserver-fqdn", "", "FQDN of the apiserver")
 	flag.StringVar(&bootstrapConfig.CustomClientID, "custom-client-id", "", "client ID of the user-assigned managed identity to use when requesting a token from IMDS - if not specified the kubelet identity will be used")
@@ -41,6 +50,7 @@ func init() {
 	flag.BoolVar(&bootstrapConfig.InsecureSkipTLSVerify, "insecure-skip-tls-verify", false, "skip TLS verification when connecting to the control plane")
 	flag.BoolVar(&bootstrapConfig.EnsureAuthorizedClient, "ensure-authorized", false, "ensure the specified kubeconfig contains an authorized clientset before bootstrapping")
 	flag.DurationVar(&bootstrapConfig.Deadline, "deadline", 3*time.Minute, "deadline within which bootstrapping must succeed")
+
 	flag.Parse()
 }
 
@@ -55,34 +65,108 @@ func main() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	logger, err := configureLogging(logFile, verbose)
+	// defer calls are not executed on os.Exit
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGKILL, syscall.SIGABRT)
+	exitCode := run(ctx)
+	cancel()
+	os.Exit(exitCode)
+}
+
+func run(ctx context.Context) int {
+	var code int
+
+	logger, errBuf, err := configureLogging(logFile, verbose)
 	if err != nil {
 		fmt.Printf("unable to construct zap logger: %s\n", err)
 		os.Exit(1)
 	}
-	// defer calls are not executed on os.Exit
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	exitCode := run(ctx, logger)
-	cancel()
-	flush(logger)
-	os.Exit(exitCode)
+	defer flush(logger)
+
+	start := time.Now()
+	dl := start.Add(bootstrapConfig.Deadline)
+	logger.Info("set bootstrap deadline", zap.Time("deadline", dl))
+	bootstrapCtx, cancel := context.WithDeadline(ctx, dl)
+	defer cancel()
+
+	bootstrapEvent := &event.Event{
+		Name:  "AKS.performSecureTLSBootstrapping",
+		Start: start,
+	}
+	defer func() {
+		if err := bootstrapEvent.Write(); err != nil {
+			logger.Error("unable to write guest agent event to disk", zap.Error(err))
+		}
+	}()
+	bootstrapResult := &event.BootstrapResult{
+		Status: event.BootstrapStatusSuccess,
+	}
+
+	err = performBootstrapping(bootstrapCtx, logger)
+	bootstrapEvent.End = time.Now()
+	if err != nil {
+		logger.Error("failed to bootstrap", zap.Error(err))
+		// get the last 20 lines of error-level logs
+		bootstrapResult.Log = tail(errBuf)
+		bootstrapResult.Status = event.BootstrapStatusFailure
+		code = 1
+	}
+
+	rawResult, err := json.Marshal(bootstrapResult)
+	if err != nil {
+		logger.Error("failed to marshal bootstrap result", zap.Error(err))
+	}
+
+	bootstrapEvent.Message = string(rawResult)
+	return code
 }
 
-func configureLogging(logFile string, verbose bool) (*zap.Logger, error) {
-	if err := os.MkdirAll(filepath.Dir(logFile), 0755); err != nil {
-		return nil, fmt.Errorf("failed to create log directory: %w", err)
+func performBootstrapping(ctx context.Context, logger *zap.Logger) error {
+	client, err := bootstrap.NewClient(logger)
+	if err != nil {
+		return fmt.Errorf("constructing bootstrap client: %w", err)
 	}
+	retryIf := func(err error) bool {
+		return !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded)
+	}
+	return retry.Do(
+		func() error {
+			kubeconfigData, err := client.GetKubeletClientCredential(ctx, &bootstrapConfig)
+			if err != nil {
+				return fmt.Errorf("generating kubelet client credential: %w", err)
+			}
+			if kubeconfigData == nil {
+				return nil
+			}
+			if err := clientcmd.WriteToFile(*kubeconfigData, bootstrapConfig.KubeconfigPath); err != nil {
+				return fmt.Errorf("writing generated kubeconfig to disk: %w", err)
+			}
+			return nil
+		},
+		retry.RetryIf(retryIf),
+		retry.DelayType(retry.DefaultDelayType), // backoff + random jitter
+		retry.Delay(500*time.Millisecond),
+		retry.MaxDelay(2*time.Second),
+		retry.LastErrorOnly(true),
+	)
+}
 
+func configureLogging(logFile string, verbose bool) (*zap.Logger, *bytes.Buffer, error) {
+	if err := os.MkdirAll(filepath.Dir(logFile), 0755); err != nil {
+		return nil, nil, fmt.Errorf("failed to create log directory: %w", err)
+	}
 	logFileHandle, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open log file: %w", err)
+		return nil, nil, fmt.Errorf("failed to open log file: %w", err)
 	}
+
+	// used to store error-level logs for guest agent event telemetry
+	errBuf := new(bytes.Buffer)
 
 	encoderConfig := zap.NewProductionEncoderConfig()
 	encoderConfig.TimeKey = "timestamp"
 	encoderConfig.EncodeTime = zapcore.RFC3339NanoTimeEncoder
 
-	fileEncoder := zapcore.NewJSONEncoder(encoderConfig)
+	jsonEncoder := zapcore.NewJSONEncoder(encoderConfig)
 	consoleEncoder := zapcore.NewConsoleEncoder(encoderConfig)
 
 	level := zap.InfoLevel
@@ -91,10 +175,18 @@ func configureLogging(logFile string, verbose bool) (*zap.Logger, error) {
 	}
 
 	core := zapcore.NewTee(
-		zapcore.NewCore(fileEncoder, zapcore.AddSync(logFileHandle), level),
+		zapcore.NewCore(jsonEncoder, zapcore.AddSync(logFileHandle), level),
 		zapcore.NewCore(consoleEncoder, zapcore.AddSync(os.Stdout), level),
+		zapcore.NewCore(jsonEncoder, zapcore.AddSync(errBuf), zap.ErrorLevel),
 	)
-	return zap.New(core), nil
+	return zap.New(core), errBuf, nil
+}
+
+func tail(b *bytes.Buffer) string {
+	lines := bytes.Split(b.Bytes(), []byte("\n"))
+	return strings.Join(lo.Map(lines[len(lines)-20:], func(line []byte, _ int) string {
+		return string(line)
+	}), "\n")
 }
 
 func flush(logger *zap.Logger) {
