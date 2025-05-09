@@ -4,7 +4,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -13,17 +12,15 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strings"
 	"syscall"
 	"time"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/bootstrap"
-	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/event"
+	internalerrors "github.com/Azure/aks-secure-tls-bootstrap/client/internal/errors"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/events"
 	"github.com/avast/retry-go"
-	"github.com/samber/lo"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
 var (
@@ -75,7 +72,7 @@ func main() {
 func run(ctx context.Context) int {
 	var code int
 
-	logger, errBuf, err := configureLogging(logFile, verbose)
+	logger, err := configureLogging(logFile, verbose)
 	if err != nil {
 		fmt.Printf("unable to construct zap logger: %s\n", err)
 		os.Exit(1)
@@ -88,7 +85,7 @@ func run(ctx context.Context) int {
 	bootstrapCtx, cancel := context.WithDeadline(ctx, dl)
 	defer cancel()
 
-	bootstrapEvent := &event.Event{
+	bootstrapEvent := &events.Event{
 		Name:  "AKS.performSecureTLSBootstrapping",
 		Start: start,
 	}
@@ -97,17 +94,23 @@ func run(ctx context.Context) int {
 			logger.Error("unable to write guest agent event to disk", zap.Error(err))
 		}
 	}()
-	bootstrapResult := &event.BootstrapResult{
-		Status: event.BootstrapStatusSuccess,
+	bootstrapResult := &events.BootstrapResult{
+		Status: events.BootstrapStatusSuccess,
 	}
 
 	err = performBootstrapping(bootstrapCtx, logger)
 	bootstrapEvent.End = time.Now()
 	if err != nil {
-		logger.Error("failed to bootstrap", zap.Error(err))
-		// get the last 20 lines of error-level logs
-		bootstrapResult.Log = tail(errBuf)
-		bootstrapResult.Status = event.BootstrapStatusFailure
+		bootstrapResult.Status = events.BootstrapStatusFailure
+		var bootstrapErr *internalerrors.BootstrapError
+		if errors.As(err, &bootstrapErr) {
+			logger.Error("failed to bootstrap", zap.Error(bootstrapErr.Inner))
+			bootstrapResult.Error = bootstrapErr.Inner.Error()
+			bootstrapResult.ErrorType = bootstrapErr.Type
+		} else {
+			logger.Error("failed to bootstrap", zap.Error(err))
+			bootstrapResult.Error = err.Error()
+		}
 		code = 1
 	}
 
@@ -130,17 +133,7 @@ func performBootstrapping(ctx context.Context, logger *zap.Logger) error {
 	}
 	return retry.Do(
 		func() error {
-			kubeconfigData, err := client.GetKubeletClientCredential(ctx, &bootstrapConfig)
-			if err != nil {
-				return fmt.Errorf("generating kubelet client credential: %w", err)
-			}
-			if kubeconfigData == nil {
-				return nil
-			}
-			if err := clientcmd.WriteToFile(*kubeconfigData, bootstrapConfig.KubeconfigPath); err != nil {
-				return fmt.Errorf("writing generated kubeconfig to disk: %w", err)
-			}
-			return nil
+			return bootstrap.Bootstrap(ctx, client, &bootstrapConfig)
 		},
 		retry.RetryIf(retryIf),
 		retry.DelayType(retry.DefaultDelayType), // backoff + random jitter
@@ -150,17 +143,14 @@ func performBootstrapping(ctx context.Context, logger *zap.Logger) error {
 	)
 }
 
-func configureLogging(logFile string, verbose bool) (*zap.Logger, *bytes.Buffer, error) {
+func configureLogging(logFile string, verbose bool) (*zap.Logger, error) {
 	if err := os.MkdirAll(filepath.Dir(logFile), 0755); err != nil {
-		return nil, nil, fmt.Errorf("failed to create log directory: %w", err)
+		return nil, fmt.Errorf("failed to create log directory: %w", err)
 	}
 	logFileHandle, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to open log file: %w", err)
+		return nil, fmt.Errorf("failed to open log file: %w", err)
 	}
-
-	// used to store error-level logs for guest agent event telemetry
-	errBuf := new(bytes.Buffer)
 
 	encoderConfig := zap.NewProductionEncoderConfig()
 	encoderConfig.TimeKey = "timestamp"
@@ -177,16 +167,8 @@ func configureLogging(logFile string, verbose bool) (*zap.Logger, *bytes.Buffer,
 	core := zapcore.NewTee(
 		zapcore.NewCore(jsonEncoder, zapcore.AddSync(logFileHandle), level),
 		zapcore.NewCore(consoleEncoder, zapcore.AddSync(os.Stdout), level),
-		zapcore.NewCore(jsonEncoder, zapcore.AddSync(errBuf), zap.ErrorLevel),
 	)
-	return zap.New(core), errBuf, nil
-}
-
-func tail(b *bytes.Buffer) string {
-	lines := bytes.Split(b.Bytes(), []byte("\n"))
-	return strings.Join(lo.Map(lines[len(lines)-20:], func(line []byte, _ int) string {
-		return string(line)
-	}), "\n")
+	return zap.New(core), nil
 }
 
 func flush(logger *zap.Logger) {

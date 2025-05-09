@@ -1,4 +1,4 @@
-package event
+package events
 
 import (
 	"encoding/json"
@@ -8,6 +8,8 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/errors"
 )
 
 var (
@@ -41,8 +43,9 @@ const (
 )
 
 type BootstrapResult struct {
-	Status BootstrapStatus `json:"Status,omitempty"`
-	Log    string          `json:"Log,omitempty"`
+	Status    BootstrapStatus           `json:"Status,omitempty"`
+	ErrorType errors.BootstrapErrorType `json:"ErrorType,omitempty"`
+	Error     string                    `json:"Error,omitempty"`
 }
 
 type Event struct {

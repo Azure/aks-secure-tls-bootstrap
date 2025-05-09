@@ -135,7 +135,7 @@ var _ = Describe("Client tests", Ordered, func() {
 				imdsClient.EXPECT().GetAttestedData(gomock.Any(), gomock.Any()).Times(0)
 				imdsClient.EXPECT().GetInstanceData(gomock.Any()).Times(0)
 
-				kubeconfigData, err := bootstrapClient.GetKubeletClientCredential(ctx, bootstrapConfig)
+				kubeconfigData, err := bootstrapClient.BootstrapKubeletClientCredential(ctx, bootstrapConfig)
 				Expect(err).To(BeNil())
 				Expect(kubeconfigData).To(BeNil())
 			})
@@ -148,7 +148,7 @@ var _ = Describe("Client tests", Ordered, func() {
 					Return(fmt.Errorf("invalid kubeconfig")).
 					Times(1)
 
-				kubeconfigData, err := bootstrapClient.GetKubeletClientCredential(ctx, bootstrapConfig)
+				kubeconfigData, err := bootstrapClient.BootstrapKubeletClientCredential(ctx, bootstrapConfig)
 				Expect(kubeconfigData).To(BeNil())
 				Expect(err).ToNot(BeNil())
 				Expect(err.Error()).To(ContainSubstring("failed to generate access token for gRPC connection"))
@@ -165,7 +165,7 @@ var _ = Describe("Client tests", Ordered, func() {
 					Return(nil, errors.New("cannot get VM instance data from IMDS")).
 					Times(1)
 
-				kubeconfigData, err := bootstrapClient.GetKubeletClientCredential(ctx, bootstrapConfig)
+				kubeconfigData, err := bootstrapClient.BootstrapKubeletClientCredential(ctx, bootstrapConfig)
 				Expect(kubeconfigData).To(BeNil())
 				Expect(err).ToNot(BeNil())
 				Expect(err.Error()).To(ContainSubstring("failed to retrieve instance metadata"))
@@ -185,7 +185,7 @@ var _ = Describe("Client tests", Ordered, func() {
 					Return(&akssecuretlsbootstrapv1.GetNonceResponse{}, errors.New("cannot get nonce response")).
 					Times(1)
 
-				kubeconfigData, err := bootstrapClient.GetKubeletClientCredential(ctx, bootstrapConfig)
+				kubeconfigData, err := bootstrapClient.BootstrapKubeletClientCredential(ctx, bootstrapConfig)
 				Expect(kubeconfigData).To(BeNil())
 				Expect(err).ToNot(BeNil())
 				Expect(err.Error()).To(ContainSubstring("failed to retrieve a nonce from bootstrap server"))
@@ -210,7 +210,7 @@ var _ = Describe("Client tests", Ordered, func() {
 					Return(nil, errors.New("cannot get VM attested data")).
 					Times(1)
 
-				kubeconfigData, err := bootstrapClient.GetKubeletClientCredential(ctx, bootstrapConfig)
+				kubeconfigData, err := bootstrapClient.BootstrapKubeletClientCredential(ctx, bootstrapConfig)
 				Expect(kubeconfigData).To(BeNil())
 				Expect(err).ToNot(BeNil())
 				Expect(err.Error()).To(ContainSubstring("failed to retrieve attested data"))
@@ -240,7 +240,7 @@ var _ = Describe("Client tests", Ordered, func() {
 					Return(nil, errors.New("cannot get credential")).
 					Times(1)
 
-				kubeconfigData, err := bootstrapClient.GetKubeletClientCredential(ctx, bootstrapConfig)
+				kubeconfigData, err := bootstrapClient.BootstrapKubeletClientCredential(ctx, bootstrapConfig)
 				Expect(kubeconfigData).To(BeNil())
 				Expect(err).ToNot(BeNil())
 				Expect(err.Error()).To(ContainSubstring("failed to retrieve new kubelet client credential from bootstrap server"))
@@ -272,7 +272,7 @@ var _ = Describe("Client tests", Ordered, func() {
 					}, nil).
 					Times(1)
 
-				kubeconfigData, err := bootstrapClient.GetKubeletClientCredential(ctx, bootstrapConfig)
+				kubeconfigData, err := bootstrapClient.BootstrapKubeletClientCredential(ctx, bootstrapConfig)
 				Expect(kubeconfigData).To(BeNil())
 				Expect(err).ToNot(BeNil())
 				Expect(err.Error()).To(ContainSubstring("cert data from bootstrap server is empty"))
@@ -303,7 +303,7 @@ var _ = Describe("Client tests", Ordered, func() {
 					}, nil).
 					Times(1)
 
-				kubeconfigData, err := bootstrapClient.GetKubeletClientCredential(ctx, bootstrapConfig)
+				kubeconfigData, err := bootstrapClient.BootstrapKubeletClientCredential(ctx, bootstrapConfig)
 				Expect(kubeconfigData).To(BeNil())
 				Expect(err).ToNot(BeNil())
 				Expect(err.Error()).To(ContainSubstring("failed to decode cert data from bootstrap server"))
@@ -345,7 +345,7 @@ var _ = Describe("Client tests", Ordered, func() {
 					}, nil).
 					Times(1)
 
-				kubeconfigData, err := bootstrapClient.GetKubeletClientCredential(ctx, bootstrapConfig)
+				kubeconfigData, err := bootstrapClient.BootstrapKubeletClientCredential(ctx, bootstrapConfig)
 				Expect(err).To(BeNil())
 				Expect(kubeconfigData).ToNot(BeNil())
 

@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"fmt"
 
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/errors"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/imds"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/kubeconfig"
 	akssecuretlsbootstrapv1 "github.com/Azure/aks-secure-tls-bootstrap/service/pkg/gen/akssecuretlsbootstrap/v1"
@@ -33,7 +34,7 @@ func NewClient(logger *zap.Logger) (*Client, error) {
 	}, nil
 }
 
-func (c *Client) GetKubeletClientCredential(ctx context.Context, cfg *Config) (*clientcmdapi.Config, error) {
+func (c *Client) BootstrapKubeletClientCredential(ctx context.Context, cfg *Config) (*clientcmdapi.Config, error) {
 	err := c.kubeconfigValidator.Validate(cfg.KubeconfigPath, cfg.EnsureAuthorizedClient)
 	if err == nil {
 		c.logger.Info("existing kubeconfig is valid, will skip bootstrapping", zap.String("kubeconfig", cfg.KubeconfigPath))
@@ -44,14 +45,20 @@ func (c *Client) GetKubeletClientCredential(ctx context.Context, cfg *Config) (*
 	token, err := c.getAccessToken(cfg.CustomClientID, cfg.AADResource, &cfg.AzureConfig)
 	if err != nil {
 		c.logger.Error("failed to generate access token for gRPC connection", zap.Error(err))
-		return nil, fmt.Errorf("failed to generate access token for gRPC connection: %w", err)
+		return nil, &errors.BootstrapError{
+			Type:  errors.BootstrapErrorTypeGetAccessTokenFailure,
+			Inner: fmt.Errorf("failed to generate access token for gRPC connection: %w", err),
+		}
 	}
 	c.logger.Info("generated access token for gRPC connection")
 
 	serviceClient, close, err := c.getServiceClientFunc(c.logger, token, cfg)
 	if err != nil {
 		c.logger.Error("failed to setup bootstrap service connection", zap.Error(err))
-		return nil, fmt.Errorf("failed to setup bootstrap service connection: %w", err)
+		return nil, &errors.BootstrapError{
+			Type:  errors.BootstrapErrorTypeGetServiceClientFailure,
+			Inner: fmt.Errorf("failed to setup bootstrap service connection: %w", err),
+		}
 	}
 	defer func() {
 		if err := close(); err != nil {
@@ -63,7 +70,10 @@ func (c *Client) GetKubeletClientCredential(ctx context.Context, cfg *Config) (*
 	instanceData, err := c.imdsClient.GetInstanceData(ctx)
 	if err != nil {
 		c.logger.Error("failed to retrieve instance metadata from IMDS", zap.Error(err))
-		return nil, fmt.Errorf("failed to retrieve instance metadata from IMDS: %w", err)
+		return nil, &errors.BootstrapError{
+			Type:  errors.BootstrapErrorTypeGetIntanceDataFailure,
+			Inner: fmt.Errorf("failed to retrieve instance metadata from IMDS: %w", err),
+		}
 	}
 	c.logger.Info("retrieved IMDS instance data", zap.String("vmResourceId", instanceData.Compute.ResourceID))
 
@@ -72,7 +82,10 @@ func (c *Client) GetKubeletClientCredential(ctx context.Context, cfg *Config) (*
 	})
 	if err != nil {
 		c.logger.Error("failed retrieve a nonce from bootstrap server", zap.Error(err))
-		return nil, fmt.Errorf("failed to retrieve a nonce from bootstrap server: %w", err)
+		return nil, &errors.BootstrapError{
+			Type:  errors.BootstrapErrorTypeGetNonceFailure,
+			Inner: fmt.Errorf("failed to retrieve a nonce from bootstrap server: %w", err),
+		}
 	}
 	c.logger.Info("received new nonce from bootstrap server")
 	nonce := nonceResponse.GetNonce()
@@ -80,14 +93,20 @@ func (c *Client) GetKubeletClientCredential(ctx context.Context, cfg *Config) (*
 	attestedData, err := c.imdsClient.GetAttestedData(ctx, nonce)
 	if err != nil {
 		c.logger.Error("failed to retrieve attested data from IMDS", zap.Error(err))
-		return nil, fmt.Errorf("failed to retrieve attested data from IMDS: %w", err)
+		return nil, &errors.BootstrapError{
+			Type:  errors.BootstrapErrorTypeGetAttestedDataFailure,
+			Inner: fmt.Errorf("failed to retrieve attested data from IMDS: %w", err),
+		}
 	}
 	c.logger.Info("retrieved IMDS attested data")
 
 	csrPEM, privateKey, err := makeKubeletClientCSR()
 	if err != nil {
 		c.logger.Error("failed to create kubelet client CSR", zap.Error(err))
-		return nil, fmt.Errorf("failed to create kubelet client CSR: %w", err)
+		return nil, &errors.BootstrapError{
+			Type:  errors.BootstrapErrorTypeMakeKubeletClientCSRFailure,
+			Inner: fmt.Errorf("failed to create kubelet client CSR: %w", err),
+		}
 	}
 	c.logger.Info("generated kubelet client CSR and associated private key")
 
@@ -99,19 +118,28 @@ func (c *Client) GetKubeletClientCredential(ctx context.Context, cfg *Config) (*
 	})
 	if err != nil {
 		c.logger.Error("failed to retrieve new kubelet client credential from bootstrap server", zap.Error(err))
-		return nil, fmt.Errorf("failed to retrieve new kubelet client credential from bootstrap server: %w", err)
+		return nil, &errors.BootstrapError{
+			Type:  errors.BootstrapErrorTypeGetCredentialFailure,
+			Inner: fmt.Errorf("failed to retrieve new kubelet client credential from bootstrap server: %w", err),
+		}
 	}
 	c.logger.Info("received kubelet client credential from bootstrap server")
 
 	encodedCertPEM := credentialResponse.GetEncodedCertPem()
 	if encodedCertPEM == "" {
 		c.logger.Error("cert data from bootstrap server is empty")
-		return nil, fmt.Errorf("cert data from bootstrap server is empty")
+		return nil, &errors.BootstrapError{
+			Type:  errors.BootstrapErrorTypeGetCredentialFailure,
+			Inner: fmt.Errorf("cert data from bootstrap server is empty"),
+		}
 	}
 	certPEM, err := base64.StdEncoding.DecodeString(encodedCertPEM)
 	if err != nil {
 		c.logger.Error("failed to decode cert data from bootstrap server", zap.Error(err))
-		return nil, fmt.Errorf("failed to decode cert data from bootstrap server: %w", err)
+		return nil, &errors.BootstrapError{
+			Type:  errors.BootstrapErrorTypeGetCredentialFailure,
+			Inner: fmt.Errorf("failed to decode cert data from bootstrap server: %w", err),
+		}
 	}
 	kubeconfigData, err := kubeconfig.GenerateForCertAndKey(certPEM, privateKey, &kubeconfig.Config{
 		APIServerFQDN:     cfg.APIServerFQDN,
@@ -121,7 +149,10 @@ func (c *Client) GetKubeletClientCredential(ctx context.Context, cfg *Config) (*
 	})
 	if err != nil {
 		c.logger.Error("failed to generate kubeconfig for new client cert and key", zap.Error(err))
-		return nil, fmt.Errorf("failed to generate kubeconfig for new client cert and key: %w", err)
+		return nil, &errors.BootstrapError{
+			Type:  errors.BootstrapErrorTypeGenerateKubeconfigFailure,
+			Inner: fmt.Errorf("failed to generate kubeconfig for new client cert and key: %w", err),
+		}
 	}
 	c.logger.Info("successfully generated new kubeconfig data")
 
