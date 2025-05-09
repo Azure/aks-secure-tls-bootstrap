@@ -10,7 +10,6 @@ require (
 	github.com/hashicorp/go-retryablehttp v0.7.7
 	github.com/onsi/ginkgo/v2 v2.15.0
 	github.com/onsi/gomega v1.31.0
-	github.com/samber/lo v1.50.0
 	github.com/stretchr/testify v1.10.0
 	go.uber.org/mock v0.5.0
 	go.uber.org/zap v1.26.0
