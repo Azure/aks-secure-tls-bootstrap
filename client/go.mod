@@ -16,7 +16,6 @@ require (
 	go.uber.org/zap v1.26.0
 	golang.org/x/oauth2 v0.24.0
 	google.golang.org/grpc v1.70.0
-	grpc.go4.org v0.0.0-20170609214715-11d0a25b4919
 	k8s.io/apimachinery v0.29.1
 	k8s.io/client-go v0.29.1
 	software.sslmate.com/src/go-pkcs12 v0.5.0
