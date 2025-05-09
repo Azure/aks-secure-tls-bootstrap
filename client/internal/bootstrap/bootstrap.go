@@ -14,6 +14,9 @@ import (
 func PerformBootstrapping(ctx context.Context, logger *zap.Logger, client *Client, config *Config) error {
 	return retry.Do(
 		func() error {
+			if err := ctx.Err(); err != nil {
+				return err // return the context error if the done channel is closed
+			}
 			kubeconfigData, err := client.BootstrapKubeletClientCredential(ctx, config)
 			if err != nil {
 				return err
@@ -35,6 +38,5 @@ func PerformBootstrapping(ctx context.Context, logger *zap.Logger, client *Clien
 		retry.DelayType(retry.DefaultDelayType), // backoff + random jitter
 		retry.Delay(500*time.Millisecond),
 		retry.MaxDelay(3*time.Second),
-		retry.LastErrorOnly(true),
 	)
 }
