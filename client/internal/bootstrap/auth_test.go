@@ -10,7 +10,7 @@ import (
 	. "github.com/onsi/gomega"
 	"go.uber.org/zap"
 
-	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/datamodel"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/cloud"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/testutil"
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure"
@@ -42,12 +42,12 @@ var _ = Describe("Auth", Ordered, func() {
 
 		When("there is an error generating an MSI access token", func() {
 			It("should return an error", func() {
-				azureConfig := &datamodel.AzureConfig{
+				cloudProviderConfig := &cloud.ProviderConfig{
 					UserAssignedIdentityID: "kubelet-identity-id",
 					TenantID:               testTenantID,
 				}
 
-				token, err := bootstrapClient.getAccessToken("", "", azureConfig) // pass an empty resource to force a failure
+				token, err := bootstrapClient.getAccessToken("", "", cloudProviderConfig) // pass an empty resource to force a failure
 				Expect(token).To(BeEmpty())
 				Expect(err).To(MatchError(ContainSubstring("generating MSI access token")))
 			})
@@ -55,14 +55,14 @@ var _ = Describe("Auth", Ordered, func() {
 
 		When("there is an error getting the azure environment config for the specified cloud", func() {
 			It("should return an error", func() {
-				azureConfig := &datamodel.AzureConfig{
-					Cloud:        "invalid",
+				cloudProviderConfig := &cloud.ProviderConfig{
+					CloudName:    "invalid",
 					ClientID:     "service-principal-id",
 					ClientSecret: "secret",
 					TenantID:     testTenantID,
 				}
 
-				token, err := bootstrapClient.getAccessToken("", testResource, azureConfig)
+				token, err := bootstrapClient.getAccessToken("", testResource, cloudProviderConfig)
 				Expect(token).To(BeEmpty())
 				Expect(err).To(MatchError(ContainSubstring(`getting azure environment config for cloud "invalid"`)))
 			})
@@ -70,14 +70,14 @@ var _ = Describe("Auth", Ordered, func() {
 
 		When("there is an error generating a service principal access token with username and password", func() {
 			It("should return an error", func() {
-				azureConfig := &datamodel.AzureConfig{
-					Cloud:        azure.PublicCloud.Name,
+				cloudProviderConfig := &cloud.ProviderConfig{
+					CloudName:    azure.PublicCloud.Name,
 					ClientID:     "service-principal-id",
 					ClientSecret: "", // empty secret to force a failure
 					TenantID:     testTenantID,
 				}
 
-				token, err := bootstrapClient.getAccessToken("", testResource, azureConfig)
+				token, err := bootstrapClient.getAccessToken("", testResource, cloudProviderConfig)
 				Expect(token).To(BeEmpty())
 				Expect(err).To(MatchError(ContainSubstring("generating SPN access token with username and password")))
 			})
@@ -85,14 +85,14 @@ var _ = Describe("Auth", Ordered, func() {
 
 		When("there is an error b64-decoding the certificate data", func() {
 			It("should return an error", func() {
-				azureConfig := &datamodel.AzureConfig{
-					Cloud:        azure.PublicCloud.Name,
+				cloudProviderConfig := &cloud.ProviderConfig{
+					CloudName:    azure.PublicCloud.Name,
 					ClientID:     "service-principal-id",
 					ClientSecret: "certificate:YW55IGNhcm5hbCBwbGVhc3U======", // invalid b64-encoding
 					TenantID:     testTenantID,
 				}
 
-				token, err := bootstrapClient.getAccessToken("", testResource, azureConfig)
+				token, err := bootstrapClient.getAccessToken("", testResource, cloudProviderConfig)
 				Expect(token).To(BeEmpty())
 				Expect(err).To(MatchError(ContainSubstring("b64-decoding certificate data in client secret")))
 			})
@@ -100,14 +100,14 @@ var _ = Describe("Auth", Ordered, func() {
 
 		When("there is an error decoding the pfx certificate data", func() {
 			It("should return an error", func() {
-				azureConfig := &datamodel.AzureConfig{
-					Cloud:        azure.PublicCloud.Name,
+				cloudProviderConfig := &cloud.ProviderConfig{
+					CloudName:    azure.PublicCloud.Name,
 					ClientID:     "service-principal-id",
 					ClientSecret: "certificate:dGVzdAo=", // b64-encoding of "test"
 					TenantID:     testTenantID,
 				}
 
-				token, err := bootstrapClient.getAccessToken("", testResource, azureConfig)
+				token, err := bootstrapClient.getAccessToken("", testResource, cloudProviderConfig)
 				Expect(token).To(BeEmpty())
 				Expect(err).To(MatchError(ContainSubstring("decoding pfx certificate data in client secret")))
 			})
@@ -122,14 +122,14 @@ var _ = Describe("Auth", Ordered, func() {
 				})
 				Expect(err).To(BeNil())
 
-				azureConfig := &datamodel.AzureConfig{
-					Cloud:        azure.PublicCloud.Name,
+				cloudProviderConfig := &cloud.ProviderConfig{
+					CloudName:    azure.PublicCloud.Name,
 					ClientID:     "service-principal-id",
 					ClientSecret: "certificate:" + certData,
 					TenantID:     testTenantID,
 				}
 
-				token, err := bootstrapClient.getAccessToken("", "", azureConfig) // pass an empty resource to force a failure
+				token, err := bootstrapClient.getAccessToken("", "", cloudProviderConfig) // pass an empty resource to force a failure
 				Expect(token).To(BeEmpty())
 				Expect(err).To(MatchError(ContainSubstring("generating SPN access token with certificate")))
 			})
@@ -137,12 +137,12 @@ var _ = Describe("Auth", Ordered, func() {
 
 		When("UserAssignedIdentityID is specified in azure config", func() {
 			It("should return a corresponding MSI access token", func() {
-				azureConfig := &datamodel.AzureConfig{
+				cloudProviderConfig := &cloud.ProviderConfig{
 					UserAssignedIdentityID: "kubelet-identity-id",
 					TenantID:               testTenantID,
 				}
 
-				token, err := bootstrapClient.getAccessToken("", testResource, azureConfig)
+				token, err := bootstrapClient.getAccessToken("", testResource, cloudProviderConfig)
 				Expect(err).To(BeNil())
 				Expect(token).To(Equal("token"))
 			})
@@ -151,12 +151,12 @@ var _ = Describe("Auth", Ordered, func() {
 		When("a custom client ID is specified", func() {
 			It("should return a corresponding MSI access token from IMDS", func() {
 				customClientID := "custom"
-				azureConfig := &datamodel.AzureConfig{
+				cloudProviderConfig := &cloud.ProviderConfig{
 					UserAssignedIdentityID: "kubelet-identity-id",
 					TenantID:               testTenantID,
 				}
 
-				token, err := bootstrapClient.getAccessToken(customClientID, testResource, azureConfig)
+				token, err := bootstrapClient.getAccessToken(customClientID, testResource, cloudProviderConfig)
 				Expect(err).To(BeNil())
 				Expect(token).To(Equal("token"))
 			})
@@ -164,14 +164,14 @@ var _ = Describe("Auth", Ordered, func() {
 
 		When("service principal client secret does not contain certificate data", func() {
 			It("should return a corresponding SPN access token using username + password auth", func() {
-				azureConfig := &datamodel.AzureConfig{
-					Cloud:        azure.PublicCloud.Name,
+				cloudProviderConfig := &cloud.ProviderConfig{
+					CloudName:    azure.PublicCloud.Name,
 					ClientID:     "service-principal-id",
 					ClientSecret: "secret",
 					TenantID:     testTenantID,
 				}
 
-				token, err := bootstrapClient.getAccessToken("", testResource, azureConfig)
+				token, err := bootstrapClient.getAccessToken("", testResource, cloudProviderConfig)
 				Expect(err).To(BeNil())
 				Expect(token).To(Equal("token"))
 			})
@@ -186,14 +186,14 @@ var _ = Describe("Auth", Ordered, func() {
 				})
 				Expect(err).To(BeNil())
 
-				azureConfig := &datamodel.AzureConfig{
-					Cloud:        azure.PublicCloud.Name,
+				cloudProviderConfig := &cloud.ProviderConfig{
+					CloudName:    azure.PublicCloud.Name,
 					ClientID:     "service-principal-id",
 					ClientSecret: "certificate:" + certData,
 					TenantID:     testTenantID,
 				}
 
-				token, err := bootstrapClient.getAccessToken("", testResource, azureConfig)
+				token, err := bootstrapClient.getAccessToken("", testResource, cloudProviderConfig)
 				Expect(err).To(BeNil())
 				Expect(token).To(Equal("token"))
 			})

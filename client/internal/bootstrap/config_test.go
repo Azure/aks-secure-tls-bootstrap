@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/datamodel"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/cloud"
 	"github.com/Azure/go-autorest/autorest/azure"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -22,25 +22,25 @@ var _ = Describe("config tests", func() {
 
 			BeforeEach(func() {
 				cfg = &Config{
-					AzureConfigPath:   "path/to/azure.json",
-					APIServerFQDN:     "fqdn",
-					CustomClientID:    "clientId",
-					NextProto:         "alpn",
-					AADResource:       "appID",
-					ClusterCAFilePath: "path",
-					KubeconfigPath:    "path",
-					CertFilePath:      "path",
-					KeyFilePath:       "path",
-					Deadline:          time.Second,
+					CloudProviderConfigPath: "path/to/azure.json",
+					APIServerFQDN:           "fqdn",
+					CustomClientID:          "clientId",
+					NextProto:               "alpn",
+					AADResource:             "appID",
+					ClusterCAFilePath:       "path",
+					KubeconfigPath:          "path",
+					CertFilePath:            "path",
+					KeyFilePath:             "path",
+					Deadline:                time.Second,
 				}
 			})
 
-			When("azureConfigPath is empty", func() {
+			When("cloudProviderConfigPath is empty", func() {
 				It("should return an error", func() {
-					cfg.AzureConfigPath = ""
+					cfg.CloudProviderConfigPath = ""
 					err := cfg.Validate()
 					Expect(err).ToNot(BeNil())
-					Expect(err.Error()).To(ContainSubstring("azure config path must be specified"))
+					Expect(err.Error()).To(ContainSubstring("cloud provider config path must be specified"))
 				})
 			})
 
@@ -107,47 +107,47 @@ var _ = Describe("config tests", func() {
 				})
 			})
 
-			When("azure config path does not exist", func() {
+			When("cloud provider config path does not exist", func() {
 				It("should return an error", func() {
-					cfg.AzureConfigPath = "does/not/exist.json"
+					cfg.CloudProviderConfigPath = "does/not/exist.json"
 					err := cfg.Validate()
 					Expect(err).ToNot(BeNil())
-					Expect(err.Error()).To(ContainSubstring("reading azure config data"))
+					Expect(err.Error()).To(ContainSubstring("reading cloud provider config data"))
 				})
 			})
 
-			When("azure config is malformed", func() {
+			When("cloud provider config is malformed", func() {
 				It("should return an error", func() {
 					tempDir := GinkgoT().TempDir()
 					path := filepath.Join(tempDir, "config.json")
 					err := os.WriteFile(path, []byte("malformed"), os.ModePerm)
 					Expect(err).To(BeNil())
-					cfg.AzureConfigPath = path
+					cfg.CloudProviderConfigPath = path
 					err = cfg.Validate()
 					Expect(err).ToNot(BeNil())
-					Expect(err.Error()).To(ContainSubstring("unmarshalling azure config data"))
+					Expect(err.Error()).To(ContainSubstring("unmarshalling cloud provider config data"))
 				})
 			})
 
 			When("client opts are valid", func() {
 				It("should validate without error", func() {
-					azureConfig := datamodel.AzureConfig{
+					cloudProviderConfig := cloud.ProviderConfig{
 						ClientID:               "msi",
 						UserAssignedIdentityID: "identityId",
-						Cloud:                  azure.PublicCloud.Name,
+						CloudName:              azure.PublicCloud.Name,
 					}
-					configBytes, err := json.Marshal(azureConfig)
+					configBytes, err := json.Marshal(cloudProviderConfig)
 					Expect(err).To(BeNil())
 
 					tempDir := GinkgoT().TempDir()
-					cfg.AzureConfigPath = filepath.Join(tempDir, "azure.json")
+					cfg.CloudProviderConfigPath = filepath.Join(tempDir, "azure.json")
 
-					err = os.WriteFile(cfg.AzureConfigPath, configBytes, os.ModePerm)
+					err = os.WriteFile(cfg.CloudProviderConfigPath, configBytes, os.ModePerm)
 					Expect(err).To(BeNil())
 
 					err = cfg.Validate()
 					Expect(err).To(BeNil())
-					Expect(cfg.AzureConfig).To(Equal(azureConfig))
+					Expect(cfg.ProviderConfig).To(Equal(cloudProviderConfig))
 				})
 			})
 		})
@@ -183,15 +183,15 @@ var _ = Describe("config tests", func() {
 			When("config file exists and is valid", func() {
 				It("should load from the config file without error", func() {
 					config := &Config{
-						AzureConfigPath:   "path/to/azure.json",
-						APIServerFQDN:     "fqdn",
-						CustomClientID:    "clientId",
-						NextProto:         "alpn",
-						AADResource:       "appID",
-						ClusterCAFilePath: "clusterCAPath",
-						KubeconfigPath:    "kubeconfigPath",
-						CertFilePath:      "certFilePath",
-						KeyFilePath:       "keyFilePath",
+						CloudProviderConfigPath: "path/to/azure.json",
+						APIServerFQDN:           "fqdn",
+						CustomClientID:          "clientId",
+						NextProto:               "alpn",
+						AADResource:             "appID",
+						ClusterCAFilePath:       "clusterCAPath",
+						KubeconfigPath:          "kubeconfigPath",
+						CertFilePath:            "certFilePath",
+						KeyFilePath:             "keyFilePath",
 					}
 					tempDir := GinkgoT().TempDir()
 					path := filepath.Join(tempDir, "config.json")

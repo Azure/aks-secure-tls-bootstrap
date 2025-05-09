@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/datamodel"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/cloud"
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"go.uber.org/zap"
@@ -28,10 +28,10 @@ func extractAccessToken(token *adal.ServicePrincipalToken) (string, error) {
 	return token.OAuthToken(), nil
 }
 
-// getAccessToken retrieves an AAD access token (JWT) using the specified custom client ID, resource, and azure config.
+// getAccessToken retrieves an AAD access token (JWT) using the specified custom client ID, resource, and cloud provider config.
 // MSI access tokens are retrieved from IMDS, while service principal tokens are retrieved directly from AAD.
-func (c *Client) getAccessToken(customClientID, resource string, azureConfig *datamodel.AzureConfig) (string, error) {
-	userAssignedID := azureConfig.UserAssignedIdentityID
+func (c *Client) getAccessToken(customClientID, resource string, cloudProviderConfig *cloud.ProviderConfig) (string, error) {
+	userAssignedID := cloudProviderConfig.UserAssignedIdentityID
 	if customClientID != "" {
 		userAssignedID = customClientID
 	}
@@ -47,27 +47,27 @@ func (c *Client) getAccessToken(customClientID, resource string, azureConfig *da
 		return c.extractAccessTokenFunc(token)
 	}
 
-	env, err := azure.EnvironmentFromName(azureConfig.Cloud)
+	env, err := azure.EnvironmentFromName(cloudProviderConfig.CloudName)
 	if err != nil {
-		return "", fmt.Errorf("getting azure environment config for cloud %q: %w", azureConfig.Cloud, err)
+		return "", fmt.Errorf("getting azure environment config for cloud %q: %w", cloudProviderConfig.CloudName, err)
 	}
-	oauthConfig, err := adal.NewOAuthConfig(env.ActiveDirectoryEndpoint, azureConfig.TenantID)
+	oauthConfig, err := adal.NewOAuthConfig(env.ActiveDirectoryEndpoint, cloudProviderConfig.TenantID)
 	if err != nil {
 		return "", fmt.Errorf("creating oauth config with azure environment: %w", err)
 	}
 
-	if !strings.HasPrefix(azureConfig.ClientSecret, certificateSecretPrefix) {
-		c.logger.Info("generating SPN access token with username and password", zap.String("clientId", azureConfig.ClientID))
-		token, err := adal.NewServicePrincipalToken(*oauthConfig, azureConfig.ClientID, azureConfig.ClientSecret, resource)
+	if !strings.HasPrefix(cloudProviderConfig.ClientSecret, certificateSecretPrefix) {
+		c.logger.Info("generating SPN access token with username and password", zap.String("clientId", cloudProviderConfig.ClientID))
+		token, err := adal.NewServicePrincipalToken(*oauthConfig, cloudProviderConfig.ClientID, cloudProviderConfig.ClientSecret, resource)
 		if err != nil {
 			return "", fmt.Errorf("generating SPN access token with username and password: %w", err)
 		}
 		return c.extractAccessTokenFunc(token)
 	}
 
-	c.logger.Info("client secret contains certificate data, using certificate to generate SPN access token", zap.String("clientId", azureConfig.ClientID))
+	c.logger.Info("client secret contains certificate data, using certificate to generate SPN access token", zap.String("clientId", cloudProviderConfig.ClientID))
 
-	certData, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(azureConfig.ClientSecret, certificateSecretPrefix))
+	certData, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(cloudProviderConfig.ClientSecret, certificateSecretPrefix))
 	if err != nil {
 		return "", fmt.Errorf("b64-decoding certificate data in client secret: %w", err)
 	}
@@ -76,8 +76,8 @@ func (c *Client) getAccessToken(customClientID, resource string, azureConfig *da
 		return "", fmt.Errorf("decoding pfx certificate data in client secret: %w", err)
 	}
 
-	c.logger.Info("generating SPN access token with certificate", zap.String("clientId", azureConfig.ClientID))
-	token, err := adal.NewServicePrincipalTokenFromCertificate(*oauthConfig, azureConfig.ClientID, certificate, privateKey, resource)
+	c.logger.Info("generating SPN access token with certificate", zap.String("clientId", cloudProviderConfig.ClientID))
+	token, err := adal.NewServicePrincipalTokenFromCertificate(*oauthConfig, cloudProviderConfig.ClientID, certificate, privateKey, resource)
 	if err != nil {
 		return "", fmt.Errorf("generating SPN access token with certificate: %w", err)
 	}

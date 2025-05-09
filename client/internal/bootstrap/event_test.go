@@ -1,4 +1,4 @@
-package events
+package bootstrap
 
 import (
 	"encoding/json"
@@ -20,13 +20,12 @@ func TestLinuxEvent(t *testing.T) {
 
 	now := time.Now()
 	e := &Event{
-		Name:    "test-linux-event",
 		Start:   now,
 		End:     now.Add(time.Minute),
 		Message: "linux",
 	}
 
-	err := e.Write()
+	err := e.write()
 	assert.NoError(t, err)
 
 	windowsEntries, err := os.ReadDir(guestAgentEventsPathWindows)
@@ -47,7 +46,7 @@ func TestLinuxEvent(t *testing.T) {
 	err = json.Unmarshal(content, &eventData)
 	assert.NoError(t, err)
 
-	assert.Equal(t, "test-linux-event", eventData["TaskName"])
+	assert.Equal(t, performSecureTLSBootstrappingGuestAgentEventName, eventData["TaskName"])
 	assert.Equal(t, "Informational", eventData["EventLevel"])
 	assert.Equal(t, now.Format("2006-01-02 15:04:05.000"), eventData["Timestamp"])
 	assert.Equal(t, now.Add(time.Minute).Format("2006-01-02 15:04:05.000"), eventData["OperationId"])
@@ -66,13 +65,12 @@ func TestWindowsEvent(t *testing.T) {
 
 	now := time.Now()
 	e := &Event{
-		Name:    "test-windows-event",
 		Start:   now,
 		End:     now.Add(time.Minute),
 		Message: "windows",
 	}
 
-	err := e.Write()
+	err := e.write()
 	assert.NoError(t, err)
 
 	linuxEntries, err := os.ReadDir(guestAgentEventsPathLinux)
@@ -93,7 +91,7 @@ func TestWindowsEvent(t *testing.T) {
 	err = json.Unmarshal(content, &eventData)
 	assert.NoError(t, err)
 
-	assert.Equal(t, "test-windows-event", eventData["TaskName"])
+	assert.Equal(t, performSecureTLSBootstrappingGuestAgentEventName, eventData["TaskName"])
 	assert.Equal(t, "Informational", eventData["EventLevel"])
 	assert.Equal(t, now.Format("2006-01-02 15:04:05.000"), eventData["Timestamp"])
 	assert.Equal(t, now.Add(time.Minute).Format("2006-01-02 15:04:05.000"), eventData["OperationId"])

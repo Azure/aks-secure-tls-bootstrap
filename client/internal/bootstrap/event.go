@@ -1,4 +1,4 @@
-package events
+package bootstrap
 
 import (
 	"encoding/json"
@@ -6,10 +6,11 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"time"
+)
 
-	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/errors"
+const (
+	performSecureTLSBootstrappingGuestAgentEventName = "AKS.performSecureTLSBootstrapping"
 )
 
 var (
@@ -24,7 +25,7 @@ func init() {
 	guestAgentEventsPathWindows = "C:\\WindowsAzure\\Logs\\Plugins\\Microsoft.Compute.CustomScriptExtension\\Events"
 
 	isWindows = func() bool {
-		return strings.EqualFold(runtime.GOOS, "windows")
+		return runtime.GOOS == "windows"
 	}
 }
 
@@ -35,21 +36,21 @@ func getGuestAgentEventsPath() string {
 	return guestAgentEventsPathLinux
 }
 
-type BootstrapStatus string
+type Status string
 
 const (
-	BootstrapStatusSuccess BootstrapStatus = "Success"
-	BootstrapStatusFailure BootstrapStatus = "Failure"
+	StatusSuccess Status = "Success"
+	StatusFailure Status = "Failure"
 )
 
-type BootstrapResult struct {
-	Status    BootstrapStatus           `json:"Status,omitempty"`
-	ErrorType errors.BootstrapErrorType `json:"ErrorType,omitempty"`
-	Error     string                    `json:"Error,omitempty"`
+type Result struct {
+	Status    Status        `json:"Status"`
+	Elapsed   time.Duration `json:"Elapsed,omitempty"`
+	ErrorType ErrorType     `json:"ErrorType,omitempty"`
+	Error     string        `json:"Error,omitempty"`
 }
 
 type Event struct {
-	Name    string
 	Message string
 	Start   time.Time
 	End     time.Time
@@ -58,7 +59,8 @@ type Event struct {
 var _ json.Marshaler = (*Event)(nil)
 
 // Event instances are marshaled according to the GuestAgentGenericLogsSchema object used
-// by the azure guest agent (WALinuxAgent). For details, see: https://github.com/Azure/WALinuxAgent/blob/master/azurelinuxagent/common/telemetryevent.py#L49
+// by the azure guest agent (WALinuxAgent).
+// For details, see: https://github.com/Azure/WALinuxAgent/blob/master/azurelinuxagent/common/telemetryevent.py#L49
 func (e *Event) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		TaskName    string `json:"TaskName"`
@@ -70,7 +72,7 @@ func (e *Event) MarshalJSON() ([]byte, error) {
 		EventPID    string `json:"EventPid"`
 		EventTID    string `json:"EventTid"`
 	}{
-		TaskName:    e.Name,
+		TaskName:    performSecureTLSBootstrappingGuestAgentEventName,
 		Timestamp:   e.Start.Format("2006-01-02 15:04:05.000"),
 		OperationID: e.End.Format("2006-01-02 15:04:05.000"),
 		Message:     e.Message,
@@ -81,7 +83,17 @@ func (e *Event) MarshalJSON() ([]byte, error) {
 	})
 }
 
-func (e *Event) Write() error {
+func (e *Event) WriteWithResult(result *Result) error {
+	resultBytes, err := json.Marshal(result)
+	if err != nil {
+		e.Message = "Completed"
+	} else {
+		e.Message = string(resultBytes)
+	}
+	return e.write()
+}
+
+func (e *Event) write() error {
 	path := filepath.Join(getGuestAgentEventsPath(), fmt.Sprintf("%d.json", e.Start.UnixNano()))
 	data, err := json.Marshal(e)
 	if err != nil {

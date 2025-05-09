@@ -5,29 +5,24 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"os"
-	"os/signal"
 	"path/filepath"
-	"syscall"
 	"time"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/bootstrap"
-	internalerrors "github.com/Azure/aks-secure-tls-bootstrap/client/internal/errors"
-	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/events"
-	"github.com/avast/retry-go"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
+var bootstrapConfig = new(bootstrap.Config)
+
 var (
-	bootstrapConfig bootstrap.Config
-	configFile      string
-	logFile         string
-	verbose         bool
+	configFile string
+	logFile    string
+	verbose    bool
 )
 
 func init() {
@@ -35,7 +30,7 @@ func init() {
 	flag.StringVar(&logFile, "log-file", "", "path to a file where logs will be written, will be created if it does not already exist")
 	flag.BoolVar(&verbose, "verbose", false, "enable verbose log output")
 
-	flag.StringVar(&bootstrapConfig.AzureConfigPath, "azure-config", "", "path to the azure config file")
+	flag.StringVar(&bootstrapConfig.CloudProviderConfigPath, "cloud provider-config", "", "path to the cloud provider config file")
 	flag.StringVar(&bootstrapConfig.APIServerFQDN, "apiserver-fqdn", "", "FQDN of the apiserver")
 	flag.StringVar(&bootstrapConfig.CustomClientID, "custom-client-id", "", "client ID of the user-assigned managed identity to use when requesting a token from IMDS - if not specified the kubelet identity will be used")
 	flag.StringVar(&bootstrapConfig.AADResource, "aad-resource", "", "resource (audience) used to request JWT tokens from AAD for authentication")
@@ -63,84 +58,62 @@ func main() {
 		os.Exit(1)
 	}
 	// defer calls are not executed on os.Exit
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGKILL, syscall.SIGABRT)
+	ctx, cancel := context.WithCancel(context.Background())
 	exitCode := run(ctx)
 	cancel()
 	os.Exit(exitCode)
 }
 
 func run(ctx context.Context) int {
-	var code int
-
 	logger, err := configureLogging(logFile, verbose)
 	if err != nil {
 		fmt.Printf("unable to construct zap logger: %s\n", err)
-		os.Exit(1)
+		return 1
 	}
 	defer flush(logger)
 
-	start := time.Now()
-	dl := start.Add(bootstrapConfig.Deadline)
-	logger.Info("set bootstrap deadline", zap.Time("deadline", dl))
-	bootstrapCtx, cancel := context.WithDeadline(ctx, dl)
+	bootstrapClient, err := bootstrap.NewClient(logger)
+	if err != nil {
+		fmt.Printf("unable to construct bootstrap client: %s\n", err)
+		return 1
+	}
+
+	bootstrapStartTime := time.Now()
+	bootstrapDeadline := bootstrapStartTime.Add(bootstrapConfig.Deadline)
+	logger.Info("set bootstrap deadline", zap.Time("deadline", bootstrapDeadline))
+	bootstrapCtx, cancel := context.WithDeadline(ctx, bootstrapDeadline)
 	defer cancel()
 
-	bootstrapEvent := &events.Event{
-		Name:  "AKS.performSecureTLSBootstrapping",
-		Start: start,
-	}
-	defer func() {
-		if err := bootstrapEvent.Write(); err != nil {
-			logger.Error("unable to write guest agent event to disk", zap.Error(err))
-		}
-	}()
-	bootstrapResult := &events.BootstrapResult{
-		Status: events.BootstrapStatusSuccess,
+	err = bootstrap.PerformBootstrapping(bootstrapCtx, logger, bootstrapClient, bootstrapConfig)
+	bootstrapEndTime := time.Now()
+
+	var exitCode int
+	bootstrapResult := &bootstrap.Result{
+		Status:  bootstrap.StatusSuccess,
+		Elapsed: bootstrapEndTime.Sub(bootstrapStartTime),
 	}
 
-	err = performBootstrapping(bootstrapCtx, logger)
-	bootstrapEvent.End = time.Now()
 	if err != nil {
-		bootstrapResult.Status = events.BootstrapStatusFailure
-		var bootstrapErr *internalerrors.BootstrapError
+		bootstrapResult.Status = bootstrap.StatusFailure
+		var bootstrapErr *bootstrap.BootstrapError
 		if errors.As(err, &bootstrapErr) {
-			logger.Error("failed to bootstrap", zap.Error(bootstrapErr.Inner))
-			bootstrapResult.Error = bootstrapErr.Inner.Error()
-			bootstrapResult.ErrorType = bootstrapErr.Type
-		} else {
-			logger.Error("failed to bootstrap", zap.Error(err))
-			bootstrapResult.Error = err.Error()
+			bootstrapResult.ErrorType = bootstrapErr.Type()
+			err = bootstrapErr.Unwrap()
 		}
-		code = 1
+		bootstrapResult.Error = err.Error()
+		logger.Error("failed to bootstrap", zap.Error(err))
+		exitCode = 1
 	}
 
-	rawResult, err := json.Marshal(bootstrapResult)
-	if err != nil {
-		logger.Error("failed to marshal bootstrap result", zap.Error(err))
+	bootstrapEvent := &bootstrap.Event{
+		Start: bootstrapStartTime,
+		End:   bootstrapEndTime,
+	}
+	if err := bootstrapEvent.WriteWithResult(bootstrapResult); err != nil {
+		logger.Error("unable to write bootstrap guest agent event to disk", zap.Error(err))
 	}
 
-	bootstrapEvent.Message = string(rawResult)
-	return code
-}
-
-func performBootstrapping(ctx context.Context, logger *zap.Logger) error {
-	client, err := bootstrap.NewClient(logger)
-	if err != nil {
-		return fmt.Errorf("constructing bootstrap client: %w", err)
-	}
-	retryIf := func(err error) bool {
-		return !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded)
-	}
-	return retry.Do(
-		func() error {
-			return bootstrap.Bootstrap(ctx, client, &bootstrapConfig)
-		},
-		retry.RetryIf(retryIf),
-		retry.DelayType(retry.DefaultDelayType), // backoff + random jitter
-		retry.Delay(500*time.Millisecond),
-		retry.MaxDelay(2*time.Second),
-		retry.LastErrorOnly(true),
-	)
+	return exitCode
 }
 
 func configureLogging(logFile string, verbose bool) (*zap.Logger, error) {

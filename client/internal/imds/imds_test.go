@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/datamodel"
 	internalhttp "github.com/Azure/aks-secure-tls-bootstrap/client/internal/http"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -50,7 +49,7 @@ var _ = Describe("Client Tests", Ordered, func() {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			err := imdsClient.callIMDS(ctx, imds.URL, map[string]string{}, &datamodel.VMSSInstanceData{})
+			err := imdsClient.callIMDS(ctx, imds.URL, map[string]string{}, &VMInstanceData{})
 			Expect(err).To(BeNil())
 		})
 
@@ -64,7 +63,7 @@ var _ = Describe("Client Tests", Ordered, func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 
-				err := imdsClient.callIMDS(ctx, imds.URL, map[string]string{}, &datamodel.VMSSInstanceData{})
+				err := imdsClient.callIMDS(ctx, imds.URL, map[string]string{}, &VMInstanceData{})
 				Expect(err).To(BeNil())
 			})
 		})
@@ -87,7 +86,7 @@ var _ = Describe("Client Tests", Ordered, func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 
-				err := imdsClient.callIMDS(ctx, imds.URL, params, &datamodel.VMSSInstanceData{})
+				err := imdsClient.callIMDS(ctx, imds.URL, params, &VMInstanceData{})
 				Expect(err).To(BeNil())
 			})
 		})
