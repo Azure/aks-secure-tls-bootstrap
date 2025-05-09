@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/datamodel"
 	internalhttp "github.com/Azure/aks-secure-tls-bootstrap/client/internal/http"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -18,11 +17,9 @@ import (
 
 var _ = Describe("Client Tests", Ordered, func() {
 	const (
-		mockMSITokenResponseJSON          = `{"access_token":"accesstoken"}`
-		mockVMSSInstanceDataJSON          = `{"compute":{"resourceId": "resourceId"}}`
-		mockVMSSAttestedDataJSON          = `{"signature":"signature"}`
-		mockMSITokenResponseJSONWithError = `{"error":"tokenError","error_description":"error generating new JWT"}`
-		malformedJSON                     = `{{}`
+		mockVMInstanceDataJSON = `{"compute":{"resourceId": "resourceId"}}`
+		mockVMAttestedDataJSON = `{"signature":"signature"}`
+		malformedJSON          = `{{}`
 	)
 	var (
 		logger     *zap.Logger
@@ -50,7 +47,7 @@ var _ = Describe("Client Tests", Ordered, func() {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			err := imdsClient.callIMDS(ctx, imds.URL, map[string]string{}, &datamodel.VMSSInstanceData{})
+			err := imdsClient.callIMDS(ctx, imds.URL, map[string]string{}, &VMInstanceData{})
 			Expect(err).To(BeNil())
 		})
 
@@ -64,7 +61,7 @@ var _ = Describe("Client Tests", Ordered, func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 
-				err := imdsClient.callIMDS(ctx, imds.URL, map[string]string{}, &datamodel.VMSSInstanceData{})
+				err := imdsClient.callIMDS(ctx, imds.URL, map[string]string{}, &VMInstanceData{})
 				Expect(err).To(BeNil())
 			})
 		})
@@ -87,7 +84,7 @@ var _ = Describe("Client Tests", Ordered, func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 
-				err := imdsClient.callIMDS(ctx, imds.URL, params, &datamodel.VMSSInstanceData{})
+				err := imdsClient.callIMDS(ctx, imds.URL, params, &VMInstanceData{})
 				Expect(err).To(BeNil())
 			})
 		})
@@ -95,7 +92,7 @@ var _ = Describe("Client Tests", Ordered, func() {
 
 	Context("GetInstanceData tests", func() {
 		It("should call the correct IMDS endpoint with the correct query parameters", func() {
-			imds := mockIMDSWithAssertions(mockVMSSInstanceDataJSON, func(r *http.Request) {
+			imds := mockIMDSWithAssertions(mockVMInstanceDataJSON, func(r *http.Request) {
 				Expect(r.URL.Path).To(Equal("/metadata/instance"))
 				queryParameters := r.URL.Query()
 				Expect(queryParameters.Get("api-version")).To(Equal(apiVersion))
@@ -137,7 +134,7 @@ var _ = Describe("Client Tests", Ordered, func() {
 
 	Context("GetAttestedData tests", func() {
 		It("should call the correct IMDS endpoint with the correct query parameters", func() {
-			imds := mockIMDSWithAssertions(mockVMSSAttestedDataJSON, func(r *http.Request) {
+			imds := mockIMDSWithAssertions(mockVMAttestedDataJSON, func(r *http.Request) {
 				Expect(r.URL.Path).To(Equal("/metadata/attested/document"))
 				queryParameters := r.URL.Query()
 				Expect(queryParameters.Get("api-version")).To(Equal(apiVersion))

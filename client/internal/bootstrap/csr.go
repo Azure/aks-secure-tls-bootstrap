@@ -52,7 +52,7 @@ func makeKubeletClientCSR() (csrPEM []byte, privateKey *ecdsa.PrivateKey, err er
 func getHostname() (string, error) {
 	hostName, err := os.Hostname()
 	if err != nil {
-		return "", fmt.Errorf("couldn't determine hostname: %w", err)
+		return "", fmt.Errorf("resolving hostname: %w", err)
 	}
 
 	// Trim whitespaces first to avoid getting an empty hostname

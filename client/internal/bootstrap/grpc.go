@@ -8,12 +8,15 @@ import (
 	"crypto/x509"
 	"fmt"
 	"os"
+	"time"
 
 	internalhttp "github.com/Azure/aks-secure-tls-bootstrap/client/internal/http"
 	akssecuretlsbootstrapv1 "github.com/Azure/aks-secure-tls-bootstrap/service/pkg/gen/akssecuretlsbootstrap/v1"
+	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/retry"
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/oauth"
 )
@@ -42,6 +45,11 @@ func getServiceClient(logger *zap.Logger, token string, cfg *Config) (akssecuret
 				AccessToken: token,
 			}),
 		}),
+		grpc.WithUnaryInterceptor(retry.UnaryClientInterceptor(
+			retry.WithBackoff(retry.BackoffExponentialWithJitterBounded(100*time.Millisecond, 0.75, 2*time.Second)),
+			retry.WithCodes(codes.Aborted, codes.Unavailable),
+			retry.WithMax(10),
+		)),
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to dial client connection with context: %w", err)
