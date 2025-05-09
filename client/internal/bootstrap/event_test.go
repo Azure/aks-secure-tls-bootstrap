@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -25,8 +26,9 @@ func TestLinuxEvent(t *testing.T) {
 		Message: "linux",
 	}
 
-	err := e.write()
+	path, err := e.write()
 	assert.NoError(t, err)
+	assert.True(t, strings.HasSuffix(path, fmt.Sprintf("%d.json", now.UnixNano())))
 
 	windowsEntries, err := os.ReadDir(guestAgentEventsPathWindows)
 	assert.NoError(t, err)
@@ -70,8 +72,9 @@ func TestWindowsEvent(t *testing.T) {
 		Message: "windows",
 	}
 
-	err := e.write()
+	path, err := e.write()
 	assert.NoError(t, err)
+	assert.True(t, strings.HasSuffix(path, fmt.Sprintf("%d.json", now.UnixNano())))
 
 	linuxEntries, err := os.ReadDir(guestAgentEventsPathLinux)
 	assert.NoError(t, err)

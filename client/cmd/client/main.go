@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/bootstrap"
+	"github.com/avast/retry-go"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -86,24 +87,35 @@ func run(ctx context.Context) int {
 	bootstrapCtx, cancel := context.WithDeadline(ctx, bootstrapDeadline)
 	defer cancel()
 
-	err = bootstrap.PerformBootstrapping(bootstrapCtx, logger, bootstrapClient, bootstrapConfig)
+	multiErr, bootstrapErrorFreqs := bootstrap.PerformBootstrapping(bootstrapCtx, logger, bootstrapClient, bootstrapConfig)
 	bootstrapEndTime := time.Now()
 
 	var exitCode int
 	bootstrapResult := &bootstrap.Result{
-		Status:  bootstrap.StatusSuccess,
-		Elapsed: bootstrapEndTime.Sub(bootstrapStartTime),
+		Status:         bootstrap.StatusSuccess,
+		ElapsedSeconds: bootstrapEndTime.Sub(bootstrapStartTime).Seconds(),
+	}
+	if len(bootstrapErrorFreqs) > 0 {
+		bootstrapResult.ErrorFreqs = bootstrapErrorFreqs
 	}
 
-	if err != nil {
+	if multiErr != nil {
 		bootstrapResult.Status = bootstrap.StatusFailure
-		var bootstrapErr *bootstrap.BootstrapError
-		if errors.As(err, &bootstrapErr) {
-			bootstrapResult.ErrorType = bootstrapErr.Type()
-			err = bootstrapErr.Unwrap()
+
+		err = getLastError(multiErr)
+		switch {
+		case errors.Is(err, context.Canceled):
+			logger.Error("context was cancelled before bootstrapping could complete")
+		case errors.Is(err, context.DeadlineExceeded):
+			logger.Error(
+				"failed to successfully bootstrap before the specified deadline",
+				zap.Time("deadline", bootstrapDeadline),
+				zap.Duration("deadlineDuration", bootstrapConfig.Deadline),
+			)
+		default:
+			logger.Error("failed to bootstrap", zap.Error(err))
 		}
-		bootstrapResult.Error = err.Error()
-		logger.Error("failed to bootstrap", zap.Error(err))
+		bootstrapResult.Error = multiErr.Error()
 		exitCode = 1
 	}
 
@@ -111,39 +123,61 @@ func run(ctx context.Context) int {
 		Start: bootstrapStartTime,
 		End:   bootstrapEndTime,
 	}
-	if err := bootstrapEvent.WriteWithResult(bootstrapResult); err != nil {
+	eventFilePath, err := bootstrapEvent.WriteWithResult(bootstrapResult)
+	if err != nil {
 		logger.Error("unable to write bootstrap guest agent event to disk", zap.Error(err))
 	}
+	logger.Info("bootstrapping guest agent event telemetry written to disk", zap.String("path", eventFilePath))
 
 	return exitCode
 }
 
 func configureLogging(logFile string, verbose bool) (*zap.Logger, error) {
-	if err := os.MkdirAll(filepath.Dir(logFile), 0755); err != nil {
-		return nil, fmt.Errorf("failed to create log directory: %w", err)
-	}
-	logFileHandle, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open log file: %w", err)
-	}
-
 	encoderConfig := zap.NewProductionEncoderConfig()
 	encoderConfig.TimeKey = "timestamp"
 	encoderConfig.EncodeTime = zapcore.RFC3339NanoTimeEncoder
-
-	jsonEncoder := zapcore.NewJSONEncoder(encoderConfig)
-	consoleEncoder := zapcore.NewConsoleEncoder(encoderConfig)
 
 	level := zap.InfoLevel
 	if verbose {
 		level = zap.DebugLevel
 	}
 
-	core := zapcore.NewTee(
-		zapcore.NewCore(jsonEncoder, zapcore.AddSync(logFileHandle), level),
-		zapcore.NewCore(consoleEncoder, zapcore.AddSync(os.Stdout), level),
-	)
-	return zap.New(core), nil
+	cores := []zapcore.Core{
+		zapcore.NewCore(
+			zapcore.NewConsoleEncoder(encoderConfig),
+			zapcore.AddSync(os.Stdout),
+			level,
+		),
+	}
+
+	if logFile != "" {
+		if err := os.MkdirAll(filepath.Dir(logFile), 0755); err != nil {
+			return nil, fmt.Errorf("failed to create log directory: %w", err)
+		}
+		logFileHandle, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open log file: %w", err)
+		}
+		cores = append(cores, zapcore.NewCore(
+			zapcore.NewJSONEncoder(encoderConfig),
+			zapcore.AddSync(logFileHandle),
+			level,
+		))
+	}
+
+	return zap.New(zapcore.NewTee(cores...)), nil
+}
+
+func getLastError(err error) error {
+	multiErr, ok := err.(retry.Error)
+	if !ok {
+		return err
+	}
+	errs := multiErr.WrappedErrors()
+	if len(errs) < 1 {
+		return nil
+	}
+	return errs[len(errs)-1]
 }
 
 func flush(logger *zap.Logger) {

@@ -11,8 +11,9 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-func PerformBootstrapping(ctx context.Context, logger *zap.Logger, client *Client, config *Config) error {
-	return retry.Do(
+func PerformBootstrapping(ctx context.Context, logger *zap.Logger, client *Client, config *Config) (multiErr error, bootstrapErrorFreqs map[ErrorType]int) {
+	bootstrapErrorFreqs = map[ErrorType]int{}
+	multiErr = retry.Do(
 		func() error {
 			if err := ctx.Err(); err != nil {
 				return err // return the context error if the done channel is closed
@@ -33,10 +34,19 @@ func PerformBootstrapping(ctx context.Context, logger *zap.Logger, client *Clien
 			return nil
 		},
 		retry.RetryIf(func(err error) bool {
-			return !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded)
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				return false
+			}
+			var bootstrapErr *BootstrapError
+			if errors.As(err, &bootstrapErr) {
+				bootstrapErrorFreqs[bootstrapErr.Type()]++
+			}
+			return true
 		}),
+		retry.Attempts(1000),                    // retry indefinitely according to the context deadline
 		retry.DelayType(retry.DefaultDelayType), // backoff + random jitter
 		retry.Delay(500*time.Millisecond),
-		retry.MaxDelay(3*time.Second),
+		retry.MaxDelay(2*time.Second+500*time.Millisecond),
 	)
+	return multiErr, bootstrapErrorFreqs
 }

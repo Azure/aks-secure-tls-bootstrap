@@ -44,10 +44,10 @@ const (
 )
 
 type Result struct {
-	Status    Status        `json:"Status"`
-	Elapsed   time.Duration `json:"Elapsed,omitempty"`
-	ErrorType ErrorType     `json:"ErrorType,omitempty"`
-	Error     string        `json:"Error,omitempty"`
+	Status         Status            `json:"Status"`
+	ElapsedSeconds float64           `json:"ElapsedSeconds,omitempty"`
+	ErrorFreqs     map[ErrorType]int `json:"BootstrapErrorFrequencies,omitempty"`
+	Error          string            `json:"Error,omitempty"`
 }
 
 type Event struct {
@@ -83,7 +83,7 @@ func (e *Event) MarshalJSON() ([]byte, error) {
 	})
 }
 
-func (e *Event) WriteWithResult(result *Result) error {
+func (e *Event) WriteWithResult(result *Result) (string, error) {
 	resultBytes, err := json.Marshal(result)
 	if err != nil {
 		e.Message = "Completed"
@@ -93,14 +93,14 @@ func (e *Event) WriteWithResult(result *Result) error {
 	return e.write()
 }
 
-func (e *Event) write() error {
+func (e *Event) write() (string, error) {
 	path := filepath.Join(getGuestAgentEventsPath(), fmt.Sprintf("%d.json", e.Start.UnixNano()))
-	data, err := json.Marshal(e)
+	eventBytes, err := json.Marshal(e)
 	if err != nil {
-		return err
+		return "", err
 	}
-	if err := os.WriteFile(path, data, os.ModePerm); err != nil {
-		return err
+	if err := os.WriteFile(path, eventBytes, os.ModePerm); err != nil {
+		return "", err
 	}
-	return nil
+	return path, nil
 }
