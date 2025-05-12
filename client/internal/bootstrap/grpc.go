@@ -13,7 +13,6 @@ import (
 	internalhttp "github.com/Azure/aks-secure-tls-bootstrap/client/internal/http"
 	akssecuretlsbootstrapv1 "github.com/Azure/aks-secure-tls-bootstrap/service/pkg/gen/akssecuretlsbootstrap/v1"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/retry"
-	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -22,14 +21,13 @@ import (
 )
 
 // getServiceClientFunc returns a new SecureTLSBootstrapServiceClient over a gRPC connection, fake implementations given in unit tests.
-type getServiceClientFunc func(logger *zap.Logger, token string, cfg *Config) (akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient, func() error, error)
+type getServiceClientFunc func(token string, cfg *Config) (akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient, func() error, error)
 
-func getServiceClient(logger *zap.Logger, token string, cfg *Config) (akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient, func() error, error) {
+func getServiceClient(token string, cfg *Config) (akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient, func() error, error) {
 	clusterCAData, err := os.ReadFile(cfg.ClusterCAFilePath)
 	if err != nil {
 		return nil, nil, fmt.Errorf("reading cluster CA data from %s: %w", cfg.ClusterCAFilePath, err)
 	}
-	logger.Info("read cluster CA data", zap.String("path", cfg.ClusterCAFilePath))
 
 	tlsConfig, err := getTLSConfig(clusterCAData, cfg.NextProto, cfg.InsecureSkipTLSVerify)
 	if err != nil {
@@ -48,13 +46,12 @@ func getServiceClient(logger *zap.Logger, token string, cfg *Config) (akssecuret
 		grpc.WithUnaryInterceptor(retry.UnaryClientInterceptor(
 			retry.WithBackoff(retry.BackoffExponentialWithJitterBounded(100*time.Millisecond, 0.75, 2*time.Second)),
 			retry.WithCodes(codes.Aborted, codes.Unavailable),
-			retry.WithMax(10),
+			retry.WithMax(30),
 		)),
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to dial client connection with context: %w", err)
 	}
-	logger.Info("dialed TLS bootstrap server and created GRPC connection")
 
 	return akssecuretlsbootstrapv1.NewSecureTLSBootstrapServiceClient(conn), conn.Close, nil
 }

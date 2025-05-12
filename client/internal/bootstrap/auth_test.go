@@ -135,7 +135,7 @@ var _ = Describe("Auth", Ordered, func() {
 			})
 		})
 
-		When("UserAssignedIdentityID is specified in azure config", func() {
+		When("UserAssignedIdentityID is specified in cloud provider config", func() {
 			It("should return a corresponding MSI access token", func() {
 				cloudProviderConfig := &cloud.ProviderConfig{
 					UserAssignedIdentityID: "kubelet-identity-id",

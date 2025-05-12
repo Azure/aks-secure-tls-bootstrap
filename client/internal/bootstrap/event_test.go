@@ -24,6 +24,7 @@ func TestLinuxEvent(t *testing.T) {
 		Start:   now,
 		End:     now.Add(time.Minute),
 		Message: "linux",
+		Level:   "Informational",
 	}
 
 	path, err := e.write()
@@ -70,6 +71,7 @@ func TestWindowsEvent(t *testing.T) {
 		Start:   now,
 		End:     now.Add(time.Minute),
 		Message: "windows",
+		Level:   "Informational",
 	}
 
 	path, err := e.write()
@@ -99,7 +101,7 @@ func TestWindowsEvent(t *testing.T) {
 	assert.Equal(t, now.Format("2006-01-02 15:04:05.000"), eventData["Timestamp"])
 	assert.Equal(t, now.Add(time.Minute).Format("2006-01-02 15:04:05.000"), eventData["OperationId"])
 	assert.Equal(t, "windows", eventData["Message"])
-	assert.Equal(t, "1.23", eventData["Version"])
+	assert.Equal(t, "1.10", eventData["Version"])
 	assert.Equal(t, "0", eventData["EventPid"])
 	assert.Equal(t, "0", eventData["EventTid"])
 }

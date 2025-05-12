@@ -11,7 +11,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"go.uber.org/zap"
 	"google.golang.org/grpc/test/bufconn"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/testutil"
@@ -20,12 +19,9 @@ import (
 var _ = Describe("grpc", Ordered, func() {
 	var (
 		clusterCACertPEM []byte
-		logger           *zap.Logger
 	)
 
 	BeforeAll(func() {
-		logger, _ = zap.NewDevelopment()
-
 		var err error
 		clusterCACertPEM, _, err = testutil.GenerateCertPEM(testutil.CertTemplate{
 			CommonName:   "hcp",
@@ -39,7 +35,7 @@ var _ = Describe("grpc", Ordered, func() {
 	Context("secureTLSBootstrapServiceClientFactory", func() {
 		When("cluster ca data cannot be read", func() {
 			It("should return an error", func() {
-				serviceClient, close, err := getServiceClient(logger, "token", &Config{
+				serviceClient, close, err := getServiceClient("token", &Config{
 					ClusterCAFilePath: "does/not/exist.crt",
 					NextProto:         "nextProto",
 					APIServerFQDN:     "fqdn",
@@ -59,7 +55,7 @@ var _ = Describe("grpc", Ordered, func() {
 				err := os.WriteFile(caFilePath, []byte("SGVsbG8gV29ybGQh"), os.ModePerm)
 				Expect(err).To(BeNil())
 
-				serviceClient, close, err := getServiceClient(logger, "token", &Config{
+				serviceClient, close, err := getServiceClient("token", &Config{
 					ClusterCAFilePath: caFilePath,
 					NextProto:         "nextProto",
 					APIServerFQDN:     "fqdn",
@@ -83,7 +79,7 @@ var _ = Describe("grpc", Ordered, func() {
 				lis := bufconn.Listen(1024)
 				defer lis.Close()
 
-				serviceClient, close, err := getServiceClient(logger, "token", &Config{
+				serviceClient, close, err := getServiceClient("token", &Config{
 					ClusterCAFilePath: caFilePath,
 					NextProto:         "nextProto",
 					APIServerFQDN:     lis.Addr().String(),

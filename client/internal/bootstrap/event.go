@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	performSecureTLSBootstrappingGuestAgentEventName = "AKS.performSecureTLSBootstrapping"
+	performSecureTLSBootstrappingGuestAgentEventName = "AKS.Bootstrap.SecureTLSBootstrapping"
 )
 
 var (
@@ -36,6 +36,15 @@ func getGuestAgentEventsPath() string {
 	return guestAgentEventsPathLinux
 }
 
+func getEventVersion() string {
+	if isWindows() {
+		// corresponds to Microsoft.Compute.CustomScriptExtension-1.10
+		return "1.10"
+	}
+	// corresponds to Microsoft.Azure.Extensions.CustomScript-1.23
+	return "1.23"
+}
+
 type Status string
 
 const (
@@ -44,13 +53,14 @@ const (
 )
 
 type Result struct {
-	Status         Status            `json:"Status"`
-	ElapsedSeconds float64           `json:"ElapsedSeconds,omitempty"`
-	ErrorFreqs     map[ErrorType]int `json:"BootstrapErrorFrequencies,omitempty"`
-	Error          string            `json:"Error,omitempty"`
+	Status              Status            `json:"Status"`
+	ElapsedMilliseconds int64             `json:"ElapsedMilliseconds"`
+	BootstrapErrors     map[ErrorType]int `json:"BootstrapErrors,omitempty"`
+	FinalError          string            `json:"Error,omitempty"`
 }
 
 type Event struct {
+	Level   string
 	Message string
 	Start   time.Time
 	End     time.Time
@@ -76,14 +86,18 @@ func (e *Event) MarshalJSON() ([]byte, error) {
 		Timestamp:   e.Start.Format("2006-01-02 15:04:05.000"),
 		OperationID: e.End.Format("2006-01-02 15:04:05.000"),
 		Message:     e.Message,
-		Version:     "1.23",
-		EventLevel:  "Informational",
+		Version:     getEventVersion(),
+		EventLevel:  e.Level,
 		EventPID:    "0",
 		EventTID:    "0",
 	})
 }
 
 func (e *Event) WriteWithResult(result *Result) (string, error) {
+	e.Level = "Informational"
+	if result.Status == StatusFailure {
+		e.Level = "Error"
+	}
 	resultBytes, err := json.Marshal(result)
 	if err != nil {
 		e.Message = "Completed"
@@ -94,13 +108,20 @@ func (e *Event) WriteWithResult(result *Result) (string, error) {
 }
 
 func (e *Event) write() (string, error) {
-	path := filepath.Join(getGuestAgentEventsPath(), fmt.Sprintf("%d.json", e.Start.UnixNano()))
+	guestAgentEventsPath := getGuestAgentEventsPath()
+	if _, err := os.Stat(guestAgentEventsPath); err != nil {
+		if os.IsNotExist(err) {
+			return "", nil
+		}
+		return "", fmt.Errorf("stating guest agent event path %s: %w", guestAgentEventsPath, err)
+	}
+	eventFilePath := filepath.Join(guestAgentEventsPath, fmt.Sprintf("%d.json", e.Start.UnixNano()))
 	eventBytes, err := json.Marshal(e)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("marshalling bootstrap event data: %w", err)
 	}
-	if err := os.WriteFile(path, eventBytes, os.ModePerm); err != nil {
-		return "", err
+	if err := os.WriteFile(eventFilePath, eventBytes, os.ModePerm); err != nil {
+		return "", fmt.Errorf("writing bootstrap event data to disk: %w", err)
 	}
-	return path, nil
+	return eventFilePath, nil
 }

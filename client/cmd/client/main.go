@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/bootstrap"
-	"github.com/avast/retry-go"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -84,38 +83,38 @@ func run(ctx context.Context) int {
 	bootstrapStartTime := time.Now()
 	bootstrapDeadline := bootstrapStartTime.Add(bootstrapConfig.Deadline)
 	logger.Info("set bootstrap deadline", zap.Time("deadline", bootstrapDeadline))
+
 	bootstrapCtx, cancel := context.WithDeadline(ctx, bootstrapDeadline)
 	defer cancel()
 
-	multiErr, bootstrapErrorFreqs := bootstrap.PerformBootstrapping(bootstrapCtx, logger, bootstrapClient, bootstrapConfig)
+	err, bootstrapErrors := bootstrap.PerformBootstrapping(bootstrapCtx, logger, bootstrapClient, bootstrapConfig)
 	bootstrapEndTime := time.Now()
 
 	var exitCode int
 	bootstrapResult := &bootstrap.Result{
-		Status:         bootstrap.StatusSuccess,
-		ElapsedSeconds: bootstrapEndTime.Sub(bootstrapStartTime).Seconds(),
-	}
-	if len(bootstrapErrorFreqs) > 0 {
-		bootstrapResult.ErrorFreqs = bootstrapErrorFreqs
+		Status:              bootstrap.StatusSuccess,
+		ElapsedMilliseconds: bootstrapEndTime.Sub(bootstrapStartTime).Milliseconds(),
+		BootstrapErrors:     bootstrapErrors,
 	}
 
-	if multiErr != nil {
+	if err != nil {
 		bootstrapResult.Status = bootstrap.StatusFailure
 
-		err = getLastError(multiErr)
+		lastError := errors.Unwrap(err)
 		switch {
-		case errors.Is(err, context.Canceled):
+		case errors.Is(lastError, context.Canceled):
 			logger.Error("context was cancelled before bootstrapping could complete")
-		case errors.Is(err, context.DeadlineExceeded):
+		case errors.Is(lastError, context.DeadlineExceeded):
 			logger.Error(
 				"failed to successfully bootstrap before the specified deadline",
 				zap.Time("deadline", bootstrapDeadline),
 				zap.Duration("deadlineDuration", bootstrapConfig.Deadline),
 			)
 		default:
-			logger.Error("failed to bootstrap", zap.Error(err))
+			logger.Error("failed to bootstrap", zap.Error(lastError))
 		}
-		bootstrapResult.Error = multiErr.Error()
+
+		bootstrapResult.FinalError = err.Error()
 		exitCode = 1
 	}
 
@@ -127,7 +126,11 @@ func run(ctx context.Context) int {
 	if err != nil {
 		logger.Error("unable to write bootstrap guest agent event to disk", zap.Error(err))
 	}
-	logger.Info("bootstrapping guest agent event telemetry written to disk", zap.String("path", eventFilePath))
+	if eventFilePath == "" {
+		logger.Warn("guest agent event path does not exist, not guest agent event telemetry will be written", zap.String("eventMessage", bootstrapEvent.Message))
+	} else {
+		logger.Info("bootstrapping guest agent event telemetry written to disk", zap.String("path", eventFilePath))
+	}
 
 	return exitCode
 }
@@ -166,18 +169,6 @@ func configureLogging(logFile string, verbose bool) (*zap.Logger, error) {
 	}
 
 	return zap.New(zapcore.NewTee(cores...)), nil
-}
-
-func getLastError(err error) error {
-	multiErr, ok := err.(retry.Error)
-	if !ok {
-		return err
-	}
-	errs := multiErr.WrappedErrors()
-	if len(errs) < 1 {
-		return nil
-	}
-	return errs[len(errs)-1]
 }
 
 func flush(logger *zap.Logger) {

@@ -6,14 +6,17 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/avast/retry-go"
+	"github.com/avast/retry-go/v4"
 	"go.uber.org/zap"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-func PerformBootstrapping(ctx context.Context, logger *zap.Logger, client *Client, config *Config) (multiErr error, bootstrapErrorFreqs map[ErrorType]int) {
-	bootstrapErrorFreqs = map[ErrorType]int{}
-	multiErr = retry.Do(
+// PerformBootstrapping performs the secure TLS bootstrapping process with
+// the provided client, wrapped in a retry loop. The retry loop will continue
+// indefinitely until the specified context is done, whether that be through a timeout or cancellation.
+func PerformBootstrapping(ctx context.Context, logger *zap.Logger, client *Client, config *Config) (err error, bootstrapErrors map[ErrorType]int) {
+	bootstrapErrors = map[ErrorType]int{}
+	err = retry.Do(
 		func() error {
 			if err := ctx.Err(); err != nil {
 				return err // return the context error if the done channel is closed
@@ -34,19 +37,19 @@ func PerformBootstrapping(ctx context.Context, logger *zap.Logger, client *Clien
 			return nil
 		},
 		retry.RetryIf(func(err error) bool {
-			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-				return false
-			}
 			var bootstrapErr *BootstrapError
 			if errors.As(err, &bootstrapErr) {
-				bootstrapErrorFreqs[bootstrapErr.Type()]++
+				bootstrapErrors[bootstrapErr.Type()]++
 			}
 			return true
 		}),
-		retry.Attempts(1000),                    // retry indefinitely according to the context deadline
-		retry.DelayType(retry.DefaultDelayType), // backoff + random jitter
+		retry.Context(ctx),
+		retry.WrapContextErrorWithLastError(true),
+		retry.LastErrorOnly(true),
+		retry.DelayType(retry.CombineDelay(retry.BackOffDelay, retry.RandomDelay)),
 		retry.Delay(500*time.Millisecond),
 		retry.MaxDelay(2*time.Second+500*time.Millisecond),
+		retry.Attempts(0), // retry indefinitely according to the context deadline
 	)
-	return multiErr, bootstrapErrorFreqs
+	return err, bootstrapErrors
 }
