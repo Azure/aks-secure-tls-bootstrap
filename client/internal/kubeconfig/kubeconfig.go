@@ -19,7 +19,7 @@ type Config struct {
 }
 
 // GenerateForCertAndKey generates a valid kubeconfig with the specified cert, key, and configuration.
-// The cert and key will have their PEM-encodings written out to respective cert and key files to be
+// The cert and key will have their PEM-encodings written out to a single credential file to be
 // referenced within the generated kubeconfig.
 func GenerateForCertAndKey(certPEM, keyPEM []byte, cfg *Config) (*clientcmdapi.Config, error) {
 	var credBytes bytes.Buffer
