@@ -4,9 +4,7 @@
 package kubeconfig
 
 import (
-	"crypto/ecdsa"
-	"crypto/x509"
-	"encoding/pem"
+	"bytes"
 	"fmt"
 	"os"
 
@@ -17,29 +15,22 @@ import (
 type Config struct {
 	APIServerFQDN     string
 	ClusterCAFilePath string
-	CertFilePath      string
-	KeyFilePath       string
+	CredFilePath      string
 }
 
 // GenerateForCertAndKey generates a valid kubeconfig with the specified cert, key, and configuration.
 // The cert and key will have their PEM-encodings written out to respective cert and key files to be
 // referenced within the generated kubeconfig.
-func GenerateForCertAndKey(certPEM []byte, privateKey *ecdsa.PrivateKey, cfg *Config) (*clientcmdapi.Config, error) {
-	keyDER, err := x509.MarshalECPrivateKey(privateKey)
-	if err != nil {
-		return nil, fmt.Errorf("unable to marshal EC private key during kubeconfig generation: %w", err)
+func GenerateForCertAndKey(certPEM, keyPEM []byte, cfg *Config) (*clientcmdapi.Config, error) {
+	var credBytes bytes.Buffer
+	if _, err := credBytes.Write(certPEM); err != nil {
+		return nil, fmt.Errorf("writing client cert PEM bytes to buffer: %w", err)
 	}
-	block := &pem.Block{
-		Type:  "EC PRIVATE KEY",
-		Bytes: keyDER,
+	if _, err := credBytes.Write(keyPEM); err != nil {
+		return nil, fmt.Errorf("writing client key PEM bytes to buffer: %w", err)
 	}
-	keyPEM := pem.EncodeToMemory(block)
-
-	if err = os.WriteFile(cfg.CertFilePath, certPEM, 0644); err != nil {
-		return nil, fmt.Errorf("failed to write new client certificate to %s: %w", cfg.CertFilePath, err)
-	}
-	if err = os.WriteFile(cfg.KeyFilePath, keyPEM, 0600); err != nil {
-		return nil, fmt.Errorf("failed to write new client key to %s: %w", cfg.KeyFilePath, err)
+	if err := os.WriteFile(cfg.CredFilePath, credBytes.Bytes(), 0600); err != nil {
+		return nil, fmt.Errorf("failed to write client cert/key pair to %s: %w", cfg.CredFilePath, err)
 	}
 
 	kubeconfigData := &clientcmdapi.Config{
@@ -53,8 +44,8 @@ func GenerateForCertAndKey(certPEM []byte, privateKey *ecdsa.PrivateKey, cfg *Co
 		// Define auth based on the obtained client cert.
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{
 			"default-auth": {
-				ClientCertificate: cfg.CertFilePath,
-				ClientKey:         cfg.KeyFilePath,
+				ClientCertificate: cfg.CredFilePath,
+				ClientKey:         cfg.CredFilePath,
 			},
 		},
 		// Define a context that connects the auth info and cluster, and set it as the default

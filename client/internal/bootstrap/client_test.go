@@ -5,7 +5,9 @@ package bootstrap
 
 import (
 	"context"
+	"crypto/x509"
 	"encoding/base64"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"os"
@@ -45,8 +47,7 @@ var _ = Describe("Client tests", Ordered, func() {
 		logger              *zap.Logger
 
 		clusterCAFilePath string
-		certFilePath      string
-		keyFilePath       string
+		credFilePath      string
 	)
 
 	BeforeAll(func() {
@@ -64,8 +65,7 @@ var _ = Describe("Client tests", Ordered, func() {
 
 		tempDir := GinkgoT().TempDir()
 		clusterCAFilePath = filepath.Join(tempDir, "ca.crt")
-		certFilePath = filepath.Join(tempDir, "client.crt")
-		keyFilePath = filepath.Join(tempDir, "client.key")
+		credFilePath = filepath.Join(tempDir, "client.pem")
 
 		err = os.WriteFile(clusterCAFilePath, clusterCACertPEM, os.ModePerm)
 		Expect(err).To(BeNil())
@@ -76,8 +76,7 @@ var _ = Describe("Client tests", Ordered, func() {
 			NextProto:         "bootstrap",
 			AADResource:       "resource",
 			ClusterCAFilePath: clusterCAFilePath,
-			CertFilePath:      certFilePath,
-			KeyFilePath:       keyFilePath,
+			CredFilePath:      credFilePath,
 			APIServerFQDN:     apiServerFQDN,
 			KubeconfigPath:    kubeconfigPath,
 			ProviderConfig: cloud.ProviderConfig{
@@ -329,6 +328,9 @@ var _ = Describe("Client tests", Ordered, func() {
 				})
 				Expect(err).To(BeNil())
 
+				clientCertBlock, rest := pem.Decode(clientCertPEM)
+				Expect(rest).To(BeEmpty())
+
 				kubeconfigValidator.EXPECT().Validate(kubeconfigPath, false).
 					Return(fmt.Errorf("invalid kubeconfig")).
 					Times(1)
@@ -366,8 +368,8 @@ var _ = Describe("Client tests", Ordered, func() {
 
 				Expect(kubeconfigData.AuthInfos).To(HaveKey("default-auth"))
 				defaultAuth := kubeconfigData.AuthInfos["default-auth"]
-				Expect(defaultAuth.ClientCertificate).To(Equal(bootstrapConfig.CertFilePath))
-				Expect(defaultAuth.ClientKey).To(Equal(bootstrapConfig.KeyFilePath))
+				Expect(defaultAuth.ClientCertificate).To(Equal(bootstrapConfig.CredFilePath))
+				Expect(defaultAuth.ClientKey).To(Equal(bootstrapConfig.CredFilePath))
 
 				Expect(kubeconfigData.Contexts).To(HaveKey("default-context"))
 				defaultContext := kubeconfigData.Contexts["default-context"]
@@ -376,13 +378,20 @@ var _ = Describe("Client tests", Ordered, func() {
 
 				Expect(kubeconfigData.CurrentContext).To(Equal("default-context"))
 
-				certData, err := os.ReadFile(bootstrapConfig.CertFilePath)
+				credData, err := os.ReadFile(bootstrapConfig.CredFilePath)
 				Expect(err).To(BeNil())
-				Expect(certData).To(Equal(clientCertPEM))
 
-				keyData, err := os.ReadFile(bootstrapConfig.KeyFilePath)
+				certBlock, rest := pem.Decode(credData)
+				Expect(rest).ToNot(BeEmpty())
+				Expect(certBlock.Bytes).To(Equal(clientCertBlock.Bytes))
+
+				keyData, rest := pem.Decode(rest)
+				Expect(rest).To(BeEmpty())
+				Expect(keyData).ToNot(BeNil())
+
+				key, err := x509.ParseECPrivateKey(keyData.Bytes)
 				Expect(err).To(BeNil())
-				Expect(keyData).ToNot(BeEmpty())
+				Expect(key).ToNot(BeNil())
 			})
 		})
 	})
