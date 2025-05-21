@@ -42,7 +42,6 @@ func (c *client) GetInstanceData(ctx context.Context) (*VMInstanceData, error) {
 	c.logger.Info("calling IMDS instance data endpoint", zap.String("url", url))
 
 	params := getCommonParameters()
-	params[formatParameterKey] = "json"
 
 	instanceData := new(VMInstanceData)
 	if err := c.callIMDS(ctx, url, params, instanceData); err != nil {
@@ -57,7 +56,6 @@ func (c *client) GetAttestedData(ctx context.Context, nonce string) (*VMAttested
 	c.logger.Info("calling IMDS attested data endpoint", zap.String("url", url))
 
 	params := getCommonParameters()
-	params[formatParameterKey] = "json"
 	params[nonceParameterKey] = nonce
 
 	attestedData := new(VMAttestedData)
@@ -104,5 +102,6 @@ func (c *client) callIMDS(ctx context.Context, url string, queryParameters map[s
 func getCommonParameters() map[string]string {
 	return map[string]string{
 		apiVersionParameterKey: apiVersion,
+		formatParameterKey:     "json",
 	}
 }
