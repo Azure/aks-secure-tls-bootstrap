@@ -4,7 +4,6 @@
 package bootstrap
 
 import (
-	"crypto/elliptic"
 	"crypto/x509"
 	"encoding/pem"
 
@@ -15,10 +14,10 @@ import (
 var _ = Describe("CSR tests", func() {
 	Context("makeKubeletClientCSR tests", func() {
 		It("should generate and return a new kubelet client CSR for the provided hostname", func() {
-			csrPEM, privateKey, err := makeKubeletClientCSR()
+			csrPEM, keyPEM, err := makeKubeletClientCSR()
 			Expect(err).To(BeNil())
 			Expect(csrPEM).ToNot(BeEmpty())
-			Expect(privateKey.Curve).To(Equal(elliptic.P256()))
+			Expect(keyPEM).ToNot(BeEmpty())
 
 			block, rest := pem.Decode(csrPEM)
 			Expect(rest).To(BeEmpty())
@@ -32,6 +31,14 @@ var _ = Describe("CSR tests", func() {
 			Expect(subject.Organization[0]).To(Equal("system:nodes"))
 			Expect(subject.CommonName).To(HavePrefix("system:node:"))
 			Expect(csr.SignatureAlgorithm).To(Equal(x509.ECDSAWithSHA256))
+
+			block, rest = pem.Decode(keyPEM)
+			Expect(rest).To(BeEmpty())
+			Expect(block).ToNot(BeNil())
+
+			key, err := x509.ParseECPrivateKey(block.Bytes)
+			Expect(err).To(BeNil())
+			Expect(key).ToNot(BeNil())
 		})
 	})
 })

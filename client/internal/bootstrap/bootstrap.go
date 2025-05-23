@@ -18,9 +18,6 @@ func PerformBootstrapping(ctx context.Context, logger *zap.Logger, client *Clien
 	bootstrapErrors = map[ErrorType]int{}
 	err = retry.Do(
 		func() error {
-			if err := ctx.Err(); err != nil {
-				return err // return the context error if the done channel is closed
-			}
 			kubeconfigData, err := client.BootstrapKubeletClientCredential(ctx, config)
 			if err != nil {
 				return err

@@ -4,7 +4,6 @@
 package kubeconfig
 
 import (
-	"crypto/x509"
 	"encoding/pem"
 	"os"
 	"path/filepath"
@@ -19,8 +18,7 @@ var _ = Describe("kubeconfig tests", func() {
 	Context("GenerateKubeconfigForCertAndKey", func() {
 		It("should generate a valid kubeconfig containing the kubelet client credential", func() {
 			tempDir := GinkgoT().TempDir()
-			certPath := filepath.Join(tempDir, "client.crt")
-			keyPath := filepath.Join(tempDir, "client.key")
+			credPath := filepath.Join(tempDir, "client.pem")
 
 			certPEM, keyPEM, err := testutil.GenerateCertPEM(testutil.CertTemplate{
 				CommonName:   "system:node:node",
@@ -28,19 +26,14 @@ var _ = Describe("kubeconfig tests", func() {
 				Expiration:   time.Now().Add(time.Hour),
 			})
 			Expect(err).To(BeNil())
-			block, rest := pem.Decode(keyPEM)
-			Expect(rest).To(BeEmpty())
-			privateKey, err := x509.ParseECPrivateKey(block.Bytes)
-			Expect(err).To(BeNil())
 
 			cfg := &Config{
 				APIServerFQDN:     "host",
 				ClusterCAFilePath: "path",
-				CertFilePath:      certPath,
-				KeyFilePath:       keyPath,
+				CredFilePath:      credPath,
 			}
 
-			kubeconfigData, err := GenerateForCertAndKey(certPEM, privateKey, cfg)
+			kubeconfigData, err := GenerateForCertAndKey(certPEM, keyPEM, cfg)
 			Expect(err).To(BeNil())
 			Expect(kubeconfigData.Clusters).To(HaveKey("default-cluster"))
 			defaultCluster := kubeconfigData.Clusters["default-cluster"]
@@ -49,8 +42,8 @@ var _ = Describe("kubeconfig tests", func() {
 
 			Expect(kubeconfigData.AuthInfos).To(HaveKey("default-auth"))
 			defaultAuth := kubeconfigData.AuthInfos["default-auth"]
-			Expect(defaultAuth.ClientCertificate).To(Equal(certPath))
-			Expect(defaultAuth.ClientKey).To(Equal(keyPath))
+			Expect(defaultAuth.ClientCertificate).To(Equal(credPath))
+			Expect(defaultAuth.ClientKey).To(Equal(credPath))
 
 			Expect(kubeconfigData.Contexts).To(HaveKey("default-context"))
 			defaultContext := kubeconfigData.Contexts["default-context"]
@@ -59,13 +52,19 @@ var _ = Describe("kubeconfig tests", func() {
 
 			Expect(kubeconfigData.CurrentContext).To(Equal("default-context"))
 
-			certData, err := os.ReadFile(certPath)
+			credData, err := os.ReadFile(credPath)
 			Expect(err).To(BeNil())
-			Expect(certData).ToNot(BeEmpty())
+			Expect(credData).ToNot(BeNil())
 
-			keyData, err := os.ReadFile(keyPath)
-			Expect(err).To(BeNil())
-			Expect(keyData).ToNot(BeEmpty())
+			certBlock, rest := pem.Decode(credData)
+			Expect(certBlock).ToNot(BeNil())
+			Expect(certBlock.Type).To(Equal("CERTIFICATE"))
+			Expect(rest).ToNot(BeEmpty())
+
+			keyBlock, rest := pem.Decode(rest)
+			Expect(keyBlock).ToNot(BeNil())
+			Expect(keyBlock.Type).To(Equal("EC PRIVATE KEY"))
+			Expect(rest).To(BeEmpty())
 		})
 	})
 })

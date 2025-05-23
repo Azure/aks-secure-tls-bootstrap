@@ -99,7 +99,7 @@ func (c *Client) BootstrapKubeletClientCredential(ctx context.Context, cfg *Conf
 	}
 	c.logger.Info("retrieved IMDS attested data")
 
-	csrPEM, privateKey, err := makeKubeletClientCSR()
+	csrPEM, keyPEM, err := makeKubeletClientCSR()
 	if err != nil {
 		c.logger.Error("failed to create kubelet client CSR", zap.Error(err))
 		return nil, &BootstrapError{
@@ -140,11 +140,10 @@ func (c *Client) BootstrapKubeletClientCredential(ctx context.Context, cfg *Conf
 			inner:     fmt.Errorf("failed to decode cert data from bootstrap server: %w", err),
 		}
 	}
-	kubeconfigData, err := kubeconfig.GenerateForCertAndKey(certPEM, privateKey, &kubeconfig.Config{
+	kubeconfigData, err := kubeconfig.GenerateForCertAndKey(certPEM, keyPEM, &kubeconfig.Config{
 		APIServerFQDN:     cfg.APIServerFQDN,
 		ClusterCAFilePath: cfg.ClusterCAFilePath,
-		CertFilePath:      cfg.CertFilePath,
-		KeyFilePath:       cfg.KeyFilePath,
+		CredFilePath:      cfg.CredFilePath,
 	})
 	if err != nil {
 		c.logger.Error("failed to generate kubeconfig for new client cert and key", zap.Error(err))

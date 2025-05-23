@@ -29,8 +29,7 @@ var _ = Describe("config tests", func() {
 					AADResource:             "appID",
 					ClusterCAFilePath:       "path",
 					KubeconfigPath:          "path",
-					CertFilePath:            "path",
-					KeyFilePath:             "path",
+					CredFilePath:            "path",
 					Deadline:                time.Second,
 				}
 			})
@@ -89,21 +88,12 @@ var _ = Describe("config tests", func() {
 				})
 			})
 
-			When("CertFilePath is empty", func() {
+			When("CredFilePath is empty", func() {
 				It("should return an error", func() {
-					cfg.CertFilePath = ""
+					cfg.CredFilePath = ""
 					err := cfg.Validate()
 					Expect(err).ToNot(BeNil())
-					Expect(err.Error()).To(ContainSubstring("cert file path must be specified"))
-				})
-			})
-
-			When("KeyFilePath is empty", func() {
-				It("should return an error", func() {
-					cfg.KeyFilePath = ""
-					err := cfg.Validate()
-					Expect(err).ToNot(BeNil())
-					Expect(err.Error()).To(ContainSubstring("key file path must be specified"))
+					Expect(err.Error()).To(ContainSubstring("cred file path must be specified"))
 				})
 			})
 
@@ -190,8 +180,7 @@ var _ = Describe("config tests", func() {
 						AADResource:             "appID",
 						ClusterCAFilePath:       "clusterCAPath",
 						KubeconfigPath:          "kubeconfigPath",
-						CertFilePath:            "certFilePath",
-						KeyFilePath:             "keyFilePath",
+						CredFilePath:            "credFilePath",
 					}
 					tempDir := GinkgoT().TempDir()
 					path := filepath.Join(tempDir, "config.json")
