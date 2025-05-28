@@ -11,10 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-
-
 func TestMakeKubeletClientCSR(t *testing.T) {
-	
 	csrPEM, keyPEM, err := makeKubeletClientCSR()
 	assert.NoError(t,err)
 	assert.NotEmpty(t, keyPEM)
@@ -40,5 +37,4 @@ func TestMakeKubeletClientCSR(t *testing.T) {
 	key, err := x509.ParseECPrivateKey(block.Bytes)
 	assert.NoError(t, err)
 	assert.NotNil(t, key)
-
 }
