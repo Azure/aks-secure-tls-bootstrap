@@ -8,6 +8,7 @@ import (
 	"strings"
 	"crypto/x509"
 	"encoding/pem"
+	"github.com/stretchr/testify/assert"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -19,67 +20,30 @@ import (
 func TestMakeKubeletClientCSR(t *testing.T) {
 	
 	csrPEM, keyPEM, err := makeKubeletClientCSR()
-	if err != nil {
-		t.Errorf("%v", err)
-	}
-
-	if len(csrPEM) == 0 {
-		t.Errorf("Expected non-empty CSR PEM, got empty")
-	}
-
-	if len(keyPEM) == 0 {
-		t.Errorf("Expected non-empty key PEM, got empty")
-	}
+	assert.NoError(t,err)
+	assert.NotEmpty(t, keyPEM)
+	assert.NotEmpty(t, csrPEM)
 
 	block, rest := pem.Decode(csrPEM)
-	if len(rest) != 0 {
-		t.Errorf("Expected empty rest, got non-empty")
-	}
-
-	if block == nil {
-		t.Errorf("Expected non-nil block, got nil")
-	}
+	assert.Empty(t, rest)
+	assert.NotNil(t, block)
 
 	csr, err := x509.ParseCertificateRequest(block.Bytes)
-
-	if err != nil {
-		t.Errorf("%v", err)
-	}
+	assert.NoError(t, err)
 
 	subject := csr.Subject
-	if len(subject.Organization) != 1 {
-		t.Errorf("Expected organization length 1, got %d", len(subject.Organization))
-	}
-
-	if subject.Organization[0] != "system:nodes" {
-		t.Errorf("Expected organization 'system:nodes', got '%s'", subject.Organization[0])
-	}
-
-	if !strings.HasPrefix(subject.CommonName, "system:node:") {
-		t.Errorf("Expected common name to start with 'system:node:', got '%s'", subject.CommonName)
-	}
-
-	if csr.SignatureAlgorithm != x509.ECDSAWithSHA256 {
-		t.Errorf("Expected ECDSAWithSHA256, got %v", csr.SignatureAlgorithm)
-	}
+	assert.Len(t, subject.Organization, 1)
+	assert.Equal(t, "system:nodes", subject.Organization[0])
+	assert.True(t, strings.HasPrefix(subject.CommonName, "system:node:"))
+	assert.Equal(t, x509.ECDSAWithSHA256, csr.SignatureAlgorithm)
 
 	block, rest = pem.Decode(keyPEM)
-	if len(rest) != 0 {
-		t.Errorf("Expected empty rest, got non-empty %d", len(rest))
-	}
-
-	if block == nil {
-		t.Errorf("Expected non-nil block, got nil")
-	}
+	assert.Empty(t, rest)
+	assert.NotNil(t, block)
 
 	key, err := x509.ParseECPrivateKey(block.Bytes)
-	if err != nil {
-		t.Errorf("%v", err)
-	}
-
-	if key == nil {
-		t.Errorf("Expected non-nil key, got nil")
-	}
+	assert.NoError(t, err)
+	assert.NotNil(t, key)
 
 }
 
