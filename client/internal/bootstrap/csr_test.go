@@ -4,16 +4,17 @@
 package bootstrap
 
 import (
-	"testing"
-	"strings"
 	"crypto/x509"
 	"encoding/pem"
+	"strings"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 )
 
 func TestMakeKubeletClientCSR(t *testing.T) {
 	csrPEM, keyPEM, err := makeKubeletClientCSR()
-	assert.NoError(t,err)
+	assert.NoError(t, err)
 	assert.NotEmpty(t, keyPEM)
 	assert.NotEmpty(t, csrPEM)
 
