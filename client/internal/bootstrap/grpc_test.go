@@ -86,9 +86,7 @@ func TestGRPC(t *testing.T) {
 	})
 
 	t.Run("getTLSConfig tests", func(t *testing.T) {
-		var rootPool *x509.CertPool
-
-		rootPool = x509.NewCertPool()
+		rootPool := x509.NewCertPool()
 		ok := rootPool.AppendCertsFromPEM(clusterCACertPEM)
 		assert.True(t, ok)
 
