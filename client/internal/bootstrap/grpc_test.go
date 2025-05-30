@@ -112,13 +112,13 @@ func TestGRPC(t *testing.T) {
 				name:              "insecureSkipVerify false",
 				nextProto:         "nextProto",
 				insecureSkipVerify: false,
-				expectedNextProtos: nil,
+				expectedNextProtos: []string{"nextProto", "h2"},
 			},
 			{
 				name:              "insecureSkipVerify true",
 				nextProto:         "nextProto",
 				insecureSkipVerify: true,
-				expectedNextProtos: nil,
+				expectedNextProtos: []string{"nextProto", "h2"},
 			},
 		}
 		for _, tt := range tests {
