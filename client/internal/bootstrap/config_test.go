@@ -136,16 +136,6 @@ func TestConfig(t *testing.T) {
 	}
 }
 func TestLoadFromFile(t *testing.T) {
-	baseCfg := &Config{
-		CloudProviderConfigPath: "path/to/azure.json",
-		APIServerFQDN:           "fqdn",
-		CustomClientID:          "clientId",
-		NextProto:               "alpn",
-		AADResource:             "appID",
-		ClusterCAFilePath:       "path",
-		KubeconfigPath:          "path",
-		CredFilePath:            "path",
-	}
 	tests := []struct {
 		name        string
 		modify      func(*Config, *testing.T)
@@ -172,6 +162,16 @@ func TestLoadFromFile(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			baseCfg := &Config{
+				CloudProviderConfigPath: "path/to/azure.json",
+				APIServerFQDN:           "fqdn",
+				CustomClientID:          "clientId",
+				NextProto:               "alpn",
+				AADResource:             "appID",
+				ClusterCAFilePath:       "path",
+				KubeconfigPath:          "path",
+				CredFilePath:            "path",
+			}
 			cfg := *baseCfg
 			tt.modify(&cfg, t)
 
