@@ -102,7 +102,7 @@ func TestConfig(t *testing.T) {
 				c.CloudProviderConfigPath = filepath.Join(tempDir, "azure.json")
 				_ = os.WriteFile(c.CloudProviderConfigPath, data, os.ModePerm)
 			},
-			expectedErr: errors.New(""),
+			expectedErr: nil,
 		},
 	}
 	for _, tt := range tests {
