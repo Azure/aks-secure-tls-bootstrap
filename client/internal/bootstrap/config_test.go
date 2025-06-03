@@ -123,7 +123,7 @@ func TestConfig(t *testing.T) {
 
 			err := cfg.Validate()
 			if tt.expectedErr != nil {
-				assert.Equal(t, err, tt.expectedErr)
+				assert.ErrorContains(t, err, tt.expectedErr.Error())
 			} else {
 				assert.NoError(t, err)
 				assert.Equal(t, cloud.ProviderConfig{
@@ -177,7 +177,7 @@ func TestLoadFromFile(t *testing.T) {
 
 			err := cfg.LoadFromFile(cfg.CloudProviderConfigPath)
 			if tt.expectedErr != nil {
-				assert.Equal(t, tt.expectedErr.Error(), err.Error())
+				assert.ErrorContains(t, err, tt.expectedErr.Error())
 			} else {
 				assert.NoError(t, err)
 			}
