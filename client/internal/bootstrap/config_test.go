@@ -124,7 +124,7 @@ func TestConfig(t *testing.T) {
 				assert.Error(t,err)
 				assert.Contains(t, err.Error(), tt.expectedErr)
 			} else {
-				assert.NoError(t,err)
+				assert.NoError(t, err)
 				assert.Equal(t, cloud.ProviderConfig{
 					ClientID: "msi",
 					UserAssignedIdentityID: "identityId",
