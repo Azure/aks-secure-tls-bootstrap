@@ -5,6 +5,7 @@ package bootstrap
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -16,77 +17,66 @@ import (
 )
 
 func TestConfig(t *testing.T) {
-	baseCfg := &Config{
-		CloudProviderConfigPath: "path/to/azure.json",
-		APIServerFQDN:           "fqdn",
-		CustomClientID:          "clientId",
-		NextProto:               "alpn",
-		AADResource:             "appID",
-		ClusterCAFilePath:       "path",
-		KubeconfigPath:          "path",
-		CredFilePath:            "path",
-		Deadline:                time.Second,
-	}
 	tests := []struct {
 		name        string
 		modify      func(*Config, *testing.T)
-		expectedErr string
+		expectedErr error
 	}{
 		{
 			name: "cloudProviderConfigPath is empty",
 			modify: func(c *Config, t *testing.T) {
 				c.CloudProviderConfigPath = ""
 			},
-			expectedErr: "cloud provider config path must be specified",
+			expectedErr: errors.New("cloud provider config path must be specified"),
 		},
 		{
 			name: "ClusterCAFilePath is empty",
 			modify: func(c *Config, t *testing.T) {
 				c.ClusterCAFilePath = ""
 			},
-			expectedErr: "cluster CA file path must be specified",
+			expectedErr: errors.New("cluster CA file path must be specified"),
 		},
 		{
 			name: "APIServerFQDN is empty",
 			modify: func(c *Config, t *testing.T) {
 				c.APIServerFQDN = ""
 			},
-			expectedErr: "apiserver FQDN must be specified",
+			expectedErr: errors.New("apiserver FQDN must be specified"),
 		},
 		{
 			name: "NextProto is empty",
 			modify: func(c *Config, t *testing.T) {
 				c.NextProto = ""
 			},
-			expectedErr: "next proto header value must be specified",
+			expectedErr: errors.New("next proto header value must be specified"),
 		},
 		{
 			name: "AADResource is empty",
 			modify: func(c *Config, t *testing.T) {
 				c.AADResource = ""
 			},
-			expectedErr: "AAD resource must be specified",
+			expectedErr: errors.New("AAD resource must be specified"),
 		},
 		{
 			name: "KubeconfigPath is empty",
 			modify: func(c *Config, t *testing.T) {
 				c.KubeconfigPath = ""
 			},
-			expectedErr: "kubeconfig path must be specified",
+			expectedErr: errors.New("kubeconfig path must be specified"),
 		},
 		{
 			name: "CredFilePath is empty",
 			modify: func(c *Config, t *testing.T) {
 				c.CredFilePath = ""
 			},
-			expectedErr: "cred file path must be specified",
+			expectedErr: errors.New("cred file path must be specified"),
 		},
 		{
 			name: "cloud provider config path does not exist",
 			modify: func(c *Config, t *testing.T) {
 				c.CloudProviderConfigPath = "does/not/exist.json"
 			},
-			expectedErr: "reading cloud provider config data",
+			expectedErr: errors.New("reading cloud provider config data"),
 		},
 		{
 			name: "cloud provider config is malformed",
@@ -96,7 +86,7 @@ func TestConfig(t *testing.T) {
 				_ = os.WriteFile(path, []byte("malformed"), os.ModePerm)
 				c.CloudProviderConfigPath = path
 			},
-			expectedErr: "unmarshalling cloud provider config data",
+			expectedErr: errors.New("unmarshalling cloud provider config data"),
 		},
 		{
 			name: "client opts are valid",
@@ -106,35 +96,45 @@ func TestConfig(t *testing.T) {
 					UserAssignedIdentityID: "identityId",
 					CloudName:              azure.PublicCloud.Name,
 				}
-				data, _ := json.Marshal(config)
+				data, err := json.Marshal(config)
+				assert.NoError(t, err)
 				tempDir := t.TempDir()
 				c.CloudProviderConfigPath = filepath.Join(tempDir, "azure.json")
 				_ = os.WriteFile(c.CloudProviderConfigPath, data, os.ModePerm)
 			},
-			expectedErr: "",
+			expectedErr: errors.New(""),
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			baseCfg := &Config{
+				CloudProviderConfigPath: "path/to/azure.json",
+				APIServerFQDN:           "fqdn",
+				CustomClientID:          "clientId",
+				NextProto:               "alpn",
+				AADResource:             "appID",
+				ClusterCAFilePath:       "path",
+				KubeconfigPath:          "path",
+				CredFilePath:            "path",
+				Deadline:                time.Second,
+			}
 			cfg := *baseCfg
 			tt.modify(&cfg, t)
 
 			err := cfg.Validate()
-			if tt.expectedErr != "" {
-				assert.Error(t,err)
-				assert.Contains(t, err.Error(), tt.expectedErr)
+			if tt.expectedErr != nil {
+				assert.Equal(t, err, tt.expectedErr)
 			} else {
-				assert.NoError(t,err)
+				assert.NoError(t, err)
 				assert.Equal(t, cloud.ProviderConfig{
-					ClientID: "msi",
+					ClientID:               "msi",
 					UserAssignedIdentityID: "identityId",
-					CloudName: azure.PublicCloud.Name,
+					CloudName:              azure.PublicCloud.Name,
 				}, cfg.ProviderConfig)
 			}
 		})
 	}
 }
-
 func TestLoadFromFile(t *testing.T) {
 	baseCfg := &Config{
 		CloudProviderConfigPath: "path/to/azure.json",
@@ -149,14 +149,14 @@ func TestLoadFromFile(t *testing.T) {
 	tests := []struct {
 		name        string
 		modify      func(*Config, *testing.T)
-		expectedErr string
+		expectedErr error
 	}{
 		{
 			name: "config file does not exist",
 			modify: func(c *Config, t *testing.T) {
 				c.CloudProviderConfigPath = "does/not/exist.json"
 			},
-			expectedErr: "reading config file",
+			expectedErr: errors.New("reading config file"),
 		},
 		{
 			name: "config file is malformed",
@@ -167,7 +167,7 @@ func TestLoadFromFile(t *testing.T) {
 				assert.NoError(t, err)
 				c.CloudProviderConfigPath = path
 			},
-			expectedErr: "unmarshalling config file content",
+			expectedErr: errors.New("unmarshalling config file content"),
 		},
 	}
 	for _, tt := range tests {
@@ -176,9 +176,8 @@ func TestLoadFromFile(t *testing.T) {
 			tt.modify(&cfg, t)
 
 			err := cfg.LoadFromFile(cfg.CloudProviderConfigPath)
-			if tt.expectedErr != "" {
-				assert.Error(t, err)
-				assert.Contains(t, err.Error(), tt.expectedErr)
+			if tt.expectedErr != nil {
+				assert.Equal(t, tt.expectedErr.Error(), err.Error())
 			} else {
 				assert.NoError(t, err)
 			}
