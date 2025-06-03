@@ -121,7 +121,7 @@ func TestConfig(t *testing.T) {
 
 			err := cfg.Validate()
 			if tt.expectedErr != "" {
-				assert.Error(t,err)
+				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tt.expectedErr)
 			} else {
 				assert.NoError(t, err)
