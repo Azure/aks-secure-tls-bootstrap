@@ -95,7 +95,9 @@ func TestGRPC(t *testing.T) {
 
 			if tt.expectError {
 				assert.Error(t, err)
-				assert.Contains(t, err.Error(), tt.errorSubstr)
+				for _, substr := range tt.errorSubstr {
+					assert.Contains(t, err.Error(), substr)
+				}
 				assert.Nil(t, client)
 				assert.Nil(t, closeFn)
 			} else {
