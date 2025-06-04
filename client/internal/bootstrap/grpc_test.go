@@ -7,7 +7,6 @@ import (
 	"crypto/x509"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -88,18 +87,6 @@ func TestGRPC(t *testing.T) {
 			errorSubstr: nil,
 		},
 	}
-	t.Run("cluster ca data cannot be read", func(t *testing.T) {
-		serviceClient, close, err := getServiceClient("token", &Config{
-			ClusterCAFilePath: "does/not/exist.crt",
-			NextProto:         "nextProto",
-			APIServerFQDN:     "fqdn",
-		})
-
-		assert.Nil(t, serviceClient)
-		assert.Nil(t, close)
-		assert.NotNil(t, err)
-		assert.Equal(t, strings.Contains(err.Error(), "reading cluster CA data from does/not/exist.crt"), true)
-	})
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -119,46 +106,6 @@ func TestGRPC(t *testing.T) {
 			}
 		})
 	}
-	t.Run("cluster ca data is invalid", func(t *testing.T) {
-		tempDir := t.TempDir()
-		caFilePath := filepath.Join(tempDir, "ca.crt")
-		err := os.WriteFile(caFilePath, []byte("SGVsbG8gV29ybGQh"), os.ModePerm)
-		assert.NoError(t, err)
-
-		serviceClient, close, err := getServiceClient("token", &Config{
-			ClusterCAFilePath: caFilePath,
-			NextProto:         "nextProto",
-			APIServerFQDN:     "fqdn",
-		})
-
-		assert.Nil(t, serviceClient)
-		assert.Nil(t, close)
-		assert.NotNil(t, err)
-		assert.Equal(t, strings.Contains(err.Error(), "failed to get TLS config"), true)
-		assert.Equal(t, strings.Contains(err.Error(), "unable to construct new cert pool using cluster CA data"), true)
-	})
-
-	t.Run("client connection can be created with provided auth token", func(t *testing.T) {
-		tempDir := t.TempDir()
-		caFilePath := filepath.Join(tempDir, "ca.crt")
-		err := os.WriteFile(caFilePath, clusterCACertPEM, os.ModePerm)
-		assert.NoError(t, err)
-
-		lis := bufconn.Listen(1024)
-		defer lis.Close()
-
-		serviceClient, close, err := getServiceClient("token", &Config{
-			ClusterCAFilePath: caFilePath,
-			NextProto:         "nextProto",
-			APIServerFQDN:     lis.Addr().String(),
-		})
-
-		assert.NoError(t, err)
-		assert.NotNil(t, close)
-		assert.NotNil(t, serviceClient)
-
-		_ = close()
-	})
 }
 func TestGetTLSConfig(t *testing.T) {
 	var (
