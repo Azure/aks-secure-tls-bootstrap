@@ -119,7 +119,7 @@ func TestConfig(t *testing.T) {
 				Deadline:                time.Second,
 			}
 			cfg := *baseCfg
-			tt.modify(&cfg, t)
+			tt.modify(baseCfg, t)
 
 			err := cfg.Validate()
 			if tt.expectedErr != nil {
