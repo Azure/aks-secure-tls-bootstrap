@@ -173,7 +173,7 @@ func TestLoadFromFile(t *testing.T) {
 				CredFilePath:            "path",
 			}
 			cfg := *baseCfg
-			tt.modify(&cfg, t)
+			tt.modify(baseCfg, t)
 
 			err := cfg.LoadFromFile(cfg.CloudProviderConfigPath)
 			if tt.expectedErr != nil {
