@@ -107,7 +107,7 @@ func TestConfig(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			baseCfg := &Config{
+			cfg := &Config{
 				CloudProviderConfigPath: "path/to/azure.json",
 				APIServerFQDN:           "fqdn",
 				CustomClientID:          "clientId",
@@ -118,8 +118,7 @@ func TestConfig(t *testing.T) {
 				CredFilePath:            "path",
 				Deadline:                time.Second,
 			}
-			cfg := *baseCfg
-			tt.modify(baseCfg, t)
+			tt.modify(cfg, t)
 
 			err := cfg.Validate()
 			if tt.expectedErr != nil {
@@ -162,7 +161,7 @@ func TestLoadFromFile(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			baseCfg := &Config{
+			cfg := &Config{
 				CloudProviderConfigPath: "path/to/azure.json",
 				APIServerFQDN:           "fqdn",
 				CustomClientID:          "clientId",
@@ -172,8 +171,7 @@ func TestLoadFromFile(t *testing.T) {
 				KubeconfigPath:          "path",
 				CredFilePath:            "path",
 			}
-			cfg := *baseCfg
-			tt.modify(baseCfg, t)
+			tt.modify(cfg, t)
 
 			err := cfg.LoadFromFile(cfg.CloudProviderConfigPath)
 			if tt.expectedErr != nil {
