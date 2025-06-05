@@ -104,11 +104,7 @@ func TestGetServiceClient(t *testing.T) {
 }
 
 func TestGetTLSConfig(t *testing.T) {
-	var (
-		clusterCACertPEM []byte
-	)
-	var err error
-	clusterCACertPEM, _, err = testutil.GenerateCertPEM(testutil.CertTemplate{
+	clusterCACertPEM, _, err := testutil.GenerateCertPEM(testutil.CertTemplate{
 		CommonName:   "hcp",
 		Organization: "aks",
 		IsCA:         true,
