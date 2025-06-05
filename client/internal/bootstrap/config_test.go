@@ -105,6 +105,7 @@ func TestConfig(t *testing.T) {
 			expectedErr: nil,
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := &Config{
@@ -134,6 +135,7 @@ func TestConfig(t *testing.T) {
 		})
 	}
 }
+
 func TestLoadFromFile(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -159,6 +161,7 @@ func TestLoadFromFile(t *testing.T) {
 			expectedErr: errors.New("unmarshalling config file content"),
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := &Config{
