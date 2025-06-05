@@ -78,11 +78,11 @@ func setupBootstrapClientTestDeps(t *testing.T, logger *zap.Logger) (*Client, co
 
 	t.Helper()
 	ctx := context.Background()
-	ctrl := gomock.NewController(t)
+	mockCtrl := gomock.NewController(t)
 
-	imdsClient := imdsmocks.NewMockClient(ctrl)
-	kubeconfigValidator := kubeconfigmocks.NewMockValidator(ctrl)
-	serviceClient := akssecuretlsbootstrapv1_mocks.NewMockSecureTLSBootstrapServiceClient(ctrl)
+	imdsClient := imdsmocks.NewMockClient(mockCtrl)
+	kubeconfigValidator := kubeconfigmocks.NewMockValidator(mockCtrl)
+	serviceClient := akssecuretlsbootstrapv1_mocks.NewMockSecureTLSBootstrapServiceClient(mockCtrl)
 
 	client := &Client{
 		logger:              logger,
@@ -97,7 +97,7 @@ func setupBootstrapClientTestDeps(t *testing.T, logger *zap.Logger) (*Client, co
 		},
 	}
 
-	return client, ctx, ctrl, imdsClient, kubeconfigValidator, serviceClient
+	return client, ctx, mockCtrl, imdsClient, kubeconfigValidator, serviceClient
 }
 
 func TestBootstrapKubeletClientCredential(t *testing.T) {
@@ -308,7 +308,7 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 			Expiration:   time.Now().Add(time.Hour),
 		})
 		assert.NoError(t, err)
-		
+
 		clientCertBlock, rest := pem.Decode(clientCertPEM)
 		assert.Empty(t, rest)
 
@@ -352,9 +352,9 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 		defaultContext := kubeconfigData.Contexts["default-context"]
 		assert.Equal(t, "default-cluster", defaultContext.Cluster)
 		assert.Equal(t, "default-auth", defaultContext.AuthInfo)
-		
+
 		assert.Equal(t, "default-context", kubeconfigData.CurrentContext)
-		
+
 		credData, err := os.ReadFile(bootstrapConfig.CredFilePath)
 		assert.NoError(t, err)
 
