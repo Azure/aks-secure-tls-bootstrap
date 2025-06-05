@@ -96,7 +96,9 @@ func TestGetInstanceData(t *testing.T) {
 	)
 	var (
 		imdsClient *client
+		logger     *zap.Logger
 	)
+	logger, _ = zap.NewDevelopment()
 
 	tests := []struct {
 		name              string
@@ -136,6 +138,10 @@ func TestGetInstanceData(t *testing.T) {
 			assert.Equal(t, queryParameters.Get("format"), "json")
 		})
 		defer imds.Close()
+		imdsClient = &client{
+			httpClient: internalhttp.NewClient(logger),
+			logger:     logger,
+		}
 		imdsClient.baseURL = imds.URL
 
 		ctx, cancel := context.WithCancel(context.Background())
