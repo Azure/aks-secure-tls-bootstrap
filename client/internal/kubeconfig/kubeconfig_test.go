@@ -14,8 +14,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestKubeconfig(t *testing.T) {
-	tempDir := GinkgoT().TempDir()
+func TestKubeconfigGeneration(t *testing.T) {
+	tempDir := t.TempDir()
 	credPath := filepath.Join(tempDir, "client.pem")
 
 	certPEM, keyPEM, err := testutil.GenerateCertPEM(testutil.CertTemplate{
