@@ -33,18 +33,18 @@ func TestKubeconfigGeneration(t *testing.T) {
 
 	kubeconfigData, err := GenerateForCertAndKey(certPEM, keyPEM, cfg)
 	assert.NoError(t, err)
-	assert.Equal(t, kubeconfigData.Clusters, "default-cluster")
+	assert.Contains(t, kubeconfigData.Clusters, "default-cluster")
 
 	defaultCluster := kubeconfigData.Clusters["default-cluster"]
 	assert.Equal(t, defaultCluster.Server, "https://host:443")
 	assert.Equal(t, defaultCluster.CertificateAuthority, cfg.ClusterCAFilePath)
 
-	assert.Equal(t, kubeconfigData.AuthInfos, "default-auth")
+	assert.Contains(t, kubeconfigData.AuthInfos, "default-auth")
 	defaultAuth := kubeconfigData.AuthInfos["default-auth"]
 	assert.Equal(t, defaultAuth.ClientCertificate, credPath)
 	assert.Equal(t, defaultAuth.ClientKey, credPath)
 
-	assert.Equal(t, kubeconfigData.Contexts, "default-context")
+	assert.Contains(t, kubeconfigData.Contexts, "default-context")
 	defaultContext := kubeconfigData.Contexts["default-context"]
 	assert.Equal(t, defaultContext.Cluster, "default-cluster")
 	assert.Equal(t, defaultContext.AuthInfo, "default-auth")
