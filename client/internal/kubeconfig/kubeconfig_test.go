@@ -7,64 +7,61 @@ import (
 	"encoding/pem"
 	"os"
 	"path/filepath"
+	"testing"
 	"time"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/testutil"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
 )
 
-var _ = Describe("kubeconfig tests", func() {
-	Context("GenerateKubeconfigForCertAndKey", func() {
-		It("should generate a valid kubeconfig containing the kubelet client credential", func() {
-			tempDir := GinkgoT().TempDir()
-			credPath := filepath.Join(tempDir, "client.pem")
+func TestKubeconfig(t *testing.T) {
+	tempDir := GinkgoT().TempDir()
+	credPath := filepath.Join(tempDir, "client.pem")
 
-			certPEM, keyPEM, err := testutil.GenerateCertPEM(testutil.CertTemplate{
-				CommonName:   "system:node:node",
-				Organization: "system:nodes",
-				Expiration:   time.Now().Add(time.Hour),
-			})
-			Expect(err).To(BeNil())
-
-			cfg := &Config{
-				APIServerFQDN:     "host",
-				ClusterCAFilePath: "path",
-				CredFilePath:      credPath,
-			}
-
-			kubeconfigData, err := GenerateForCertAndKey(certPEM, keyPEM, cfg)
-			Expect(err).To(BeNil())
-			Expect(kubeconfigData.Clusters).To(HaveKey("default-cluster"))
-			defaultCluster := kubeconfigData.Clusters["default-cluster"]
-			Expect(defaultCluster.Server).To(Equal("https://host:443"))
-			Expect(defaultCluster.CertificateAuthority).To(Equal(cfg.ClusterCAFilePath))
-
-			Expect(kubeconfigData.AuthInfos).To(HaveKey("default-auth"))
-			defaultAuth := kubeconfigData.AuthInfos["default-auth"]
-			Expect(defaultAuth.ClientCertificate).To(Equal(credPath))
-			Expect(defaultAuth.ClientKey).To(Equal(credPath))
-
-			Expect(kubeconfigData.Contexts).To(HaveKey("default-context"))
-			defaultContext := kubeconfigData.Contexts["default-context"]
-			Expect(defaultContext.Cluster).To(Equal("default-cluster"))
-			Expect(defaultContext.AuthInfo).To(Equal("default-auth"))
-
-			Expect(kubeconfigData.CurrentContext).To(Equal("default-context"))
-
-			credData, err := os.ReadFile(credPath)
-			Expect(err).To(BeNil())
-			Expect(credData).ToNot(BeNil())
-
-			certBlock, rest := pem.Decode(credData)
-			Expect(certBlock).ToNot(BeNil())
-			Expect(certBlock.Type).To(Equal("CERTIFICATE"))
-			Expect(rest).ToNot(BeEmpty())
-
-			keyBlock, rest := pem.Decode(rest)
-			Expect(keyBlock).ToNot(BeNil())
-			Expect(keyBlock.Type).To(Equal("EC PRIVATE KEY"))
-			Expect(rest).To(BeEmpty())
-		})
+	certPEM, keyPEM, err := testutil.GenerateCertPEM(testutil.CertTemplate{
+		CommonName:   "system:node:node",
+		Organization: "system:nodes",
+		Expiration:   time.Now().Add(time.Hour),
 	})
-})
+	assert.NoError(t, err)
+
+	cfg := &Config{
+		APIServerFQDN:     "host",
+		ClusterCAFilePath: "path",
+		CredFilePath:      credPath,
+	}
+
+	kubeconfigData, err := GenerateForCertAndKey(certPEM, keyPEM, cfg)
+	assert.NoError(t, err)
+	assert.Equal(t, kubeconfigData.Clusters, "default-cluster")
+
+	defaultCluster := kubeconfigData.Clusters["default-cluster"]
+	assert.Equal(t, defaultCluster.Server, "https://host:443")
+	assert.Equal(t, defaultCluster.CertificateAuthority, cfg.ClusterCAFilePath)
+
+	assert.Equal(t, kubeconfigData.AuthInfos, "default-auth")
+	defaultAuth := kubeconfigData.AuthInfos["default-auth"]
+	assert.Equal(t, defaultAuth.ClientCertificate, credPath)
+	assert.Equal(t, defaultAuth.ClientKey, credPath)
+
+	assert.Equal(t, kubeconfigData.Contexts, "default-context")
+	defaultContext := kubeconfigData.Contexts["default-context"]
+	assert.Equal(t, defaultContext.Cluster, "default-cluster")
+	assert.Equal(t, defaultContext.AuthInfo, "default-auth")
+
+	assert.Equal(t, kubeconfigData.CurrentContext, "default-context")
+
+	credData, err := os.ReadFile(credPath)
+	assert.NoError(t, err)
+	assert.NotNil(t, credData)
+
+	certBlock, rest := pem.Decode(credData)
+	assert.NotNil(t, certBlock)
+	assert.Equal(t, certBlock.Type, "CERTIFICATE")
+	assert.NotEmpty(t, rest)
+
+	keyBlock, rest := pem.Decode(rest)
+	assert.NotNil(t, keyBlock)
+	assert.Equal(t, keyBlock.Type, "EC PRIVATE KEY")
+	assert.Empty(t, rest)
+}
