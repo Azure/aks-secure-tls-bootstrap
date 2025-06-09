@@ -221,7 +221,7 @@ func TestEnsureAuthorizedClient(t *testing.T) {
 				assert.NoError(t, err)
 			},
 		},
-	}
+	} //testing gpg
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			v := &validator{
