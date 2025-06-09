@@ -66,39 +66,6 @@ func (c *Client) BootstrapKubeletClientCredential(ctx context.Context, cfg *Conf
 	}()
 	c.logger.Info("created gRPC connection and bootstrap service client")
 
-	instanceData, err := c.imdsClient.GetInstanceData(ctx)
-	if err != nil {
-		c.logger.Error("failed to retrieve instance metadata from IMDS", zap.Error(err))
-		return nil, &BootstrapError{
-			errorType: ErrorTypeGetIntanceDataFailure,
-			inner:     fmt.Errorf("failed to retrieve instance metadata from IMDS: %w", err),
-		}
-	}
-	c.logger.Info("retrieved IMDS instance data", zap.String("vmResourceId", instanceData.Compute.ResourceID))
-
-	nonceResponse, err := serviceClient.GetNonce(ctx, &akssecuretlsbootstrapv1.GetNonceRequest{
-		ResourceId: instanceData.Compute.ResourceID,
-	})
-	if err != nil {
-		c.logger.Error("failed retrieve a nonce from bootstrap server", zap.Error(err))
-		return nil, &BootstrapError{
-			errorType: ErrorTypeGetNonceFailure,
-			inner:     fmt.Errorf("failed to retrieve a nonce from bootstrap server: %w", err),
-		}
-	}
-	c.logger.Info("received new nonce from bootstrap server")
-	nonce := nonceResponse.GetNonce()
-
-	attestedData, err := c.imdsClient.GetAttestedData(ctx, nonce)
-	if err != nil {
-		c.logger.Error("failed to retrieve attested data from IMDS", zap.Error(err))
-		return nil, &BootstrapError{
-			errorType: ErrorTypeGetAttestedDataFailure,
-			inner:     fmt.Errorf("failed to retrieve attested data from IMDS: %w", err),
-		}
-	}
-	c.logger.Info("retrieved IMDS attested data")
-
 	csrPEM, keyPEM, err := makeKubeletClientCSR()
 	if err != nil {
 		c.logger.Error("failed to create kubelet client CSR", zap.Error(err))
@@ -109,9 +76,29 @@ func (c *Client) BootstrapKubeletClientCredential(ctx context.Context, cfg *Conf
 	}
 	c.logger.Info("generated kubelet client CSR and associated private key")
 
+	instanceData, err := c.imdsClient.GetInstanceData(ctx)
+	if err != nil {
+		c.logger.Error("failed to retrieve instance metadata from IMDS", zap.Error(err))
+		return nil, &BootstrapError{
+			errorType: ErrorTypeGetIntanceDataFailure,
+			inner:     fmt.Errorf("failed to retrieve instance metadata from IMDS: %w", err),
+		}
+	}
+	c.logger.Info("retrieved IMDS instance data", zap.String("resourceId", instanceData.Compute.ResourceID))
+
+	attestedData, err := c.imdsClient.GetAttestedData(ctx, "")
+	if err != nil {
+		c.logger.Error("failed to retrieve attested data from IMDS", zap.Error(err))
+		return nil, &BootstrapError{
+			errorType: ErrorTypeGetAttestedDataFailure,
+			inner:     fmt.Errorf("failed to retrieve attested data from IMDS: %w", err),
+		}
+	}
+	c.logger.Info("retrieved IMDS attested data")
+
 	credentialResponse, err := serviceClient.GetCredential(ctx, &akssecuretlsbootstrapv1.GetCredentialRequest{
 		ResourceId:    instanceData.Compute.ResourceID,
-		Nonce:         nonce,
+		Nonce:         "",
 		AttestedData:  attestedData.Signature,
 		EncodedCsrPem: base64.StdEncoding.EncodeToString(csrPEM),
 	})
