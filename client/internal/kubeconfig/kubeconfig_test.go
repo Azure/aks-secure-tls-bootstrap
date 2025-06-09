@@ -56,6 +56,7 @@ func TestKubeconfigGeneration(t *testing.T) {
 	assert.NotNil(t, credData)
 
 	certBlock, rest := pem.Decode(credData)
+
 	assert.NotNil(t, certBlock)
 	assert.Equal(t, certBlock.Type, "CERTIFICATE")
 	assert.NotEmpty(t, rest)
