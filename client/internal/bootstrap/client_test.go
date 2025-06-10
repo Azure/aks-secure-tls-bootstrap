@@ -100,7 +100,6 @@ func setupBootstrapClientTestDeps(t *testing.T, logger *zap.Logger, ctrl *gomock
 
 func TestBootstrapKubeletClientCredential(t *testing.T) {
 	logger, _ := zap.NewDevelopment()
-
 	tests := []struct {
 		name                   string
 		setupMocks             func(*testing.T, *gomock.Controller) (*Client, context.Context, *Config, []byte)
@@ -109,8 +108,7 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 		expectedKubeconfigData func(*testing.T, *clientcmdapi.Config, *Config, []byte)
 	}{
 		{
-			name: "when specified kubeconfig is already valid",
-			setupMocks: func(t *testing.T, ctrl *gomock.Controller) (*Client, context.Context, *Config, []byte) {
+			name: "when specified kubeconfig is already valid", setupMocks: func(t *testing.T, ctrl *gomock.Controller) (*Client, context.Context, *Config, []byte) {
 				client, ctx, imdsClient, kubeconfigValidator, serviceClient := setupBootstrapClientTestDeps(t, logger, ctrl)
 				bootstrapConfig := setupConfig(t)
 				kubeconfigValidator.EXPECT().Validate(bootstrapConfig.KubeconfigPath, false).Return(nil).Times(1)
@@ -125,8 +123,7 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 				assert.Nil(t, data)
 			},
 			expectedErrorType: "",
-		},
-		{
+		}, {
 			name: "when an access token cannot be retrieved",
 			setupMocks: func(t *testing.T, ctrl *gomock.Controller) (*Client, context.Context, *Config, []byte) {
 				client, ctx, _, kubeconfigValidator, _ := setupBootstrapClientTestDeps(t, logger, ctrl)
@@ -141,8 +138,7 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 			expectedKubeconfigData: func(t *testing.T, data *clientcmdapi.Config, _ *Config, _ []byte) {
 				assert.Nil(t, data)
 			},
-		},
-		{
+		}, {
 			name: "when unable to retrieve instance data from IMDS",
 			setupMocks: func(t *testing.T, ctrl *gomock.Controller) (*Client, context.Context, *Config, []byte) {
 				client, ctx, imdsClient, kubeconfigValidator, _ := setupBootstrapClientTestDeps(t, logger, ctrl)
@@ -327,11 +323,12 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 			},
 		},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
+			// We don't need these variables since setupMocks will create its own instances
+			_, _, _, _, _ = setupBootstrapClientTestDeps(t, logger, ctrl)
 			client, ctx, config, certBlockBytes := tt.setupMocks(t, ctrl)
 			kubeconfigData, err := client.BootstrapKubeletClientCredential(ctx, config)
 			if tt.expectedError == "" {
