@@ -34,7 +34,7 @@ func TestCallIMDS(t *testing.T) {
 			params: map[string]string{},
 			setupFunc: func(params map[string]string) *httptest.Server {
 				return mockIMDSWithAssertions(t, "{}", func(r *http.Request) {
-					assert.Equal(t, r.Header.Get("Metadata"), "True")
+					assert.Equal(t, "True", r.Header.Get("Metadata"))
 				})
 			},
 		},
@@ -58,7 +58,7 @@ func TestCallIMDS(t *testing.T) {
 				imds := mockIMDSWithAssertions(t, "{}", func(r *http.Request) {
 					queryParameters := r.URL.Query()
 					for param, expectedValue := range params {
-						assert.Equal(t, queryParameters.Get(param), expectedValue)
+						assert.Equal(t, expectedValue, queryParameters.Get(param))
 					}
 				})
 
@@ -116,10 +116,10 @@ func TestGetInstanceData(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			imds := mockIMDSWithAssertions(t, tt.json, func(r *http.Request) {
-				assert.Equal(t, r.URL.Path, "/metadata/instance")
+				assert.Equal(t, "/metadata/instance", r.URL.Path)
 				queryParameters := r.URL.Query()
-				assert.Equal(t, queryParameters.Get("api-version"), apiVersion)
-				assert.Equal(t, queryParameters.Get("format"), "json")
+				assert.Equal(t, apiVersion, queryParameters.Get("api-version"))
+				assert.Equal(t, "json", queryParameters.Get("format"))
 			})
 			defer imds.Close()
 
@@ -182,11 +182,11 @@ func TestGetAttestedData(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			imds := mockIMDSWithAssertions(t, tt.json, func(r *http.Request) {
-				assert.Equal(t, r.URL.Path, "/metadata/attested/document")
+				assert.Equal(t, "/metadata/attested/document", r.URL.Path)
 				queryParameters := r.URL.Query()
-				assert.Equal(t, queryParameters.Get("api-version"), apiVersion)
-				assert.Equal(t, queryParameters.Get("format"), "json")
-				assert.Equal(t, queryParameters.Get("nonce"), "nonce")
+				assert.Equal(t, apiVersion, queryParameters.Get("api-version"))
+				assert.Equal(t, "json", queryParameters.Get("format"))
+				assert.Equal(t, "nonce", queryParameters.Get("nonce"))
 			})
 			defer imds.Close()
 
