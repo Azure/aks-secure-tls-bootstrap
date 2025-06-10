@@ -115,7 +115,7 @@ func TestGetAuthToken(t *testing.T) {
 			if tt.expectErr {
 				assert.Error(t, err)
 				for _, substr := range tt.errSubstrs {
-					assert.Contains(t, err.Error(), substr)
+					assert.ErrorContains(t, err, substr)
 				}
 				assert.Empty(t, token)
 			} else {

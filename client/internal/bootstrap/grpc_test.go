@@ -16,12 +16,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestGRPC(t *testing.T) {
-	var (
-		clusterCACertPEM []byte
-	)
-	var err error
-	clusterCACertPEM, _, err = testutil.GenerateCertPEM(testutil.CertTemplate{
+func TestGetServiceClient(t *testing.T) {
+	clusterCACertPEM, _, err := testutil.GenerateCertPEM(testutil.CertTemplate{
 		CommonName:   "hcp",
 		Organization: "aks",
 		IsCA:         true,
@@ -32,7 +28,6 @@ func TestGRPC(t *testing.T) {
 	tests := []struct {
 		name        string
 		setupFunc   func(*testing.T) *Config
-		expectError bool
 		errorSubstr []string
 	}{
 		{
@@ -44,7 +39,6 @@ func TestGRPC(t *testing.T) {
 					APIServerFQDN:     "fqdn",
 				}
 			},
-			expectError: true,
 			errorSubstr: []string{"reading cluster CA data from does/not/exist.crt"},
 		},
 		{
@@ -61,7 +55,6 @@ func TestGRPC(t *testing.T) {
 					APIServerFQDN:     "fqdn",
 				}
 			},
-			expectError: true,
 			errorSubstr: []string{
 				"failed to get TLS config",
 				"unable to construct new cert pool using cluster CA data",
@@ -83,7 +76,6 @@ func TestGRPC(t *testing.T) {
 					APIServerFQDN:     lis.Addr().String(),
 				}
 			},
-			expectError: false,
 			errorSubstr: nil,
 		},
 	}
@@ -93,7 +85,7 @@ func TestGRPC(t *testing.T) {
 			cfg := tt.setupFunc(t)
 			client, closeFn, err := getServiceClient("token", cfg)
 
-			if tt.expectError {
+			if len(tt.errorSubstr) > 0 {
 				assert.Error(t, err)
 				for _, substr := range tt.errorSubstr {
 					assert.Contains(t, err.Error(), substr)
@@ -104,17 +96,15 @@ func TestGRPC(t *testing.T) {
 				assert.NoError(t, err)
 				assert.NotNil(t, client)
 				assert.NotNil(t, closeFn)
-				_ = closeFn()
+				closeFn := closeFn()
+				assert.NoError(t, closeFn)
 			}
 		})
 	}
 }
+
 func TestGetTLSConfig(t *testing.T) {
-	var (
-		clusterCACertPEM []byte
-	)
-	var err error
-	clusterCACertPEM, _, err = testutil.GenerateCertPEM(testutil.CertTemplate{
+	clusterCACertPEM, _, err := testutil.GenerateCertPEM(testutil.CertTemplate{
 		CommonName:   "hcp",
 		Organization: "aks",
 		IsCA:         true,
