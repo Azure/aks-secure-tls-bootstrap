@@ -34,35 +34,32 @@ func TestKubeconfigGeneration(t *testing.T) {
 	kubeconfigData, err := GenerateForCertAndKey(certPEM, keyPEM, cfg)
 	assert.NoError(t, err)
 	assert.Contains(t, kubeconfigData.Clusters, "default-cluster")
-
 	defaultCluster := kubeconfigData.Clusters["default-cluster"]
-	assert.Equal(t, defaultCluster.Server, "https://host:443")
-	assert.Equal(t, defaultCluster.CertificateAuthority, cfg.ClusterCAFilePath)
+	assert.Equal(t, "https://host:443", defaultCluster.Server)
+	assert.Equal(t, cfg.ClusterCAFilePath, defaultCluster.CertificateAuthority)
 
 	assert.Contains(t, kubeconfigData.AuthInfos, "default-auth")
 	defaultAuth := kubeconfigData.AuthInfos["default-auth"]
-	assert.Equal(t, defaultAuth.ClientCertificate, credPath)
-	assert.Equal(t, defaultAuth.ClientKey, credPath)
-
+	assert.Equal(t, credPath, defaultAuth.ClientCertificate)
+	assert.Equal(t, credPath, defaultAuth.ClientKey)
 	assert.Contains(t, kubeconfigData.Contexts, "default-context")
 	defaultContext := kubeconfigData.Contexts["default-context"]
-	assert.Equal(t, defaultContext.Cluster, "default-cluster")
-	assert.Equal(t, defaultContext.AuthInfo, "default-auth")
+	assert.Equal(t, "default-cluster", defaultContext.Cluster)
+	assert.Equal(t, "default-auth", defaultContext.AuthInfo)
 
-	assert.Equal(t, kubeconfigData.CurrentContext, "default-context")
+	assert.Equal(t, "default-context", kubeconfigData.CurrentContext)
 
 	credData, err := os.ReadFile(credPath)
 	assert.NoError(t, err)
 	assert.NotNil(t, credData)
-
 	certBlock, rest := pem.Decode(credData)
 
 	assert.NotNil(t, certBlock)
-	assert.Equal(t, certBlock.Type, "CERTIFICATE")
+	assert.Equal(t, "CERTIFICATE", certBlock.Type)
 	assert.NotEmpty(t, rest)
 
 	keyBlock, rest := pem.Decode(rest)
 	assert.NotNil(t, keyBlock)
-	assert.Equal(t, keyBlock.Type, "EC PRIVATE KEY")
+	assert.Equal(t, "EC PRIVATE KEY", keyBlock.Type)
 	assert.Empty(t, rest)
 }
