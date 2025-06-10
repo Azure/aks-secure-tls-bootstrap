@@ -317,7 +317,7 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 				assert.NoError(t, err)
 				certBlock, rest := pem.Decode(credData)
 				assert.NotEmpty(t, rest)
-				assert.Equal(t, certBlock.Bytes, certBlockBytes)
+				assert.Equal(t, certBlockBytes, certBlock.Bytes)
 				keyData, rest := pem.Decode(rest)
 				assert.Empty(t, rest)
 				assert.NotNil(t, keyData)
