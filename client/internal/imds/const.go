@@ -13,7 +13,6 @@ const (
 const (
 	apiVersionParameterKey = "api-version"
 	formatParameterKey     = "format"
-	nonceParameterKey      = "nonce"
 )
 
 const (

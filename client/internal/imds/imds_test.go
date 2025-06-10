@@ -139,7 +139,6 @@ var _ = Describe("Client Tests", Ordered, func() {
 				queryParameters := r.URL.Query()
 				Expect(queryParameters.Get("api-version")).To(Equal(apiVersion))
 				Expect(queryParameters.Get("format")).To(Equal("json"))
-				Expect(queryParameters.Get("nonce")).To(Equal("nonce"))
 			})
 			defer imds.Close()
 			imdsClient.baseURL = imds.URL
@@ -147,8 +146,7 @@ var _ = Describe("Client Tests", Ordered, func() {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			nonce := "nonce"
-			attestedData, err := imdsClient.GetAttestedData(ctx, nonce)
+			attestedData, err := imdsClient.GetAttestedData(ctx)
 			Expect(err).To(BeNil())
 			Expect(attestedData).ToNot(BeNil())
 			Expect(attestedData.Signature).To(Equal("signature"))
@@ -161,7 +159,6 @@ var _ = Describe("Client Tests", Ordered, func() {
 					queryParameters := r.URL.Query()
 					Expect(queryParameters.Get("api-version")).To(Equal(apiVersion))
 					Expect(queryParameters.Get("format")).To(Equal("json"))
-					Expect(queryParameters.Get("nonce")).To(Equal("nonce"))
 				})
 				defer imds.Close()
 				imdsClient.baseURL = imds.URL
@@ -169,8 +166,7 @@ var _ = Describe("Client Tests", Ordered, func() {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 
-				nonce := "nonce"
-				attestedData, err := imdsClient.GetAttestedData(ctx, nonce)
+				attestedData, err := imdsClient.GetAttestedData(ctx)
 				Expect(attestedData).To(BeNil())
 				Expect(err).ToNot(BeNil())
 				Expect(err.Error()).To(ContainSubstring("failed to unmarshal IMDS data"))

@@ -9,7 +9,6 @@ const (
 	ErrorTypeGetServiceClientFailure     ErrorType = "GetServiceClientFailure"
 	ErrorTypeGetIntanceDataFailure       ErrorType = "GetInstanceDataFailure"
 	ErrorTypeGetAttestedDataFailure      ErrorType = "GetAttestedDataFailure"
-	ErrorTypeGetNonceFailure             ErrorType = "GetNonceFailure"
 	ErrorTypeMakeKubeletClientCSRFailure ErrorType = "MakeKubeletClientCSRFailure"
 	ErrorTypeGetCredentialFailure        ErrorType = "GetCredentialFailure"
 	ErrorTypeGenerateKubeconfigFailure   ErrorType = "GenerateKubeconfigFailure"

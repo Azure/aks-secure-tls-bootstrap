@@ -45,18 +45,18 @@ func (m *MockClient) EXPECT() *MockClientMockRecorder {
 }
 
 // GetAttestedData mocks base method.
-func (m *MockClient) GetAttestedData(ctx context.Context, nonce string) (*imds.VMAttestedData, error) {
+func (m *MockClient) GetAttestedData(ctx context.Context) (*imds.VMAttestedData, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetAttestedData", ctx, nonce)
+	ret := m.ctrl.Call(m, "GetAttestedData", ctx)
 	ret0, _ := ret[0].(*imds.VMAttestedData)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetAttestedData indicates an expected call of GetAttestedData.
-func (mr *MockClientMockRecorder) GetAttestedData(ctx, nonce any) *gomock.Call {
+func (mr *MockClientMockRecorder) GetAttestedData(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAttestedData", reflect.TypeOf((*MockClient)(nil).GetAttestedData), ctx, nonce)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAttestedData", reflect.TypeOf((*MockClient)(nil).GetAttestedData), ctx)
 }
 
 // GetInstanceData mocks base method.

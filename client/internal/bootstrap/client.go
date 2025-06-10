@@ -86,7 +86,7 @@ func (c *Client) BootstrapKubeletClientCredential(ctx context.Context, cfg *Conf
 	}
 	c.logger.Info("retrieved IMDS instance data", zap.String("resourceId", instanceData.Compute.ResourceID))
 
-	attestedData, err := c.imdsClient.GetAttestedData(ctx, "")
+	attestedData, err := c.imdsClient.GetAttestedData(ctx)
 	if err != nil {
 		c.logger.Error("failed to retrieve attested data from IMDS", zap.Error(err))
 		return nil, &BootstrapError{
@@ -98,7 +98,6 @@ func (c *Client) BootstrapKubeletClientCredential(ctx context.Context, cfg *Conf
 
 	credentialResponse, err := serviceClient.GetCredential(ctx, &akssecuretlsbootstrapv1.GetCredentialRequest{
 		ResourceId:    instanceData.Compute.ResourceID,
-		Nonce:         "",
 		AttestedData:  attestedData.Signature,
 		EncodedCsrPem: base64.StdEncoding.EncodeToString(csrPEM),
 	})
