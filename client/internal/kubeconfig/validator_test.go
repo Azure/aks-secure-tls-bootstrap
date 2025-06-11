@@ -138,7 +138,6 @@ func TestValidateKubeconfig(t *testing.T) {
 				logger: logger,
 			}
 			tt.setupFunc(v)
-			// tt.assertions(t, v)
 			err := v.Validate("path", false)
 			if len(tt.expectedErrs) > 0 {
 				assert.Error(t, err)
