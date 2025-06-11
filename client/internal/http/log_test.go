@@ -26,12 +26,7 @@ func (cw customWriter) Sync() error {
 }
 
 func TestHttpLog(t *testing.T) {
-	var (
-		buf       bytes.Buffer
-		bufWriter *bufio.Writer
-		logger    *zap.Logger
-	)
-
+	var logger *zap.Logger
 	tests := []struct {
 		name                     string
 		logFunc                  func()
@@ -67,6 +62,11 @@ func TestHttpLog(t *testing.T) {
 			expectedStdoutSubstrs: []string{"leveled_logger_fields"},
 		},
 	}
+
+	var (
+		buf       bytes.Buffer
+		bufWriter *bufio.Writer
+	)
 
 	bufWriter = bufio.NewWriter(&buf)
 
