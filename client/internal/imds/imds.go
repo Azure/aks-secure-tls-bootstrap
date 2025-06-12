@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	internalhttp "github.com/Azure/aks-secure-tls-bootstrap/client/internal/http"
 	"go.uber.org/zap"
@@ -18,7 +19,7 @@ import (
 
 type Client interface {
 	GetInstanceData(ctx context.Context) (*VMInstanceData, error)
-	GetAttestedData(ctx context.Context, nonce string) (*VMAttestedData, error)
+	GetAttestedData(ctx context.Context) (*VMAttestedData, error)
 }
 
 type client struct {
@@ -51,12 +52,12 @@ func (c *client) GetInstanceData(ctx context.Context) (*VMInstanceData, error) {
 	return instanceData, nil
 }
 
-func (c *client) GetAttestedData(ctx context.Context, nonce string) (*VMAttestedData, error) {
+func (c *client) GetAttestedData(ctx context.Context) (*VMAttestedData, error) {
 	url := fmt.Sprintf("%s/%s", c.baseURL, attestedDataEndpoint)
 	c.logger.Info("calling IMDS attested data endpoint", zap.String("url", url))
 
 	params := getCommonParameters()
-	params[nonceParameterKey] = nonce
+	params[nonceParameterKey] = fmt.Sprintf("%d", time.Now().Add(5*time.Second).Unix())
 
 	attestedData := new(VMAttestedData)
 	if err := c.callIMDS(ctx, url, params, attestedData); err != nil {

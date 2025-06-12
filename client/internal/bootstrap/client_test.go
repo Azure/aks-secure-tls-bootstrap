@@ -133,8 +133,7 @@ var _ = Describe("Client tests", Ordered, func() {
 					Return(nil).
 					Times(1)
 				serviceClient.EXPECT().GetCredential(gomock.Any(), gomock.Any()).Times(0)
-				serviceClient.EXPECT().GetNonce(gomock.Any(), gomock.Any()).Times(0)
-				imdsClient.EXPECT().GetAttestedData(gomock.Any(), gomock.Any()).Times(0)
+				imdsClient.EXPECT().GetAttestedData(gomock.Any()).Times(0)
 				imdsClient.EXPECT().GetInstanceData(gomock.Any()).Times(0)
 
 				kubeconfigData, err := bootstrapClient.BootstrapKubeletClientCredential(ctx, bootstrapConfig)
@@ -177,27 +176,6 @@ var _ = Describe("Client tests", Ordered, func() {
 			})
 		})
 
-		When("unable to retrieve nonce from bootstrap server", func() {
-			It("should return an error", func() {
-				kubeconfigValidator.EXPECT().Validate(kubeconfigPath, false).
-					Return(fmt.Errorf("invalid kubeconfig")).
-					Times(1)
-				imdsClient.EXPECT().GetInstanceData(ctx).
-					Return(&imds.VMInstanceData{}, nil).
-					Times(1)
-				serviceClient.EXPECT().GetNonce(ctx, gomock.Any()).
-					Return(&akssecuretlsbootstrapv1.GetNonceResponse{}, errors.New("cannot get nonce response")).
-					Times(1)
-
-				kubeconfigData, err := bootstrapClient.BootstrapKubeletClientCredential(ctx, bootstrapConfig)
-				Expect(kubeconfigData).To(BeNil())
-				Expect(err).ToNot(BeNil())
-				expectBootstrapErrorWithType(err, ErrorTypeGetNonceFailure)
-				Expect(err.Error()).To(ContainSubstring("failed to retrieve a nonce from bootstrap server"))
-				Expect(err.Error()).To(ContainSubstring("cannot get nonce response"))
-			})
-		})
-
 		When("unable to retrieve attested data from IMDS", func() {
 			It("should return an error", func() {
 				kubeconfigValidator.EXPECT().Validate(kubeconfigPath, false).
@@ -206,12 +184,7 @@ var _ = Describe("Client tests", Ordered, func() {
 				imdsClient.EXPECT().GetInstanceData(ctx).
 					Return(&imds.VMInstanceData{}, nil).
 					Times(1)
-				serviceClient.EXPECT().GetNonce(ctx, gomock.Any()).
-					Return(&akssecuretlsbootstrapv1.GetNonceResponse{
-						Nonce: "nonce",
-					}, nil).
-					Times(1)
-				imdsClient.EXPECT().GetAttestedData(ctx, "nonce").
+				imdsClient.EXPECT().GetAttestedData(ctx).
 					Return(nil, errors.New("cannot get VM attested data")).
 					Times(1)
 
@@ -232,12 +205,7 @@ var _ = Describe("Client tests", Ordered, func() {
 				imdsClient.EXPECT().GetInstanceData(ctx).
 					Return(&imds.VMInstanceData{}, nil).
 					Times(1)
-				serviceClient.EXPECT().GetNonce(ctx, gomock.Any()).
-					Return(&akssecuretlsbootstrapv1.GetNonceResponse{
-						Nonce: "nonce",
-					}, nil).
-					Times(1)
-				imdsClient.EXPECT().GetAttestedData(ctx, "nonce").
+				imdsClient.EXPECT().GetAttestedData(ctx).
 					Return(&imds.VMAttestedData{
 						Signature: "signedBlob",
 					}, nil).
@@ -263,12 +231,7 @@ var _ = Describe("Client tests", Ordered, func() {
 				imdsClient.EXPECT().GetInstanceData(ctx).
 					Return(&imds.VMInstanceData{}, nil).
 					Times(1)
-				serviceClient.EXPECT().GetNonce(ctx, gomock.Any()).
-					Return(&akssecuretlsbootstrapv1.GetNonceResponse{
-						Nonce: "nonce",
-					}, nil).
-					Times(1)
-				imdsClient.EXPECT().GetAttestedData(ctx, "nonce").
+				imdsClient.EXPECT().GetAttestedData(ctx).
 					Return(&imds.VMAttestedData{
 						Signature: "signedBlob",
 					}, nil).
@@ -295,12 +258,7 @@ var _ = Describe("Client tests", Ordered, func() {
 				imdsClient.EXPECT().GetInstanceData(ctx).
 					Return(&imds.VMInstanceData{}, nil).
 					Times(1)
-				serviceClient.EXPECT().GetNonce(ctx, gomock.Any()).
-					Return(&akssecuretlsbootstrapv1.GetNonceResponse{
-						Nonce: "nonce",
-					}, nil).
-					Times(1)
-				imdsClient.EXPECT().GetAttestedData(ctx, "nonce").
+				imdsClient.EXPECT().GetAttestedData(ctx).
 					Return(&imds.VMAttestedData{
 						Signature: "signedBlob",
 					}, nil).
@@ -341,12 +299,7 @@ var _ = Describe("Client tests", Ordered, func() {
 						},
 					}, nil).
 					Times(1)
-				serviceClient.EXPECT().GetNonce(ctx, gomock.Any()).
-					Return(&akssecuretlsbootstrapv1.GetNonceResponse{
-						Nonce: "nonce",
-					}, nil).
-					Times(1)
-				imdsClient.EXPECT().GetAttestedData(ctx, "nonce").
+				imdsClient.EXPECT().GetAttestedData(ctx).
 					Return(&imds.VMAttestedData{
 						Signature: "signedBlob",
 					}, nil).
