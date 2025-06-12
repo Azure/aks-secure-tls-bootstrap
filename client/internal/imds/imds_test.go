@@ -139,6 +139,7 @@ var _ = Describe("Client Tests", Ordered, func() {
 				queryParameters := r.URL.Query()
 				Expect(queryParameters.Get("api-version")).To(Equal(apiVersion))
 				Expect(queryParameters.Get("format")).To(Equal("json"))
+				Expect(queryParameters.Get("nonce")).To(HaveLen(10))
 			})
 			defer imds.Close()
 			imdsClient.baseURL = imds.URL
