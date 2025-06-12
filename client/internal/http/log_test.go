@@ -26,20 +26,15 @@ func (cw customWriter) Sync() error {
 }
 
 func TestHttpLog(t *testing.T) {
-	var logger *zap.Logger
 	tests := []struct {
 		name                     string
-		logFunc                  func()
+		logFunc                  func(*leveledLoggerShim)
 		expectedStdoutSubstrs    []string
 		notExpectedStdoutSubstrs []string
 	}{
 		{
 			name: "should correctly shim into a zap.Logger",
-			logFunc: func() {
-				shim := &leveledLoggerShim{
-					logger: logger,
-				}
-
+			logFunc: func(shim *leveledLoggerShim) {
 				shim.Info("info", "field", "value")
 				shim.Warn("warn", "field", "value")
 				shim.Error("error", "field", "value")
@@ -49,11 +44,7 @@ func TestHttpLog(t *testing.T) {
 		},
 		{
 			name: "unexpected number of keys and values are specified",
-			logFunc: func() {
-				shim := &leveledLoggerShim{
-					logger: logger,
-				}
-
+			logFunc: func(shim *leveledLoggerShim) {
 				shim.Info("info", "field", "value", "otherField")
 				shim.Warn("warn", "field", "value", "otherField")
 				shim.Error("error", "field", "value", "otherField")
@@ -80,12 +71,15 @@ func TestHttpLog(t *testing.T) {
 
 	config.OutputPaths = []string{"custom:test"}
 
-	logger, err = config.Build()
+	logger, err := config.Build()
 	assert.NoError(t, err)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.logFunc()
+			shim := &leveledLoggerShim{
+				logger: logger,
+			}
+			tt.logFunc(shim)
 
 			err := bufWriter.Flush()
 			assert.NoError(t, err)
