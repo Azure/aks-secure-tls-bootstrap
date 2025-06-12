@@ -17,13 +17,6 @@ import (
 )
 
 func TestCallIMDS(t *testing.T) {
-	var (
-		logger     *zap.Logger
-		imdsClient *client
-	)
-
-	logger, _ = zap.NewDevelopment()
-
 	tests := []struct {
 		name      string
 		setupFunc func(map[string]string) *httptest.Server
@@ -67,8 +60,9 @@ func TestCallIMDS(t *testing.T) {
 		},
 	}
 
+	logger, _ := zap.NewDevelopment()
 	for _, tt := range tests {
-		imdsClient = &client{
+		imdsClient := &client{
 			httpClient: internalhttp.NewClient(logger),
 			logger:     logger,
 		}
@@ -88,10 +82,6 @@ func TestGetInstanceData(t *testing.T) {
 		mockVMAttestedDataJSON = `{"signature":"signature"}`
 		malformedJSON          = `{{}`
 	)
-	var (
-		logger *zap.Logger
-	)
-	logger, _ = zap.NewDevelopment()
 
 	tests := []struct {
 		name               string
@@ -113,6 +103,7 @@ func TestGetInstanceData(t *testing.T) {
 		},
 	}
 
+	logger, _ := zap.NewDevelopment()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			imds := mockIMDSWithAssertions(t, tt.json, func(r *http.Request) {
@@ -132,10 +123,8 @@ func TestGetInstanceData(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			// Execute the test
 			instanceData, err := imdsClient.GetInstanceData(ctx)
 
-			// Direct assertions
 			if tt.expectedErrSubStr != "" {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tt.expectedErrSubStr)
@@ -155,10 +144,7 @@ func TestGetAttestedData(t *testing.T) {
 		mockVMAttestedDataJSON = `{"signature":"signature"}`
 		malformedJSON          = `{{}`
 	)
-	var (
-		logger *zap.Logger
-	)
-	logger, _ = zap.NewDevelopment()
+
 	tests := []struct {
 		name              string
 		json              string
@@ -179,6 +165,7 @@ func TestGetAttestedData(t *testing.T) {
 		},
 	}
 
+	logger, _ := zap.NewDevelopment()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			imds := mockIMDSWithAssertions(t, tt.json, func(r *http.Request) {
