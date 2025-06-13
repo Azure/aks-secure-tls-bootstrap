@@ -8,180 +8,202 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
+	"testing"
 
 	internalhttp "github.com/Azure/aks-secure-tls-bootstrap/client/internal/http"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 )
 
-var _ = Describe("Client Tests", Ordered, func() {
+func TestCallIMDS(t *testing.T) {
+	tests := []struct {
+		name      string
+		setupFunc func(map[string]string) *httptest.Server
+		params    map[string]string
+	}{
+		{
+			name:   "should specify Metadata:True in the request headers",
+			params: map[string]string{},
+			setupFunc: func(params map[string]string) *httptest.Server {
+				return mockIMDSWithAssertions(t, "{}", func(r *http.Request) {
+					assert.Equal(t, "True", r.Header.Get("Metadata"))
+				})
+			},
+		},
+		{
+			name:   "there aren't query parameters",
+			params: map[string]string{},
+			setupFunc: func(params map[string]string) *httptest.Server {
+				return mockIMDSWithAssertions(t, "{}", func(r *http.Request) {
+					assert.Empty(t, r.URL.Query())
+				})
+			},
+		},
+		{
+			name: "there are query parameters",
+			params: map[string]string{
+				"a": "1",
+				"b": "2",
+				"c": "3",
+			},
+			setupFunc: func(params map[string]string) *httptest.Server {
+				imds := mockIMDSWithAssertions(t, "{}", func(r *http.Request) {
+					queryParameters := r.URL.Query()
+					for param, expectedValue := range params {
+						assert.Equal(t, expectedValue, queryParameters.Get(param))
+					}
+				})
+
+				return imds
+			},
+		},
+	}
+
+	logger, _ := zap.NewDevelopment()
+	for _, tt := range tests {
+		imdsClient := &client{
+			httpClient: internalhttp.NewClient(logger),
+			logger:     logger,
+		}
+		imds := tt.setupFunc(tt.params)
+		defer imds.Close()
+
+		ctx := context.Background()
+
+		err := imdsClient.callIMDS(ctx, imds.URL, tt.params, &VMInstanceData{})
+		assert.NoError(t, err)
+	}
+}
+
+func TestGetInstanceData(t *testing.T) {
 	const (
 		mockVMInstanceDataJSON = `{"compute":{"resourceId": "resourceId"}}`
 		mockVMAttestedDataJSON = `{"signature":"signature"}`
 		malformedJSON          = `{{}`
 	)
-	var (
-		logger     *zap.Logger
-		imdsClient *client
-	)
 
-	BeforeAll(func() {
-		logger, _ = zap.NewDevelopment()
-	})
+	tests := []struct {
+		name               string
+		json               string
+		expectedErrSubStr  string
+		expectedResourceID string
+	}{
+		{
+			name:               "should call the correct IMDS endpoint with the correct query parameters",
+			json:               mockVMInstanceDataJSON,
+			expectedErrSubStr:  "",
+			expectedResourceID: "resourceId",
+		},
+		{
+			name:               "unable parse instance data response from IMDS",
+			json:               malformedJSON,
+			expectedErrSubStr:  "failed to unmarshal IMDS data",
+			expectedResourceID: "",
+		},
+	}
 
-	BeforeEach(func() {
-		imdsClient = &client{
-			httpClient: internalhttp.NewClient(logger),
-			logger:     logger,
-		}
-	})
-
-	Context("callIMDS", func() {
-		It("should specify Metadata:True in the request headers", func() {
-			imds := mockIMDSWithAssertions("{}", func(r *http.Request) {
-				Expect(r.Header.Get("Metadata")).To(Equal("True"))
-			})
-			defer imds.Close()
-
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			err := imdsClient.callIMDS(ctx, imds.URL, map[string]string{}, &VMInstanceData{})
-			Expect(err).To(BeNil())
-		})
-
-		When("there aren't query parameters", func() {
-			It("should not add query parameters to to the request URL", func() {
-				imds := mockIMDSWithAssertions("{}", func(r *http.Request) {
-					Expect(r.URL.Query()).To(BeEmpty())
-				})
-				defer imds.Close()
-
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
-
-				err := imdsClient.callIMDS(ctx, imds.URL, map[string]string{}, &VMInstanceData{})
-				Expect(err).To(BeNil())
-			})
-		})
-
-		When("there are query parameters", func() {
-			It("should add the the query parameters to the request URL", func() {
-				params := map[string]string{
-					"a": "1",
-					"b": "2",
-					"c": "3",
-				}
-				imds := mockIMDSWithAssertions("{}", func(r *http.Request) {
-					queryParameters := r.URL.Query()
-					for param, expectedValue := range params {
-						Expect(queryParameters.Get(param)).To(Equal(expectedValue))
-					}
-				})
-				defer imds.Close()
-
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
-
-				err := imdsClient.callIMDS(ctx, imds.URL, params, &VMInstanceData{})
-				Expect(err).To(BeNil())
-			})
-		})
-	})
-
-	Context("GetInstanceData tests", func() {
-		It("should call the correct IMDS endpoint with the correct query parameters", func() {
-			imds := mockIMDSWithAssertions(mockVMInstanceDataJSON, func(r *http.Request) {
-				Expect(r.URL.Path).To(Equal("/metadata/instance"))
+	logger, _ := zap.NewDevelopment()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			imds := mockIMDSWithAssertions(t, tt.json, func(r *http.Request) {
+				assert.Equal(t, "/metadata/instance", r.URL.Path)
 				queryParameters := r.URL.Query()
-				Expect(queryParameters.Get("api-version")).To(Equal(apiVersion))
-				Expect(queryParameters.Get("format")).To(Equal("json"))
+				assert.Equal(t, apiVersion, queryParameters.Get("api-version"))
+				assert.Equal(t, "json", queryParameters.Get("format"))
 			})
 			defer imds.Close()
-			imdsClient.baseURL = imds.URL
+
+			imdsClient := &client{
+				httpClient: internalhttp.NewClient(logger),
+				logger:     logger,
+				baseURL:    imds.URL,
+			}
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
 			instanceData, err := imdsClient.GetInstanceData(ctx)
-			Expect(err).To(BeNil())
-			Expect(instanceData).ToNot(BeNil())
-			Expect(instanceData.Compute.ResourceID).To(Equal("resourceId"))
+
+			if tt.expectedErrSubStr != "" {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedErrSubStr)
+				assert.Nil(t, instanceData)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, instanceData)
+				assert.Equal(t, tt.expectedResourceID, instanceData.Compute.ResourceID)
+			}
 		})
+	}
+}
 
-		When("unable parse instance data response from IMDS", func() {
-			It("should return an error", func() {
-				imds := mockIMDSWithAssertions(malformedJSON, func(r *http.Request) {
-					Expect(r.URL.Path).To(Equal("/metadata/instance"))
-					queryParameters := r.URL.Query()
-					Expect(queryParameters.Get("api-version")).To(Equal(apiVersion))
-					Expect(queryParameters.Get("format")).To(Equal("json"))
-				})
-				defer imds.Close()
-				imdsClient.baseURL = imds.URL
+func TestGetAttestedData(t *testing.T) {
+	const (
+		mockVMAttestedDataJSON = `{"signature":"signature"}`
+		malformedJSON          = `{{}`
+	)
 
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
+	tests := []struct {
+		name              string
+		json              string
+		expectedErrSubStr string // Empty string indicates no error expected
+		expectedSignature string // For validating the signature in the attested data
+	}{
+		{
+			name:              "should call the correct IMDS endpoint with the correct query parameters",
+			json:              mockVMAttestedDataJSON,
+			expectedErrSubStr: "",
+			expectedSignature: "signature",
+		},
+		{
+			name:              "unable to parse attested data response from IMDS",
+			json:              malformedJSON,
+			expectedErrSubStr: "failed to unmarshal IMDS data",
+			expectedSignature: "",
+		},
+	}
 
-				instanceData, err := imdsClient.GetInstanceData(ctx)
-				Expect(instanceData).To(BeNil())
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("failed to unmarshal IMDS data"))
-			})
-		})
-	})
-
-	Context("GetAttestedData tests", func() {
-		It("should call the correct IMDS endpoint with the correct query parameters", func() {
-			imds := mockIMDSWithAssertions(mockVMAttestedDataJSON, func(r *http.Request) {
-				Expect(r.URL.Path).To(Equal("/metadata/attested/document"))
+	logger, _ := zap.NewDevelopment()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			imds := mockIMDSWithAssertions(t, tt.json, func(r *http.Request) {
+				assert.Equal(t, "/metadata/attested/document", r.URL.Path)
 				queryParameters := r.URL.Query()
-				Expect(queryParameters.Get("api-version")).To(Equal(apiVersion))
-				Expect(queryParameters.Get("format")).To(Equal("json"))
-				Expect(queryParameters.Get("nonce")).To(Equal("nonce"))
+				assert.Equal(t, apiVersion, queryParameters.Get("api-version"))
+				assert.Equal(t, "json", queryParameters.Get("format"))
+				assert.Equal(t, "nonce", queryParameters.Get("nonce"))
 			})
 			defer imds.Close()
-			imdsClient.baseURL = imds.URL
+
+			imdsClient := &client{
+				httpClient: internalhttp.NewClient(logger),
+				logger:     logger,
+				baseURL:    imds.URL,
+			}
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
 			nonce := "nonce"
 			attestedData, err := imdsClient.GetAttestedData(ctx, nonce)
-			Expect(err).To(BeNil())
-			Expect(attestedData).ToNot(BeNil())
-			Expect(attestedData.Signature).To(Equal("signature"))
+
+			if tt.expectedErrSubStr != "" {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedErrSubStr)
+				assert.Nil(t, attestedData)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, attestedData)
+				assert.Equal(t, tt.expectedSignature, attestedData.Signature)
+			}
 		})
+	}
+}
 
-		When("unable to parse instance data response from IMDS", func() {
-			It("should return an error", func() {
-				imds := mockIMDSWithAssertions(malformedJSON, func(r *http.Request) {
-					Expect(r.URL.Path).To(Equal("/metadata/attested/document"))
-					queryParameters := r.URL.Query()
-					Expect(queryParameters.Get("api-version")).To(Equal(apiVersion))
-					Expect(queryParameters.Get("format")).To(Equal("json"))
-					Expect(queryParameters.Get("nonce")).To(Equal("nonce"))
-				})
-				defer imds.Close()
-				imdsClient.baseURL = imds.URL
-
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
-
-				nonce := "nonce"
-				attestedData, err := imdsClient.GetAttestedData(ctx, nonce)
-				Expect(attestedData).To(BeNil())
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("failed to unmarshal IMDS data"))
-			})
-		})
-	})
-})
-
-func mockIMDSWithAssertions(response string, assertions func(r *http.Request)) *httptest.Server {
+func mockIMDSWithAssertions(t *testing.T, response string, assertions func(r *http.Request)) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		Expect(r.Header.Get("User-Agent")).To(HavePrefix("aks-secure-tls-bootstrap-client/"))
+		assert.True(t, strings.HasPrefix(r.Header.Get("User-Agent"), "aks-secure-tls-bootstrap-client/"))
 		assertions(r)
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintln(w, response)
