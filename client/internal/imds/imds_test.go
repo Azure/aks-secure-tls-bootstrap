@@ -140,7 +140,6 @@ func TestGetInstanceData(t *testing.T) {
 
 func TestGetAttestedData(t *testing.T) {
 	const (
-		mockVMInstanceDataJSON = `{"compute":{"resourceId": "resourceId"}}`
 		mockVMAttestedDataJSON = `{"signature":"signature"}`
 		malformedJSON          = `{{}`
 	)
