@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"testing"
 	"time"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/cloud"
@@ -23,382 +24,306 @@ import (
 	akssecuretlsbootstrapv1_mocks "github.com/Azure/aks-secure-tls-bootstrap/service/pkg/gen/mocks/akssecuretlsbootstrap/v1"
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	"go.uber.org/zap"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
-// TODO: refactor towards vanilla go tests
+type BootstrapClient struct {
+	client              *Client
+	ctx                 context.Context
+	imdsClient          *imdsmocks.MockClient
+	kubeconfigValidator *kubeconfigmocks.MockValidator
+	serviceClient       *akssecuretlsbootstrapv1_mocks.MockSecureTLSBootstrapServiceClient
+}
 
-var _ = Describe("Client tests", Ordered, func() {
-	const (
-		apiServerFQDN  = "controlplane.azmk8s.io"
-		kubeconfigPath = "path/to/kubeconfig"
-	)
-	var (
-		ctx                 context.Context
-		mockCtrl            *gomock.Controller
-		imdsClient          *imdsmocks.MockClient
-		kubeconfigValidator *kubeconfigmocks.MockValidator
-		serviceClient       *akssecuretlsbootstrapv1_mocks.MockSecureTLSBootstrapServiceClient
-		bootstrapClient     *Client
-		bootstrapConfig     *Config
-		logger              *zap.Logger
+func TestBootstrapKubeletClientCredential(t *testing.T) {
+	logger, _ := zap.NewDevelopment()
 
-		clusterCAFilePath string
-		credFilePath      string
-	)
-
-	BeforeAll(func() {
-		logger, _ = zap.NewDevelopment()
-
-		clusterCACertPEM, _, err := testutil.GenerateCertPEM(
-			testutil.CertTemplate{
-				CommonName:   "hcp",
-				Organization: "aks",
-				IsCA:         true,
-				Expiration:   time.Now().Add(time.Hour),
+	tests := []struct {
+		name                   string
+		setupMocks             func(*testing.T, *gomock.Controller, *BootstrapClient, *Config) []byte
+		expectedError          string
+		expectedErrorType      ErrorType
+		expectedKubeconfigData func(*testing.T, *clientcmdapi.Config, *Config, []byte)
+	}{
+		{
+			name: "when specified kubeconfig is already valid",
+			setupMocks: func(t *testing.T, ctrl *gomock.Controller, bootstrapClient *BootstrapClient, bootstrapConfig *Config) []byte {
+				bootstrapClient.kubeconfigValidator.EXPECT().Validate(bootstrapConfig.KubeconfigPath, false).Return(nil).Times(1)
+				bootstrapClient.serviceClient.EXPECT().GetCredential(gomock.Any(), gomock.Any()).Times(0)
+				bootstrapClient.serviceClient.EXPECT().GetNonce(gomock.Any(), gomock.Any()).Times(0)
+				bootstrapClient.imdsClient.EXPECT().GetAttestedData(gomock.Any(), gomock.Any()).Times(0)
+				bootstrapClient.imdsClient.EXPECT().GetInstanceData(gomock.Any()).Times(0)
+				return nil
 			},
-		)
-		Expect(err).To(BeNil())
-
-		tempDir := GinkgoT().TempDir()
-		clusterCAFilePath = filepath.Join(tempDir, "ca.crt")
-		credFilePath = filepath.Join(tempDir, "client.pem")
-
-		err = os.WriteFile(clusterCAFilePath, clusterCACertPEM, os.ModePerm)
-		Expect(err).To(BeNil())
-	})
-
-	BeforeEach(func() {
-		bootstrapConfig = &Config{
-			NextProto:         "bootstrap",
-			AADResource:       "resource",
-			ClusterCAFilePath: clusterCAFilePath,
-			CredFilePath:      credFilePath,
-			APIServerFQDN:     apiServerFQDN,
-			KubeconfigPath:    kubeconfigPath,
-			ProviderConfig: cloud.ProviderConfig{
-				CloudName:    azure.PublicCloud.Name,
-				ClientID:     "service-principal-id",
-				ClientSecret: "service-principal-secret",
-				TenantID:     "tenantId",
+			expectedError: "",
+			expectedKubeconfigData: func(t *testing.T, data *clientcmdapi.Config, _ *Config, _ []byte) {
+				assert.Nil(t, data)
 			},
-		}
-	})
-
-	Context("NewClient", func() {
-		It("should return a new bootstrap client", func() {
-			c, err := NewClient(logger)
-			Expect(err).To(BeNil())
-			Expect(c).ToNot(BeNil())
-			Expect(c.logger).ToNot(BeNil())
-			Expect(c.getServiceClientFunc).ToNot(BeNil())
-			Expect(c.imdsClient).ToNot(BeNil())
-			Expect(c.kubeconfigValidator).ToNot(BeNil())
-			Expect(c.extractAccessTokenFunc).ToNot(BeNil())
-		})
-	})
-
-	Context("BootstrapKubeletClientCredential", func() {
-		BeforeEach(func() {
-			ctx = context.Background()
-			mockCtrl = gomock.NewController(GinkgoT())
-			imdsClient = imdsmocks.NewMockClient(mockCtrl)
-			kubeconfigValidator = kubeconfigmocks.NewMockValidator(mockCtrl)
-			serviceClient = akssecuretlsbootstrapv1_mocks.NewMockSecureTLSBootstrapServiceClient(mockCtrl)
-
-			bootstrapClient = &Client{
-				logger:              logger,
-				imdsClient:          imdsClient,
-				kubeconfigValidator: kubeconfigValidator,
-				getServiceClientFunc: func(_ string, _ *Config) (akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient, func() error, error) {
-					return serviceClient, func() error { return nil }, nil
-				},
-				extractAccessTokenFunc: func(token *adal.ServicePrincipalToken) (string, error) {
-					Expect(token).ToNot(BeNil())
-					return "token", nil
-				},
-			}
-		})
-
-		AfterEach(func() {
-			mockCtrl.Finish()
-		})
-
-		When("specified kubeconfig is already valid", func() {
-			It("should peform a no-op", func() {
-				kubeconfigValidator.EXPECT().Validate(kubeconfigPath, false).
-					Return(nil).
-					Times(1)
-				serviceClient.EXPECT().GetCredential(gomock.Any(), gomock.Any()).Times(0)
-				serviceClient.EXPECT().GetNonce(gomock.Any(), gomock.Any()).Times(0)
-				imdsClient.EXPECT().GetAttestedData(gomock.Any(), gomock.Any()).Times(0)
-				imdsClient.EXPECT().GetInstanceData(gomock.Any()).Times(0)
-
-				kubeconfigData, err := bootstrapClient.BootstrapKubeletClientCredential(ctx, bootstrapConfig)
-				Expect(err).To(BeNil())
-				Expect(kubeconfigData).To(BeNil())
-			})
-		})
-
-		When("an access token cannot be retrieved", func() {
-			It("return an error", func() {
-				bootstrapConfig.ProviderConfig.ClientSecret = "" // force a failure to generate service principal access token
-				kubeconfigValidator.EXPECT().Validate(kubeconfigPath, false).
-					Return(fmt.Errorf("invalid kubeconfig")).
-					Times(1)
-
-				kubeconfigData, err := bootstrapClient.BootstrapKubeletClientCredential(ctx, bootstrapConfig)
-				Expect(kubeconfigData).To(BeNil())
-				Expect(err).ToNot(BeNil())
-				expectBootstrapErrorWithType(err, ErrorTypeGetAccessTokenFailure)
-				Expect(err.Error()).To(ContainSubstring("failed to generate access token for gRPC connection"))
-				Expect(err.Error()).To(ContainSubstring("generating SPN access token with username and password"))
-			})
-		})
-
-		When("unable to retrieve instance data from IMDS", func() {
-			It("should return an error", func() {
-				kubeconfigValidator.EXPECT().Validate(kubeconfigPath, false).
-					Return(fmt.Errorf("invalid kubeconfig")).
-					Times(1)
-				imdsClient.EXPECT().GetInstanceData(ctx).
-					Return(nil, errors.New("cannot get VM instance data from IMDS")).
-					Times(1)
-
-				kubeconfigData, err := bootstrapClient.BootstrapKubeletClientCredential(ctx, bootstrapConfig)
-				Expect(kubeconfigData).To(BeNil())
-				Expect(err).ToNot(BeNil())
-				expectBootstrapErrorWithType(err, ErrorTypeGetIntanceDataFailure)
-				Expect(err.Error()).To(ContainSubstring("failed to retrieve instance metadata"))
-				Expect(err.Error()).To(ContainSubstring("cannot get VM instance data from IMDS"))
-			})
-		})
-
-		When("unable to retrieve nonce from bootstrap server", func() {
-			It("should return an error", func() {
-				kubeconfigValidator.EXPECT().Validate(kubeconfigPath, false).
-					Return(fmt.Errorf("invalid kubeconfig")).
-					Times(1)
-				imdsClient.EXPECT().GetInstanceData(ctx).
-					Return(&imds.VMInstanceData{}, nil).
-					Times(1)
-				serviceClient.EXPECT().GetNonce(ctx, gomock.Any()).
-					Return(&akssecuretlsbootstrapv1.GetNonceResponse{}, errors.New("cannot get nonce response")).
-					Times(1)
-
-				kubeconfigData, err := bootstrapClient.BootstrapKubeletClientCredential(ctx, bootstrapConfig)
-				Expect(kubeconfigData).To(BeNil())
-				Expect(err).ToNot(BeNil())
-				expectBootstrapErrorWithType(err, ErrorTypeGetNonceFailure)
-				Expect(err.Error()).To(ContainSubstring("failed to retrieve a nonce from bootstrap server"))
-				Expect(err.Error()).To(ContainSubstring("cannot get nonce response"))
-			})
-		})
-
-		When("unable to retrieve attested data from IMDS", func() {
-			It("should return an error", func() {
-				kubeconfigValidator.EXPECT().Validate(kubeconfigPath, false).
-					Return(fmt.Errorf("invalid kubeconfig")).
-					Times(1)
-				imdsClient.EXPECT().GetInstanceData(ctx).
-					Return(&imds.VMInstanceData{}, nil).
-					Times(1)
-				serviceClient.EXPECT().GetNonce(ctx, gomock.Any()).
-					Return(&akssecuretlsbootstrapv1.GetNonceResponse{
-						Nonce: "nonce",
-					}, nil).
-					Times(1)
-				imdsClient.EXPECT().GetAttestedData(ctx, "nonce").
-					Return(nil, errors.New("cannot get VM attested data")).
-					Times(1)
-
-				kubeconfigData, err := bootstrapClient.BootstrapKubeletClientCredential(ctx, bootstrapConfig)
-				Expect(kubeconfigData).To(BeNil())
-				Expect(err).ToNot(BeNil())
-				expectBootstrapErrorWithType(err, ErrorTypeGetAttestedDataFailure)
-				Expect(err.Error()).To(ContainSubstring("failed to retrieve attested data"))
-				Expect(err.Error()).To(ContainSubstring("cannot get VM attested data"))
-			})
-		})
-
-		When("unable to retrieve a credential from the bootstrap server", func() {
-			It("should return an error", func() {
-				kubeconfigValidator.EXPECT().Validate(kubeconfigPath, false).
-					Return(fmt.Errorf("invalid kubeconfig")).
-					Times(1)
-				imdsClient.EXPECT().GetInstanceData(ctx).
-					Return(&imds.VMInstanceData{}, nil).
-					Times(1)
-				serviceClient.EXPECT().GetNonce(ctx, gomock.Any()).
-					Return(&akssecuretlsbootstrapv1.GetNonceResponse{
-						Nonce: "nonce",
-					}, nil).
-					Times(1)
-				imdsClient.EXPECT().GetAttestedData(ctx, "nonce").
-					Return(&imds.VMAttestedData{
-						Signature: "signedBlob",
-					}, nil).
-					Times(1)
-				serviceClient.EXPECT().GetCredential(ctx, gomock.Any()).
-					Return(nil, errors.New("cannot get credential")).
-					Times(1)
-
-				kubeconfigData, err := bootstrapClient.BootstrapKubeletClientCredential(ctx, bootstrapConfig)
-				Expect(kubeconfigData).To(BeNil())
-				Expect(err).ToNot(BeNil())
-				expectBootstrapErrorWithType(err, ErrorTypeGetCredentialFailure)
-				Expect(err.Error()).To(ContainSubstring("failed to retrieve new kubelet client credential from bootstrap server"))
-				Expect(err.Error()).To(ContainSubstring("cannot get credential"))
-			})
-		})
-
-		When("bootstrap server responds with an empty credential", func() {
-			It("should return an error", func() {
-				kubeconfigValidator.EXPECT().Validate(kubeconfigPath, false).
-					Return(fmt.Errorf("invalid kubeconfig")).
-					Times(1)
-				imdsClient.EXPECT().GetInstanceData(ctx).
-					Return(&imds.VMInstanceData{}, nil).
-					Times(1)
-				serviceClient.EXPECT().GetNonce(ctx, gomock.Any()).
-					Return(&akssecuretlsbootstrapv1.GetNonceResponse{
-						Nonce: "nonce",
-					}, nil).
-					Times(1)
-				imdsClient.EXPECT().GetAttestedData(ctx, "nonce").
-					Return(&imds.VMAttestedData{
-						Signature: "signedBlob",
-					}, nil).
-					Times(1)
-				serviceClient.EXPECT().GetCredential(ctx, gomock.Any()).
+			expectedErrorType: "",
+		},
+		{
+			name: "when an access token cannot be retrieved",
+			setupMocks: func(t *testing.T, ctrl *gomock.Controller, bootstrapClient *BootstrapClient, bootstrapConfig *Config) []byte {
+				bootstrapConfig.ProviderConfig.ClientSecret = "" // force access token failure
+				bootstrapClient.kubeconfigValidator.EXPECT().Validate(bootstrapConfig.KubeconfigPath, false).
+					Return(fmt.Errorf("invalid kubeconfig")).Times(1)
+				return nil
+			},
+			expectedError:     "failed to generate access token for gRPC connection",
+			expectedErrorType: ErrorTypeGetAccessTokenFailure,
+			expectedKubeconfigData: func(t *testing.T, data *clientcmdapi.Config, _ *Config, _ []byte) {
+				assert.Nil(t, data)
+			},
+		},
+		{
+			name: "when unable to retrieve instance data from IMDS",
+			setupMocks: func(t *testing.T, ctrl *gomock.Controller, bootstrapClient *BootstrapClient, bootstrapConfig *Config) []byte {
+				bootstrapClient.kubeconfigValidator.EXPECT().Validate(bootstrapConfig.KubeconfigPath, false).
+					Return(fmt.Errorf("invalid kubeconfig")).Times(1)
+				bootstrapClient.imdsClient.EXPECT().GetInstanceData(bootstrapClient.ctx).
+					Return(nil, errors.New("cannot get VM instance data from IMDS")).Times(1)
+				return nil
+			},
+			expectedError:     "failed to retrieve instance metadata",
+			expectedErrorType: ErrorTypeGetIntanceDataFailure,
+			expectedKubeconfigData: func(t *testing.T, data *clientcmdapi.Config, _ *Config, _ []byte) {
+				assert.Nil(t, data)
+			},
+		},
+		{
+			name: "when unable to retrieve nonce from bootstrap server",
+			setupMocks: func(t *testing.T, ctrl *gomock.Controller, bootstrapClient *BootstrapClient, bootstrapConfig *Config) []byte {
+				bootstrapClient.kubeconfigValidator.EXPECT().Validate(bootstrapConfig.KubeconfigPath, false).
+					Return(fmt.Errorf("invalid kubeconfig")).Times(1)
+				bootstrapClient.imdsClient.EXPECT().GetInstanceData(bootstrapClient.ctx).
+					Return(&imds.VMInstanceData{}, nil).Times(1)
+				bootstrapClient.serviceClient.EXPECT().GetNonce(bootstrapClient.ctx, gomock.Any()).
+					Return(&akssecuretlsbootstrapv1.GetNonceResponse{}, errors.New("cannot get nonce response")).Times(1)
+				return nil
+			},
+			expectedError:     "failed to retrieve a nonce from bootstrap server",
+			expectedErrorType: ErrorTypeGetNonceFailure,
+			expectedKubeconfigData: func(t *testing.T, data *clientcmdapi.Config, _ *Config, _ []byte) {
+				assert.Nil(t, data)
+			},
+		},
+		{
+			name: "when unable to retrieve attested data from IMDS",
+			setupMocks: func(t *testing.T, ctrl *gomock.Controller, bootstrapClient *BootstrapClient, bootstrapConfig *Config) []byte {
+				bootstrapClient.kubeconfigValidator.EXPECT().Validate(bootstrapConfig.KubeconfigPath, false).
+					Return(fmt.Errorf("invalid kubeconfig")).Times(1)
+				bootstrapClient.imdsClient.EXPECT().GetInstanceData(bootstrapClient.ctx).
+					Return(&imds.VMInstanceData{}, nil).Times(1)
+				bootstrapClient.serviceClient.EXPECT().GetNonce(bootstrapClient.ctx, gomock.Any()).
+					Return(&akssecuretlsbootstrapv1.GetNonceResponse{Nonce: "nonce"}, nil).Times(1)
+				bootstrapClient.imdsClient.EXPECT().GetAttestedData(bootstrapClient.ctx, "nonce").
+					Return(nil, errors.New("cannot get VM attested data")).Times(1)
+				return nil
+			},
+			expectedError:     "failed to retrieve attested data",
+			expectedErrorType: ErrorTypeGetAttestedDataFailure,
+			expectedKubeconfigData: func(t *testing.T, data *clientcmdapi.Config, _ *Config, _ []byte) {
+				assert.Nil(t, data)
+			},
+		},
+		{
+			name: "when unable to retrieve a credential from the bootstrap server",
+			setupMocks: func(t *testing.T, ctrl *gomock.Controller, bootstrapClient *BootstrapClient, bootstrapConfig *Config) []byte {
+				bootstrapClient.kubeconfigValidator.EXPECT().Validate(bootstrapConfig.KubeconfigPath, false).
+					Return(fmt.Errorf("invalid kubeconfig")).Times(1)
+				bootstrapClient.imdsClient.EXPECT().GetInstanceData(bootstrapClient.ctx).
+					Return(&imds.VMInstanceData{}, nil).Times(1)
+				bootstrapClient.serviceClient.EXPECT().GetNonce(bootstrapClient.ctx, gomock.Any()).
+					Return(&akssecuretlsbootstrapv1.GetNonceResponse{Nonce: "nonce"}, nil).Times(1)
+				bootstrapClient.imdsClient.EXPECT().GetAttestedData(bootstrapClient.ctx, "nonce").
+					Return(&imds.VMAttestedData{Signature: "signedBlob"}, nil).Times(1)
+				bootstrapClient.serviceClient.EXPECT().GetCredential(bootstrapClient.ctx, gomock.Any()).
+					Return(nil, errors.New("cannot get credential")).Times(1)
+				return nil
+			},
+			expectedError:     "failed to retrieve new kubelet client credential from bootstrap server",
+			expectedErrorType: ErrorTypeGetCredentialFailure,
+			expectedKubeconfigData: func(t *testing.T, data *clientcmdapi.Config, _ *Config, _ []byte) {
+				assert.Nil(t, data)
+			},
+		},
+		{
+			name: "when bootstrap server responds with an empty credential",
+			setupMocks: func(t *testing.T, ctrl *gomock.Controller, bootstrapClient *BootstrapClient, bootstrapConfig *Config) []byte {
+				bootstrapClient.kubeconfigValidator.EXPECT().Validate(bootstrapConfig.KubeconfigPath, false).
+					Return(fmt.Errorf("invalid kubeconfig")).Times(1)
+				bootstrapClient.imdsClient.EXPECT().GetInstanceData(bootstrapClient.ctx).
+					Return(&imds.VMInstanceData{}, nil).Times(1)
+				bootstrapClient.serviceClient.EXPECT().GetNonce(bootstrapClient.ctx, gomock.Any()).
+					Return(&akssecuretlsbootstrapv1.GetNonceResponse{Nonce: "nonce"}, nil).Times(1)
+				bootstrapClient.imdsClient.EXPECT().GetAttestedData(bootstrapClient.ctx, "nonce").
+					Return(&imds.VMAttestedData{Signature: "signedBlob"}, nil).Times(1)
+				bootstrapClient.serviceClient.EXPECT().GetCredential(bootstrapClient.ctx, gomock.Any()).
+					Return(&akssecuretlsbootstrapv1.GetCredentialResponse{EncodedCertPem: ""}, nil).Times(1)
+				return nil
+			},
+			expectedError:     "cert data from bootstrap server is empty",
+			expectedErrorType: ErrorTypeGetCredentialFailure,
+			expectedKubeconfigData: func(t *testing.T, data *clientcmdapi.Config, _ *Config, _ []byte) {
+				assert.Nil(t, data)
+			},
+		},
+		{
+			name: "when bootstrap server responds with an invalid credential",
+			setupMocks: func(t *testing.T, ctrl *gomock.Controller, bootstrapClient *BootstrapClient, bootstrapConfig *Config) []byte {
+				bootstrapClient.kubeconfigValidator.EXPECT().Validate(bootstrapConfig.KubeconfigPath, false).
+					Return(fmt.Errorf("invalid kubeconfig")).Times(1)
+				bootstrapClient.imdsClient.EXPECT().GetInstanceData(bootstrapClient.ctx).
+					Return(&imds.VMInstanceData{}, nil).Times(1)
+				bootstrapClient.serviceClient.EXPECT().GetNonce(bootstrapClient.ctx, gomock.Any()).
+					Return(&akssecuretlsbootstrapv1.GetNonceResponse{Nonce: "nonce"}, nil).Times(1)
+				bootstrapClient.imdsClient.EXPECT().GetAttestedData(bootstrapClient.ctx, "nonce").
+					Return(&imds.VMAttestedData{Signature: "signedBlob"}, nil).Times(1)
+				bootstrapClient.serviceClient.EXPECT().GetCredential(bootstrapClient.ctx, gomock.Any()).
 					Return(&akssecuretlsbootstrapv1.GetCredentialResponse{
-						EncodedCertPem: "",
-					}, nil).
-					Times(1)
-
-				kubeconfigData, err := bootstrapClient.BootstrapKubeletClientCredential(ctx, bootstrapConfig)
-				Expect(kubeconfigData).To(BeNil())
-				Expect(err).ToNot(BeNil())
-				expectBootstrapErrorWithType(err, ErrorTypeGetCredentialFailure)
-				Expect(err.Error()).To(ContainSubstring("cert data from bootstrap server is empty"))
-			})
-		})
-
-		When("bootstrap server responds with an invalid credential", func() {
-			It("should return an error", func() {
-				kubeconfigValidator.EXPECT().Validate(kubeconfigPath, false).
-					Return(fmt.Errorf("invalid kubeconfig")).
-					Times(1)
-				imdsClient.EXPECT().GetInstanceData(ctx).
-					Return(&imds.VMInstanceData{}, nil).
-					Times(1)
-				serviceClient.EXPECT().GetNonce(ctx, gomock.Any()).
-					Return(&akssecuretlsbootstrapv1.GetNonceResponse{
-						Nonce: "nonce",
-					}, nil).
-					Times(1)
-				imdsClient.EXPECT().GetAttestedData(ctx, "nonce").
-					Return(&imds.VMAttestedData{
-						Signature: "signedBlob",
-					}, nil).
-					Times(1)
-				serviceClient.EXPECT().GetCredential(ctx, gomock.Any()).
-					Return(&akssecuretlsbootstrapv1.GetCredentialResponse{
-						EncodedCertPem: "YW55IGNhcm5hbCBwbGVhc3U======",
-					}, nil).
-					Times(1)
-
-				kubeconfigData, err := bootstrapClient.BootstrapKubeletClientCredential(ctx, bootstrapConfig)
-				Expect(kubeconfigData).To(BeNil())
-				Expect(err).ToNot(BeNil())
-				expectBootstrapErrorWithType(err, ErrorTypeGetCredentialFailure)
-				Expect(err.Error()).To(ContainSubstring("failed to decode cert data from bootstrap server"))
-			})
-		})
-
-		When("bootstrap server can generate a credential", func() {
-			It("should return a new kubeconfig object referencing the new credential", func() {
+						EncodedCertPem: "YW55IGNhcm5hbCBwbGVhc3U======", // base64 encoded invalid PEM
+					}, nil).Times(1)
+				return nil
+			},
+			expectedError:     "failed to decode cert data from bootstrap server",
+			expectedErrorType: ErrorTypeGetCredentialFailure,
+			expectedKubeconfigData: func(t *testing.T, data *clientcmdapi.Config, _ *Config, _ []byte) {
+				assert.Nil(t, data)
+			},
+		},
+		{
+			name: "bootstrap server can generate a credential",
+			setupMocks: func(t *testing.T, ctrl *gomock.Controller, bootstrapClient *BootstrapClient, bootstrapConfig *Config) []byte {
 				clientCertPEM, _, err := testutil.GenerateCertPEM(testutil.CertTemplate{
 					CommonName:   "system:node:node",
 					Organization: "system:nodes",
 					Expiration:   time.Now().Add(time.Hour),
 				})
-				Expect(err).To(BeNil())
-
+				assert.NoError(t, err)
 				clientCertBlock, rest := pem.Decode(clientCertPEM)
-				Expect(rest).To(BeEmpty())
-
-				kubeconfigValidator.EXPECT().Validate(kubeconfigPath, false).
-					Return(fmt.Errorf("invalid kubeconfig")).
-					Times(1)
-				imdsClient.EXPECT().GetInstanceData(ctx).
-					Return(&imds.VMInstanceData{
-						Compute: imds.ComputeData{
-							ResourceID: "resourceId",
-						},
-					}, nil).
-					Times(1)
-				serviceClient.EXPECT().GetNonce(ctx, gomock.Any()).
-					Return(&akssecuretlsbootstrapv1.GetNonceResponse{
-						Nonce: "nonce",
-					}, nil).
-					Times(1)
-				imdsClient.EXPECT().GetAttestedData(ctx, "nonce").
-					Return(&imds.VMAttestedData{
-						Signature: "signedBlob",
-					}, nil).
-					Times(1)
-				serviceClient.EXPECT().GetCredential(ctx, gomock.Any()).
+				assert.Empty(t, rest)
+				bootstrapClient.kubeconfigValidator.EXPECT().Validate(bootstrapConfig.KubeconfigPath, false).
+					Return(fmt.Errorf("invalid kubeconfig")).Times(1)
+				bootstrapClient.imdsClient.EXPECT().GetInstanceData(bootstrapClient.ctx).
+					Return(&imds.VMInstanceData{}, nil).Times(1)
+				bootstrapClient.serviceClient.EXPECT().GetNonce(bootstrapClient.ctx, gomock.Any()).
+					Return(&akssecuretlsbootstrapv1.GetNonceResponse{Nonce: "nonce"}, nil).Times(1)
+				bootstrapClient.imdsClient.EXPECT().GetAttestedData(bootstrapClient.ctx, "nonce").
+					Return(&imds.VMAttestedData{Signature: "signedBlob"}, nil).Times(1)
+				bootstrapClient.serviceClient.EXPECT().GetCredential(bootstrapClient.ctx, gomock.Any()).
 					Return(&akssecuretlsbootstrapv1.GetCredentialResponse{
 						EncodedCertPem: base64.StdEncoding.EncodeToString(clientCertPEM),
-					}, nil).
-					Times(1)
-
-				kubeconfigData, err := bootstrapClient.BootstrapKubeletClientCredential(ctx, bootstrapConfig)
-				Expect(err).To(BeNil())
-				Expect(kubeconfigData).ToNot(BeNil())
-
-				Expect(kubeconfigData.Clusters).To(HaveKey("default-cluster"))
-				defaultCluster := kubeconfigData.Clusters["default-cluster"]
-				Expect(defaultCluster.Server).To(Equal("https://controlplane.azmk8s.io:443"))
-				Expect(defaultCluster.CertificateAuthority).To(Equal(bootstrapConfig.ClusterCAFilePath))
-
-				Expect(kubeconfigData.AuthInfos).To(HaveKey("default-auth"))
-				defaultAuth := kubeconfigData.AuthInfos["default-auth"]
-				Expect(defaultAuth.ClientCertificate).To(Equal(bootstrapConfig.CredFilePath))
-				Expect(defaultAuth.ClientKey).To(Equal(bootstrapConfig.CredFilePath))
-
-				Expect(kubeconfigData.Contexts).To(HaveKey("default-context"))
-				defaultContext := kubeconfigData.Contexts["default-context"]
-				Expect(defaultContext.Cluster).To(Equal("default-cluster"))
-				Expect(defaultContext.AuthInfo).To(Equal("default-auth"))
-
-				Expect(kubeconfigData.CurrentContext).To(Equal("default-context"))
-
-				credData, err := os.ReadFile(bootstrapConfig.CredFilePath)
-				Expect(err).To(BeNil())
-
+					}, nil).Times(1)
+				return clientCertBlock.Bytes
+			},
+			expectedError: "",
+			expectedKubeconfigData: func(t *testing.T, data *clientcmdapi.Config, config *Config, certBlockBytes []byte) {
+				assert.NotNil(t, data)
+				assert.Contains(t, data.Clusters, "default-cluster")
+				defaultCluster := data.Clusters["default-cluster"]
+				assert.Equal(t, "https://controlplane.azmk8s.io:443", defaultCluster.Server)
+				assert.Equal(t, config.ClusterCAFilePath, defaultCluster.CertificateAuthority)
+				assert.Contains(t, data.AuthInfos, "default-auth")
+				defaultAuth := data.AuthInfos["default-auth"]
+				assert.Equal(t, config.CredFilePath, defaultAuth.ClientCertificate)
+				assert.Equal(t, config.CredFilePath, defaultAuth.ClientKey)
+				assert.Contains(t, data.Contexts, "default-context")
+				defaultContext := data.Contexts["default-context"]
+				assert.Equal(t, "default-cluster", defaultContext.Cluster)
+				assert.Equal(t, "default-auth", defaultContext.AuthInfo)
+				assert.Equal(t, "default-context", data.CurrentContext)
+				credData, err := os.ReadFile(config.CredFilePath)
+				assert.NoError(t, err)
 				certBlock, rest := pem.Decode(credData)
-				Expect(rest).ToNot(BeEmpty())
-				Expect(certBlock.Bytes).To(Equal(clientCertBlock.Bytes))
-
+				assert.NotEmpty(t, rest)
+				assert.Equal(t, certBlockBytes, certBlock.Bytes)
 				keyData, rest := pem.Decode(rest)
-				Expect(rest).To(BeEmpty())
-				Expect(keyData).ToNot(BeNil())
-
+				assert.Empty(t, rest)
+				assert.NotNil(t, keyData)
 				key, err := x509.ParseECPrivateKey(keyData.Bytes)
-				Expect(err).To(BeNil())
-				Expect(key).ToNot(BeNil())
-			})
-		})
-	})
-})
+				assert.NoError(t, err)
+				assert.NotNil(t, key)
+			},
+		},
+	}
 
-func expectBootstrapErrorWithType(err error, expectedType ErrorType) {
-	var bootstrapErr *BootstrapError
-	Expect(errors.As(err, &bootstrapErr)).To(BeTrue())
-	Expect(bootstrapErr.errorType).To(Equal(expectedType))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			bootstrapClient := &BootstrapClient{}
+			bootstrapClient.ctx = context.Background()
+
+			bootstrapClient.imdsClient = imdsmocks.NewMockClient(ctrl)
+			bootstrapClient.kubeconfigValidator = kubeconfigmocks.NewMockValidator(ctrl)
+			bootstrapClient.serviceClient = akssecuretlsbootstrapv1_mocks.NewMockSecureTLSBootstrapServiceClient(ctrl)
+
+			bootstrapClient.client = &Client{
+				logger:              logger,
+				imdsClient:          bootstrapClient.imdsClient,
+				kubeconfigValidator: bootstrapClient.kubeconfigValidator,
+				getServiceClientFunc: func(_ string, _ *Config) (akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient, func() error, error) {
+					return bootstrapClient.serviceClient, func() error { return nil }, nil
+				},
+				extractAccessTokenFunc: func(token *adal.ServicePrincipalToken) (string, error) {
+					assert.NotNil(t, token)
+					return "token", nil
+				},
+			}
+
+			clusterCACertPEM, _, err := testutil.GenerateCertPEM(
+				testutil.CertTemplate{
+					CommonName:   "hcp",
+					Organization: "aks",
+					IsCA:         true,
+					Expiration:   time.Now().Add(time.Hour),
+				},
+			)
+			assert.NoError(t, err)
+
+			tempDir := t.TempDir()
+			clusterCAFilePath := filepath.Join(tempDir, "ca.crt")
+			credFilePath := filepath.Join(tempDir, "client.pem")
+
+			err = os.WriteFile(clusterCAFilePath, clusterCACertPEM, os.ModePerm)
+			assert.NoError(t, err)
+
+			config := &Config{
+				NextProto:         "bootstrap",
+				AADResource:       "resource",
+				ClusterCAFilePath: clusterCAFilePath,
+				CredFilePath:      credFilePath,
+				APIServerFQDN:     "controlplane.azmk8s.io",
+				KubeconfigPath:    "path/to/kubeconfig",
+				ProviderConfig: cloud.ProviderConfig{
+					CloudName:    azure.PublicCloud.Name,
+					ClientID:     "service-principal-id",
+					ClientSecret: "service-principal-secret",
+					TenantID:     "tenantId",
+				},
+			}
+
+			certBlockBytes := tt.setupMocks(t, ctrl, bootstrapClient, config)
+			kubeconfigData, err := bootstrapClient.client.BootstrapKubeletClientCredential(bootstrapClient.ctx, config)
+			if tt.expectedError == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+				if tt.expectedErrorType != "" {
+					var bootstrapErr *BootstrapError
+					assert.Error(t, err)
+					assert.True(t, errors.As(err, &bootstrapErr))
+					assert.Equal(t, tt.expectedErrorType, bootstrapErr.errorType)
+				}
+			}
+			if tt.expectedKubeconfigData != nil {
+				tt.expectedKubeconfigData(t, kubeconfigData, config, certBlockBytes)
+			}
+		})
+	}
 }
