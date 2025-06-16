@@ -8,9 +8,9 @@ import (
 	"bytes"
 	"io"
 	"net/url"
+	"testing"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 )
 
@@ -25,65 +25,75 @@ func (cw customWriter) Sync() error {
 	return nil
 }
 
-var _ = Describe("leveledLoggerShim", Ordered, func() {
+func TestHttpLog(t *testing.T) {
+	tests := []struct {
+		name                     string
+		logFunc                  func(*leveledLoggerShim)
+		expectedStdoutSubstrs    []string
+		notExpectedStdoutSubstrs []string
+	}{
+		{
+			name: "should correctly shim into a zap.Logger",
+			logFunc: func(shim *leveledLoggerShim) {
+				shim.Info("info", "field", "value")
+				shim.Warn("warn", "field", "value")
+				shim.Error("error", "field", "value")
+				shim.Debug("debug", "field", "value")
+			},
+			notExpectedStdoutSubstrs: []string{"leveled_logger_fields"},
+		},
+		{
+			name: "unexpected number of keys and values are specified",
+			logFunc: func(shim *leveledLoggerShim) {
+				shim.Info("info", "field", "value", "otherField")
+				shim.Warn("warn", "field", "value", "otherField")
+				shim.Error("error", "field", "value", "otherField")
+				shim.Debug("debug", "field", "value", "otherValue")
+			},
+			expectedStdoutSubstrs: []string{"leveled_logger_fields"},
+		},
+	}
+
 	var (
 		buf       bytes.Buffer
 		bufWriter *bufio.Writer
-		logger    *zap.Logger
 	)
 
-	BeforeAll(func() {
-		bufWriter = bufio.NewWriter(&buf)
+	bufWriter = bufio.NewWriter(&buf)
 
-		config := zap.NewDevelopmentConfig()
-		config.EncoderConfig.FunctionKey = "function"
+	config := zap.NewDevelopmentConfig()
+	config.EncoderConfig.FunctionKey = "function"
 
-		err := zap.RegisterSink("custom", func(u *url.URL) (zap.Sink, error) {
-			return &customWriter{bufWriter}, nil
-		})
-		Expect(err).To(BeNil())
-
-		config.OutputPaths = []string{"custom:test"}
-
-		logger, err = config.Build()
-		Expect(err).To(BeNil())
+	err := zap.RegisterSink("custom", func(u *url.URL) (zap.Sink, error) {
+		return &customWriter{bufWriter}, nil
 	})
+	assert.NoError(t, err)
 
-	It("should correctly shim into a zap.Logger", func() {
-		shim := &leveledLoggerShim{
-			logger: logger,
-		}
+	config.OutputPaths = []string{"custom:test"}
 
-		shim.Info("info", "field", "value")
-		shim.Warn("warn", "field", "value")
-		shim.Error("error", "field", "value")
-		shim.Debug("debug", "field", "value")
+	logger, err := config.Build()
+	assert.NoError(t, err)
 
-		err := bufWriter.Flush()
-		Expect(err).To(BeNil())
-
-		out := buf.String()
-		Expect(out).ToNot(BeEmpty())
-		Expect(out).ToNot(ContainSubstring("leveled_logger_fields"))
-	})
-
-	When("unexpected number of keys and values are specified", func() {
-		It("should inject all keys and values as a single leveled_logger_fields field", func() {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			shim := &leveledLoggerShim{
 				logger: logger,
 			}
-
-			shim.Info("info", "field", "value", "otherField")
-			shim.Warn("warn", "field", "value", "otherField")
-			shim.Error("error", "field", "value", "otherField")
-			shim.Debug("debug", "field", "value", "otherValue")
+			tt.logFunc(shim)
 
 			err := bufWriter.Flush()
-			Expect(err).To(BeNil())
+			assert.NoError(t, err)
 
 			out := buf.String()
-			Expect(out).ToNot(BeEmpty())
-			Expect(out).To(ContainSubstring("leveled_logger_fields"))
+			assert.NotEmpty(t, out)
+
+			for _, substr := range tt.expectedStdoutSubstrs {
+				assert.Contains(t, out, substr)
+			}
+
+			for _, substr := range tt.notExpectedStdoutSubstrs {
+				assert.NotContains(t, out, substr)
+			}
 		})
-	})
-})
+	}
+}
