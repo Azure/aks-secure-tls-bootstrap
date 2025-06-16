@@ -27,7 +27,8 @@ func TestGetAuthToken(t *testing.T) {
 		expectErr                error
 	}{
 		{
-			name: "error generating MSI access token",
+			name:           "error generating MSI access token",
+			customClientID: "",
 			setupCloudProviderConfig: func(t *testing.T, config *cloud.ProviderConfig) {
 				config.UserAssignedIdentityID = "kubelet-identity-id"
 			},
@@ -35,7 +36,8 @@ func TestGetAuthToken(t *testing.T) {
 			expectErr:   errors.New("generating MSI access token"),
 		},
 		{
-			name: "error getting azure environment config for specified cloud",
+			name:           "error getting azure environment config for specified cloud",
+			customClientID: "",
 			setupCloudProviderConfig: func(t *testing.T, config *cloud.ProviderConfig) {
 				config.CloudName = "invalid"
 				config.ClientID = "service-principal-id"
@@ -45,7 +47,8 @@ func TestGetAuthToken(t *testing.T) {
 			expectErr:   errors.New(`getting azure environment config for cloud "invalid"`),
 		},
 		{
-			name: "there is an error generating a service principal access token with username and password",
+			name:           "there is an error generating a service principal access token with username and password",
+			customClientID: "",
 			setupCloudProviderConfig: func(t *testing.T, config *cloud.ProviderConfig) {
 				config.CloudName = azure.PublicCloud.Name
 				config.ClientID = "service-principal-id"
@@ -55,7 +58,8 @@ func TestGetAuthToken(t *testing.T) {
 			expectErr:   errors.New("generating SPN access token with username and password"),
 		},
 		{
-			name: "there is an error b64-decoding the certificate data",
+			name:           "there is an error b64-decoding the certificate data",
+			customClientID: "",
 			setupCloudProviderConfig: func(t *testing.T, config *cloud.ProviderConfig) {
 				config.CloudName = azure.PublicCloud.Name
 				config.ClientID = "service-principal-id"
@@ -65,7 +69,8 @@ func TestGetAuthToken(t *testing.T) {
 			expectErr:   errors.New("b64-decoding certificate data in client secret"),
 		},
 		{
-			name: "there is an error decoding the pfx certificate data",
+			name:           "there is an error decoding the pfx certificate data",
+			customClientID: "",
 			setupCloudProviderConfig: func(t *testing.T, config *cloud.ProviderConfig) {
 				config.CloudName = azure.PublicCloud.Name
 				config.ClientID = "service-principal-id"
@@ -75,7 +80,8 @@ func TestGetAuthToken(t *testing.T) {
 			expectErr:   errors.New("decoding pfx certificate data in client secret"),
 		},
 		{
-			name: "there is an error generating a service principal token with certificate data",
+			name:           "there is an error generating a service principal token with certificate data",
+			customClientID: "",
 			setupCloudProviderConfig: func(t *testing.T, config *cloud.ProviderConfig) {
 				certData, err := testutil.GenerateCertAndKeyAsEncodedPFXData(testutil.CertTemplate{
 					CommonName:   "aad",
@@ -92,7 +98,8 @@ func TestGetAuthToken(t *testing.T) {
 			expectErr:   errors.New("generating SPN access token with certificate"),
 		},
 		{
-			name: "UserAssignedIdentityID is specified in cloud provider config",
+			name:           "UserAssignedIdentityID is specified in cloud provider config",
+			customClientID: "",
 			setupCloudProviderConfig: func(t *testing.T, config *cloud.ProviderConfig) {
 				config.UserAssignedIdentityID = "kubelet-identity-id"
 			},
@@ -100,8 +107,8 @@ func TestGetAuthToken(t *testing.T) {
 			expectErr:   nil,
 		},
 		{
-			name:     "a custom client ID is specified",
-			customID: "custom",
+			name:           "a custom client ID is specified",
+			customClientID: "custom",
 			setupCloudProviderConfig: func(t *testing.T, config *cloud.ProviderConfig) {
 				config.UserAssignedIdentityID = "kubelet-identity-id"
 			},
@@ -109,7 +116,8 @@ func TestGetAuthToken(t *testing.T) {
 			expectErr:   nil,
 		},
 		{
-			name: "service principal client secret does not contain certificate data",
+			name:           "service principal client secret does not contain certificate data",
+			customClientID: "",
 			setupCloudProviderConfig: func(t *testing.T, config *cloud.ProviderConfig) {
 				config.CloudName = azure.PublicCloud.Name
 				config.ClientID = "service-principal-id"
@@ -119,7 +127,8 @@ func TestGetAuthToken(t *testing.T) {
 			expectErr:   nil,
 		},
 		{
-			name: "service principal client secret contains certificate data",
+			name:           "service principal client secret contains certificate data",
+			customClientID: "",
 			setupCloudProviderConfig: func(t *testing.T, config *cloud.ProviderConfig) {
 				certData, err := testutil.GenerateCertAndKeyAsEncodedPFXData(testutil.CertTemplate{
 					CommonName:   "aad",
@@ -151,7 +160,7 @@ func TestGetAuthToken(t *testing.T) {
 				TenantID: testTenantID,
 			}
 			tt.setupCloudProviderConfig(t, providerCfg)
-			token, err := client.getAccessToken(tt.customID, testResource, providerCfg)
+			token, err := client.getAccessToken(tt.customClientID, testResource, providerCfg)
 
 			if tt.expectErr != nil {
 				assert.Error(t, err)
