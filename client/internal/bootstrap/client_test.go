@@ -43,14 +43,14 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 
 	tests := []struct {
 		name                   string
-		setupMocks             func(*testing.T, *gomock.Controller, *BootstrapClient, *Config) []byte
+		setupMocks             func(*BootstrapClient, *Config) []byte
 		expectedError          string
 		expectedErrorType      ErrorType
 		expectedKubeconfigData func(*testing.T, *clientcmdapi.Config, *Config, []byte)
 	}{
 		{
 			name: "when specified kubeconfig is already valid",
-			setupMocks: func(t *testing.T, ctrl *gomock.Controller, bootstrapClient *BootstrapClient, bootstrapConfig *Config) []byte {
+			setupMocks: func(bootstrapClient *BootstrapClient, bootstrapConfig *Config) []byte {
 				bootstrapClient.kubeconfigValidator.EXPECT().Validate(bootstrapConfig.KubeconfigPath, false).Return(nil).Times(1)
 				bootstrapClient.serviceClient.EXPECT().GetCredential(gomock.Any(), gomock.Any()).Times(0)
 				bootstrapClient.serviceClient.EXPECT().GetNonce(gomock.Any(), gomock.Any()).Times(0)
@@ -66,7 +66,7 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 		},
 		{
 			name: "when an access token cannot be retrieved",
-			setupMocks: func(t *testing.T, ctrl *gomock.Controller, bootstrapClient *BootstrapClient, bootstrapConfig *Config) []byte {
+			setupMocks: func(bootstrapClient *BootstrapClient, bootstrapConfig *Config) []byte {
 				bootstrapConfig.ProviderConfig.ClientSecret = "" // force access token failure
 				bootstrapClient.kubeconfigValidator.EXPECT().Validate(bootstrapConfig.KubeconfigPath, false).
 					Return(fmt.Errorf("invalid kubeconfig")).Times(1)
@@ -80,7 +80,7 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 		},
 		{
 			name: "when unable to retrieve instance data from IMDS",
-			setupMocks: func(t *testing.T, ctrl *gomock.Controller, bootstrapClient *BootstrapClient, bootstrapConfig *Config) []byte {
+			setupMocks: func(bootstrapClient *BootstrapClient, bootstrapConfig *Config) []byte {
 				bootstrapClient.kubeconfigValidator.EXPECT().Validate(bootstrapConfig.KubeconfigPath, false).
 					Return(fmt.Errorf("invalid kubeconfig")).Times(1)
 				bootstrapClient.imdsClient.EXPECT().GetInstanceData(bootstrapClient.ctx).
@@ -95,7 +95,7 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 		},
 		{
 			name: "when unable to retrieve nonce from bootstrap server",
-			setupMocks: func(t *testing.T, ctrl *gomock.Controller, bootstrapClient *BootstrapClient, bootstrapConfig *Config) []byte {
+			setupMocks: func(bootstrapClient *BootstrapClient, bootstrapConfig *Config) []byte {
 				bootstrapClient.kubeconfigValidator.EXPECT().Validate(bootstrapConfig.KubeconfigPath, false).
 					Return(fmt.Errorf("invalid kubeconfig")).Times(1)
 				bootstrapClient.imdsClient.EXPECT().GetInstanceData(bootstrapClient.ctx).
@@ -112,7 +112,7 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 		},
 		{
 			name: "when unable to retrieve attested data from IMDS",
-			setupMocks: func(t *testing.T, ctrl *gomock.Controller, bootstrapClient *BootstrapClient, bootstrapConfig *Config) []byte {
+			setupMocks: func(bootstrapClient *BootstrapClient, bootstrapConfig *Config) []byte {
 				bootstrapClient.kubeconfigValidator.EXPECT().Validate(bootstrapConfig.KubeconfigPath, false).
 					Return(fmt.Errorf("invalid kubeconfig")).Times(1)
 				bootstrapClient.imdsClient.EXPECT().GetInstanceData(bootstrapClient.ctx).
@@ -131,7 +131,7 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 		},
 		{
 			name: "when unable to retrieve a credential from the bootstrap server",
-			setupMocks: func(t *testing.T, ctrl *gomock.Controller, bootstrapClient *BootstrapClient, bootstrapConfig *Config) []byte {
+			setupMocks: func(bootstrapClient *BootstrapClient, bootstrapConfig *Config) []byte {
 				bootstrapClient.kubeconfigValidator.EXPECT().Validate(bootstrapConfig.KubeconfigPath, false).
 					Return(fmt.Errorf("invalid kubeconfig")).Times(1)
 				bootstrapClient.imdsClient.EXPECT().GetInstanceData(bootstrapClient.ctx).
@@ -152,7 +152,7 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 		},
 		{
 			name: "when bootstrap server responds with an empty credential",
-			setupMocks: func(t *testing.T, ctrl *gomock.Controller, bootstrapClient *BootstrapClient, bootstrapConfig *Config) []byte {
+			setupMocks: func(bootstrapClient *BootstrapClient, bootstrapConfig *Config) []byte {
 				bootstrapClient.kubeconfigValidator.EXPECT().Validate(bootstrapConfig.KubeconfigPath, false).
 					Return(fmt.Errorf("invalid kubeconfig")).Times(1)
 				bootstrapClient.imdsClient.EXPECT().GetInstanceData(bootstrapClient.ctx).
@@ -173,7 +173,7 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 		},
 		{
 			name: "when bootstrap server responds with an invalid credential",
-			setupMocks: func(t *testing.T, ctrl *gomock.Controller, bootstrapClient *BootstrapClient, bootstrapConfig *Config) []byte {
+			setupMocks: func(bootstrapClient *BootstrapClient, bootstrapConfig *Config) []byte {
 				bootstrapClient.kubeconfigValidator.EXPECT().Validate(bootstrapConfig.KubeconfigPath, false).
 					Return(fmt.Errorf("invalid kubeconfig")).Times(1)
 				bootstrapClient.imdsClient.EXPECT().GetInstanceData(bootstrapClient.ctx).
@@ -196,7 +196,7 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 		},
 		{
 			name: "bootstrap server can generate a credential",
-			setupMocks: func(t *testing.T, ctrl *gomock.Controller, bootstrapClient *BootstrapClient, bootstrapConfig *Config) []byte {
+			setupMocks: func(bootstrapClient *BootstrapClient, bootstrapConfig *Config) []byte {
 				clientCertPEM, _, err := testutil.GenerateCertPEM(testutil.CertTemplate{
 					CommonName:   "system:node:node",
 					Organization: "system:nodes",
@@ -252,15 +252,15 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
 
 			bootstrapClient := &BootstrapClient{}
 			bootstrapClient.ctx = context.Background()
 
-			bootstrapClient.imdsClient = imdsmocks.NewMockClient(ctrl)
-			bootstrapClient.kubeconfigValidator = kubeconfigmocks.NewMockValidator(ctrl)
-			bootstrapClient.serviceClient = akssecuretlsbootstrapv1_mocks.NewMockSecureTLSBootstrapServiceClient(ctrl)
+			bootstrapClient.imdsClient = imdsmocks.NewMockClient(mockCtrl)
+			bootstrapClient.kubeconfigValidator = kubeconfigmocks.NewMockValidator(mockCtrl)
+			bootstrapClient.serviceClient = akssecuretlsbootstrapv1_mocks.NewMockSecureTLSBootstrapServiceClient(mockCtrl)
 
 			bootstrapClient.client = &Client{
 				logger:              logger,
@@ -307,7 +307,7 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 				},
 			}
 
-			certBlockBytes := tt.setupMocks(t, ctrl, bootstrapClient, config)
+			certBlockBytes := tt.setupMocks(bootstrapClient, config)
 			kubeconfigData, err := bootstrapClient.client.BootstrapKubeletClientCredential(bootstrapClient.ctx, config)
 			if tt.expectedError == "" {
 				assert.NoError(t, err)
