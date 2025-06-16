@@ -79,7 +79,6 @@ func TestCallIMDS(t *testing.T) {
 func TestGetInstanceData(t *testing.T) {
 	const (
 		mockVMInstanceDataJSON = `{"compute":{"resourceId": "resourceId"}}`
-		mockVMAttestedDataJSON = `{"signature":"signature"}`
 		malformedJSON          = `{{}`
 	)
 
