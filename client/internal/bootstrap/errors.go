@@ -7,7 +7,7 @@ type ErrorType string
 const (
 	ErrorTypeGetAccessTokenFailure       ErrorType = "GetAccessTokenFailure"
 	ErrorTypeGetServiceClientFailure     ErrorType = "GetServiceClientFailure"
-	ErrorTypeGetIntanceDataFailure       ErrorType = "GetInstanceDataFailure"
+	ErrorTypeGetInstanceDataFailure      ErrorType = "GetInstanceDataFailure"
 	ErrorTypeGetAttestedDataFailure      ErrorType = "GetAttestedDataFailure"
 	ErrorTypeGetNonceFailure             ErrorType = "GetNonceFailure"
 	ErrorTypeMakeKubeletClientCSRFailure ErrorType = "MakeKubeletClientCSRFailure"
