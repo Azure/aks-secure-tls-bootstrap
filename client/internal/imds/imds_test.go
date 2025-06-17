@@ -18,14 +18,14 @@ import (
 
 func TestCallIMDS(t *testing.T) {
 	tests := []struct {
-		name      string
-		setupFunc func(map[string]string) *httptest.Server
-		params    map[string]string
+		name            string
+		setupTestServer func(map[string]string) *httptest.Server
+		params          map[string]string
 	}{
 		{
 			name:   "should specify Metadata:True in the request headers",
 			params: map[string]string{},
-			setupFunc: func(params map[string]string) *httptest.Server {
+			setupTestServer: func(params map[string]string) *httptest.Server {
 				return mockIMDSWithAssertions(t, "{}", func(r *http.Request) {
 					assert.Equal(t, "True", r.Header.Get("Metadata"))
 				})
@@ -34,7 +34,7 @@ func TestCallIMDS(t *testing.T) {
 		{
 			name:   "there aren't query parameters",
 			params: map[string]string{},
-			setupFunc: func(params map[string]string) *httptest.Server {
+			setupTestServer: func(params map[string]string) *httptest.Server {
 				return mockIMDSWithAssertions(t, "{}", func(r *http.Request) {
 					assert.Empty(t, r.URL.Query())
 				})
@@ -47,7 +47,7 @@ func TestCallIMDS(t *testing.T) {
 				"b": "2",
 				"c": "3",
 			},
-			setupFunc: func(params map[string]string) *httptest.Server {
+			setupTestServer: func(params map[string]string) *httptest.Server {
 				imds := mockIMDSWithAssertions(t, "{}", func(r *http.Request) {
 					queryParameters := r.URL.Query()
 					for param, expectedValue := range params {
@@ -66,7 +66,7 @@ func TestCallIMDS(t *testing.T) {
 			httpClient: internalhttp.NewClient(logger),
 			logger:     logger,
 		}
-		imds := tt.setupFunc(tt.params)
+		imds := tt.setupTestServer(tt.params)
 		defer imds.Close()
 
 		ctx := context.Background()
