@@ -70,7 +70,7 @@ func (c *Client) BootstrapKubeletClientCredential(ctx context.Context, cfg *Conf
 	if err != nil {
 		c.logger.Error("failed to retrieve instance metadata from IMDS", zap.Error(err))
 		return nil, &BootstrapError{
-			errorType: ErrorTypeGetIntanceDataFailure,
+			errorType: ErrorTypeGetInstanceDataFailure,
 			inner:     fmt.Errorf("failed to retrieve instance metadata from IMDS: %w", err),
 		}
 	}
