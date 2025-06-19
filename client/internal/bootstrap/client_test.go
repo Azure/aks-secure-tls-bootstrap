@@ -81,7 +81,7 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 					Return(nil, errors.New("cannot get VM instance data from IMDS")).Times(1)
 			},
 			expectedError: &BootstrapError{
-				errorType: ErrorTypeGetIntanceDataFailure,
+				errorType: ErrorTypeGetInstanceDataFailure,
 				inner:     fmt.Errorf("failed to retrieve instance metadata"),
 			},
 			assertKubeconfigData: func(t *testing.T, data *clientcmdapi.Config, _ *Config, _ []byte) {
