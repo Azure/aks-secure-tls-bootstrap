@@ -171,7 +171,7 @@ var _ = Describe("Client tests", Ordered, func() {
 				kubeconfigData, err := bootstrapClient.BootstrapKubeletClientCredential(ctx, bootstrapConfig)
 				Expect(kubeconfigData).To(BeNil())
 				Expect(err).ToNot(BeNil())
-				expectBootstrapErrorWithType(err, ErrorTypeGetIntanceDataFailure)
+				expectBootstrapErrorWithType(err, ErrorTypeGetInstanceDataFailure)
 				Expect(err.Error()).To(ContainSubstring("failed to retrieve instance metadata"))
 				Expect(err.Error()).To(ContainSubstring("cannot get VM instance data from IMDS"))
 			})
