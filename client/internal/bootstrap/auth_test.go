@@ -20,12 +20,12 @@ import (
 func TestGetAuthToken(t *testing.T) {
 	var testTenantID = "d87a2c3e-0c0c-42b2-a883-e48cd8723e22"
 	tests := []struct {
-		name                       string
-		customClientID             string
-		setupCloudProviderConfig   func(*testing.T, *cloud.ProviderConfig)
-		mockExtractAccessTokenFunc func(token *adal.ServicePrincipalToken) (string, error)
-		expectedToken              string
-		expectedErr                error
+		name                     string
+		customClientID           string
+		setupCloudProviderConfig func(*testing.T, *cloud.ProviderConfig)
+		extractAccessTokenFunc   func(token *adal.ServicePrincipalToken) (string, error)
+		expectedToken            string
+		expectedErr              error
 	}{
 		{
 			name:           "error generating MSI access token",
@@ -33,7 +33,7 @@ func TestGetAuthToken(t *testing.T) {
 			setupCloudProviderConfig: func(t *testing.T, config *cloud.ProviderConfig) {
 				config.UserAssignedIdentityID = "kubelet-identity-id"
 			},
-			mockExtractAccessTokenFunc: func(token *adal.ServicePrincipalToken) (string, error) {
+			extractAccessTokenFunc: func(token *adal.ServicePrincipalToken) (string, error) {
 				return "", errors.New("generating MSI access token")
 			},
 			expectedToken: "",
@@ -47,7 +47,7 @@ func TestGetAuthToken(t *testing.T) {
 				config.ClientID = "service-principal-id"
 				config.ClientSecret = "secret"
 			},
-			mockExtractAccessTokenFunc: func(token *adal.ServicePrincipalToken) (string, error) {
+			extractAccessTokenFunc: func(token *adal.ServicePrincipalToken) (string, error) {
 				return "", errors.New(`getting azure environment config for cloud "invalid"`)
 			},
 			expectedToken: "",
@@ -61,7 +61,7 @@ func TestGetAuthToken(t *testing.T) {
 				config.ClientID = "service-principal-id"
 				config.ClientSecret = ""
 			},
-			mockExtractAccessTokenFunc: func(token *adal.ServicePrincipalToken) (string, error) {
+			extractAccessTokenFunc: func(token *adal.ServicePrincipalToken) (string, error) {
 				return "", errors.New("generating SPN access token with username and password")
 			},
 			expectedToken: "",
@@ -75,7 +75,7 @@ func TestGetAuthToken(t *testing.T) {
 				config.ClientID = "service-principal-id"
 				config.ClientSecret = "certificate:YW55IGNhcm5hbCBwbGVhc3U======" // invalid b64-encoding
 			},
-			mockExtractAccessTokenFunc: func(token *adal.ServicePrincipalToken) (string, error) {
+			extractAccessTokenFunc: func(token *adal.ServicePrincipalToken) (string, error) {
 				return "", errors.New("b64-decoding certificate data in client secret")
 			},
 			expectedToken: "",
@@ -89,7 +89,7 @@ func TestGetAuthToken(t *testing.T) {
 				config.ClientID = "service-principal-id"
 				config.ClientSecret = "certificate:dGVzdAo=" // b64-encoding of "test"
 			},
-			mockExtractAccessTokenFunc: func(token *adal.ServicePrincipalToken) (string, error) {
+			extractAccessTokenFunc: func(token *adal.ServicePrincipalToken) (string, error) {
 				return "", errors.New("decoding pfx certificate data in client secret")
 			},
 			expectedToken: "",
@@ -110,7 +110,7 @@ func TestGetAuthToken(t *testing.T) {
 				config.ClientID = "service-principal-id"
 				config.ClientSecret = "certificate:" + certData
 			},
-			mockExtractAccessTokenFunc: func(token *adal.ServicePrincipalToken) (string, error) {
+			extractAccessTokenFunc: func(token *adal.ServicePrincipalToken) (string, error) {
 				return "", errors.New("generating SPN access token with certificate")
 			},
 			expectedToken: "",
@@ -122,7 +122,7 @@ func TestGetAuthToken(t *testing.T) {
 			setupCloudProviderConfig: func(t *testing.T, config *cloud.ProviderConfig) {
 				config.UserAssignedIdentityID = "kubelet-identity-id"
 			},
-			mockExtractAccessTokenFunc: func(token *adal.ServicePrincipalToken) (string, error) {
+			extractAccessTokenFunc: func(token *adal.ServicePrincipalToken) (string, error) {
 				return "token", nil
 			},
 			expectedToken: "token",
@@ -134,7 +134,7 @@ func TestGetAuthToken(t *testing.T) {
 			setupCloudProviderConfig: func(t *testing.T, config *cloud.ProviderConfig) {
 				config.UserAssignedIdentityID = "kubelet-identity-id"
 			},
-			mockExtractAccessTokenFunc: func(token *adal.ServicePrincipalToken) (string, error) {
+			extractAccessTokenFunc: func(token *adal.ServicePrincipalToken) (string, error) {
 				return "token", nil
 			},
 			expectedToken: "token",
@@ -148,7 +148,7 @@ func TestGetAuthToken(t *testing.T) {
 				config.ClientID = "service-principal-id"
 				config.ClientSecret = "secret"
 			},
-			mockExtractAccessTokenFunc: func(token *adal.ServicePrincipalToken) (string, error) {
+			extractAccessTokenFunc: func(token *adal.ServicePrincipalToken) (string, error) {
 				return "token", nil
 			},
 			expectedToken: "token",
@@ -169,21 +169,20 @@ func TestGetAuthToken(t *testing.T) {
 				config.ClientID = "service-principal-id"
 				config.ClientSecret = "certificate:" + certData
 			},
-			mockExtractAccessTokenFunc: func(token *adal.ServicePrincipalToken) (string, error) {
+			extractAccessTokenFunc: func(token *adal.ServicePrincipalToken) (string, error) {
 				return "token", nil
 			},
 			expectedToken: "token",
 			expectedErr:   nil,
 		},
 	}
-
+	logger, _ := zap.NewDevelopment()
 	var testResource = "resource"
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logger, _ := zap.NewDevelopment()
 			bootstrapClient := &Client{
 				logger:                 logger,
-				extractAccessTokenFunc: tt.mockExtractAccessTokenFunc,
+				extractAccessTokenFunc: tt.extractAccessTokenFunc,
 			}
 			providerCfg := &cloud.ProviderConfig{
 				TenantID: testTenantID,
