@@ -85,19 +85,19 @@ func TestGetInstanceData(t *testing.T) {
 	tests := []struct {
 		name               string
 		json               string
-		expectedErrSubStr  string
+		expectedErr        string
 		expectedResourceID string
 	}{
 		{
 			name:               "should call the correct IMDS endpoint with the correct query parameters",
 			json:               mockVMInstanceDataJSON,
-			expectedErrSubStr:  "",
+			expectedErr:        "",
 			expectedResourceID: "resourceId",
 		},
 		{
 			name:               "unable parse instance data response from IMDS",
 			json:               malformedJSON,
-			expectedErrSubStr:  "failed to unmarshal IMDS data",
+			expectedErr:        "failed to unmarshal IMDS data",
 			expectedResourceID: "",
 		},
 	}
@@ -124,9 +124,9 @@ func TestGetInstanceData(t *testing.T) {
 
 			instanceData, err := imdsClient.GetInstanceData(ctx)
 
-			if tt.expectedErrSubStr != "" {
+			if tt.expectedErr != "" {
 				assert.Error(t, err)
-				assert.Contains(t, err.Error(), tt.expectedErrSubStr)
+				assert.Contains(t, err.Error(), tt.expectedErr)
 				assert.Nil(t, instanceData)
 			} else {
 				assert.NoError(t, err)
@@ -146,19 +146,19 @@ func TestGetAttestedData(t *testing.T) {
 	tests := []struct {
 		name              string
 		json              string
-		expectedErrSubStr string // Empty string indicates no error expected
+		expectedErr       string // Empty string indicates no error expected
 		expectedSignature string // For validating the signature in the attested data
 	}{
 		{
 			name:              "should call the correct IMDS endpoint with the correct query parameters",
 			json:              mockVMAttestedDataJSON,
-			expectedErrSubStr: "",
+			expectedErr:       "",
 			expectedSignature: "signature",
 		},
 		{
 			name:              "unable to parse attested data response from IMDS",
 			json:              malformedJSON,
-			expectedErrSubStr: "failed to unmarshal IMDS data",
+			expectedErr:       "failed to unmarshal IMDS data",
 			expectedSignature: "",
 		},
 	}
@@ -187,9 +187,9 @@ func TestGetAttestedData(t *testing.T) {
 			nonce := "nonce"
 			attestedData, err := imdsClient.GetAttestedData(ctx, nonce)
 
-			if tt.expectedErrSubStr != "" {
+			if tt.expectedErr != "" {
 				assert.Error(t, err)
-				assert.Contains(t, err.Error(), tt.expectedErrSubStr)
+				assert.Contains(t, err.Error(), tt.expectedErr)
 				assert.Nil(t, attestedData)
 			} else {
 				assert.NoError(t, err)
