@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	internalhttp "github.com/Azure/aks-secure-tls-bootstrap/client/internal/http"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/telemetry"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 )
@@ -62,14 +63,13 @@ func TestCallIMDS(t *testing.T) {
 
 	logger, _ := zap.NewDevelopment()
 	for _, tt := range tests {
+		ctx := context.Background()
 		imdsClient := &client{
 			httpClient: internalhttp.NewClient(logger),
 			logger:     logger,
 		}
 		imds := tt.setupTestServer(tt.params)
 		defer imds.Close()
-
-		ctx := context.Background()
 
 		err := imdsClient.callIMDS(ctx, imds.URL, tt.params, &VMInstanceData{})
 		assert.NoError(t, err)
@@ -103,8 +103,10 @@ func TestGetInstanceData(t *testing.T) {
 	}
 
 	logger, _ := zap.NewDevelopment()
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctx := telemetry.NewContext()
 			imds := mockIMDSWithAssertions(t, tt.json, func(r *http.Request) {
 				assert.Equal(t, "/metadata/instance", r.URL.Path)
 				queryParameters := r.URL.Query()
@@ -119,11 +121,7 @@ func TestGetInstanceData(t *testing.T) {
 				baseURL:    imds.URL,
 			}
 
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
 			instanceData, err := imdsClient.GetInstanceData(ctx)
-
 			if tt.expectedErr != "" {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tt.expectedErr)
@@ -166,6 +164,7 @@ func TestGetAttestedData(t *testing.T) {
 	logger, _ := zap.NewDevelopment()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctx := telemetry.NewContext()
 			imds := mockIMDSWithAssertions(t, tt.json, func(r *http.Request) {
 				assert.Equal(t, "/metadata/attested/document", r.URL.Path)
 				queryParameters := r.URL.Query()
@@ -181,12 +180,7 @@ func TestGetAttestedData(t *testing.T) {
 				baseURL:    imds.URL,
 			}
 
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			nonce := "nonce"
-			attestedData, err := imdsClient.GetAttestedData(ctx, nonce)
-
+			attestedData, err := imdsClient.GetAttestedData(ctx, "nonce")
 			if tt.expectedErr != "" {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tt.expectedErr)

@@ -13,6 +13,7 @@ import (
 	"net/http"
 
 	internalhttp "github.com/Azure/aks-secure-tls-bootstrap/client/internal/http"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/telemetry"
 	"go.uber.org/zap"
 )
 
@@ -38,6 +39,10 @@ func NewClient(logger *zap.Logger) Client {
 }
 
 func (c *client) GetInstanceData(ctx context.Context) (*VMInstanceData, error) {
+	recorder := telemetry.MustGetTaskRecorder(ctx)
+	recorder.Start("GetInstanceData")
+	defer recorder.Stop("GetInstanceData")
+
 	url := fmt.Sprintf("%s/%s", c.baseURL, instanceDataEndpoint)
 	c.logger.Info("calling IMDS instance data endpoint", zap.String("url", url))
 
@@ -52,6 +57,10 @@ func (c *client) GetInstanceData(ctx context.Context) (*VMInstanceData, error) {
 }
 
 func (c *client) GetAttestedData(ctx context.Context, nonce string) (*VMAttestedData, error) {
+	recorder := telemetry.MustGetTaskRecorder(ctx)
+	recorder.Start("GetInstanceData")
+	defer recorder.Stop("GetInstanceData")
+
 	url := fmt.Sprintf("%s/%s", c.baseURL, attestedDataEndpoint)
 	c.logger.Info("calling IMDS attested data endpoint", zap.String("url", url))
 

@@ -4,6 +4,7 @@
 package bootstrap
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	cryptorand "crypto/rand"
@@ -13,10 +14,16 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/telemetry"
 )
 
 // makeKubeletClientCSR returns a valid kubelet client CSR for the bootstrapping host, along with the associated (ECDSA) private key.
-func makeKubeletClientCSR() (csrPEM, keyPEM []byte, err error) {
+func makeKubeletClientCSR(ctx context.Context) (csrPEM, keyPEM []byte, err error) {
+	recoder := telemetry.MustGetTaskRecorder(ctx)
+	recoder.Start("MakeKubeletClientCSR")
+	defer recoder.Stop("MakeKubeletClientCSR")
+
 	hostName, err := getHostname()
 	if err != nil {
 		return nil, nil, fmt.Errorf("resolving hostname: %w", err)

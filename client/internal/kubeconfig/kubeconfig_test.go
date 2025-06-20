@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/telemetry"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/testutil"
 	"github.com/stretchr/testify/assert"
 )
@@ -31,7 +32,8 @@ func TestKubeconfigGeneration(t *testing.T) {
 		CredFilePath:      credPath,
 	}
 
-	kubeconfigData, err := GenerateForCertAndKey(certPEM, keyPEM, cfg)
+	ctx := telemetry.NewContext()
+	kubeconfigData, err := GenerateForCertAndKey(ctx, certPEM, keyPEM, cfg)
 	assert.NoError(t, err)
 	assert.Contains(t, kubeconfigData.Clusters, "default-cluster")
 	defaultCluster := kubeconfigData.Clusters["default-cluster"]

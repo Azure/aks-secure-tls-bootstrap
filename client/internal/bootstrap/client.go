@@ -10,6 +10,7 @@ import (
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/imds"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/kubeconfig"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/telemetry"
 	akssecuretlsbootstrapv1 "github.com/Azure/aks-secure-tls-bootstrap/service/pkg/gen/akssecuretlsbootstrap/v1"
 	"go.uber.org/zap"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -34,14 +35,14 @@ func NewClient(logger *zap.Logger) (*Client, error) {
 }
 
 func (c *Client) BootstrapKubeletClientCredential(ctx context.Context, cfg *Config) (*clientcmdapi.Config, error) {
-	err := c.kubeconfigValidator.Validate(cfg.KubeconfigPath, cfg.EnsureAuthorizedClient)
+	err := c.kubeconfigValidator.Validate(ctx, cfg.KubeconfigPath, cfg.EnsureAuthorizedClient)
 	if err == nil {
 		c.logger.Info("existing kubeconfig is valid, will skip bootstrapping", zap.String("kubeconfig", cfg.KubeconfigPath))
 		return nil, nil
 	}
 	c.logger.Info("failed to validate existing kubeconfig, will bootstrap a new client credential", zap.String("kubeconfig", cfg.KubeconfigPath), zap.Error(err))
 
-	token, err := c.getAccessToken(cfg.CustomClientID, cfg.AADResource, &cfg.ProviderConfig)
+	token, err := c.getAccessToken(ctx, cfg.CustomClientID, cfg.AADResource, &cfg.ProviderConfig)
 	if err != nil {
 		c.logger.Error("failed to generate access token for gRPC connection", zap.Error(err))
 		return nil, &BootstrapError{
@@ -51,7 +52,7 @@ func (c *Client) BootstrapKubeletClientCredential(ctx context.Context, cfg *Conf
 	}
 	c.logger.Info("generated access token for gRPC connection")
 
-	serviceClient, close, err := c.getServiceClientFunc(token, cfg)
+	serviceClient, close, err := c.getServiceClientFunc(ctx, token, cfg)
 	if err != nil {
 		c.logger.Error("failed to setup bootstrap service connection", zap.Error(err))
 		return nil, &BootstrapError{
@@ -76,18 +77,10 @@ func (c *Client) BootstrapKubeletClientCredential(ctx context.Context, cfg *Conf
 	}
 	c.logger.Info("retrieved IMDS instance data", zap.String("vmResourceId", instanceData.Compute.ResourceID))
 
-	nonceResponse, err := serviceClient.GetNonce(ctx, &akssecuretlsbootstrapv1.GetNonceRequest{
-		ResourceId: instanceData.Compute.ResourceID,
-	})
+	nonce, err := c.getNonce(ctx, serviceClient, instanceData)
 	if err != nil {
-		c.logger.Error("failed retrieve a nonce from bootstrap server", zap.Error(err))
-		return nil, &BootstrapError{
-			errorType: ErrorTypeGetNonceFailure,
-			inner:     fmt.Errorf("failed to retrieve a nonce from bootstrap server: %w", err),
-		}
+		return nil, err
 	}
-	c.logger.Info("received new nonce from bootstrap server")
-	nonce := nonceResponse.GetNonce()
 
 	attestedData, err := c.imdsClient.GetAttestedData(ctx, nonce)
 	if err != nil {
@@ -99,7 +92,7 @@ func (c *Client) BootstrapKubeletClientCredential(ctx context.Context, cfg *Conf
 	}
 	c.logger.Info("retrieved IMDS attested data")
 
-	csrPEM, keyPEM, err := makeKubeletClientCSR()
+	csrPEM, keyPEM, err := makeKubeletClientCSR(ctx)
 	if err != nil {
 		c.logger.Error("failed to create kubelet client CSR", zap.Error(err))
 		return nil, &BootstrapError{
@@ -108,6 +101,58 @@ func (c *Client) BootstrapKubeletClientCredential(ctx context.Context, cfg *Conf
 		}
 	}
 	c.logger.Info("generated kubelet client CSR and associated private key")
+
+	certPEM, err := c.getCredential(ctx, serviceClient, instanceData, attestedData, nonce, csrPEM)
+	if err != nil {
+		return nil, err
+	}
+
+	kubeconfigData, err := kubeconfig.GenerateForCertAndKey(ctx, certPEM, keyPEM, &kubeconfig.Config{
+		APIServerFQDN:     cfg.APIServerFQDN,
+		ClusterCAFilePath: cfg.ClusterCAFilePath,
+		CredFilePath:      cfg.CredFilePath,
+	})
+	if err != nil {
+		c.logger.Error("failed to generate kubeconfig for new client cert and key", zap.Error(err))
+		return nil, &BootstrapError{
+			errorType: ErrorTypeGenerateKubeconfigFailure,
+			inner:     fmt.Errorf("failed to generate kubeconfig for new client cert and key: %w", err),
+		}
+	}
+	c.logger.Info("successfully generated new kubeconfig data")
+
+	return kubeconfigData, nil
+}
+
+func (c *Client) getNonce(ctx context.Context, serviceClient akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient, instanceData *imds.VMInstanceData) (string, error) {
+	recorder := telemetry.MustGetTaskRecorder(ctx)
+	recorder.Start("GetNonce")
+	defer recorder.Stop("GetNonce")
+
+	nonceResponse, err := serviceClient.GetNonce(ctx, &akssecuretlsbootstrapv1.GetNonceRequest{
+		ResourceId: instanceData.Compute.ResourceID,
+	})
+	if err != nil {
+		c.logger.Error("failed retrieve a nonce from bootstrap server", zap.Error(err))
+		return "", &BootstrapError{
+			errorType: ErrorTypeGetNonceFailure,
+			inner:     fmt.Errorf("failed to retrieve a nonce from bootstrap server: %w", err),
+		}
+	}
+	c.logger.Info("received new nonce from bootstrap server")
+	return nonceResponse.GetNonce(), nil
+}
+
+func (c *Client) getCredential(
+	ctx context.Context,
+	serviceClient akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient,
+	instanceData *imds.VMInstanceData,
+	attestedData *imds.VMAttestedData,
+	nonce string,
+	csrPEM []byte) ([]byte, error) {
+	recorder := telemetry.MustGetTaskRecorder(ctx)
+	recorder.Start("GetCredential")
+	defer recorder.Stop("GetCredential")
 
 	credentialResponse, err := serviceClient.GetCredential(ctx, &akssecuretlsbootstrapv1.GetCredentialRequest{
 		ResourceId:    instanceData.Compute.ResourceID,
@@ -140,19 +185,6 @@ func (c *Client) BootstrapKubeletClientCredential(ctx context.Context, cfg *Conf
 			inner:     fmt.Errorf("failed to decode cert data from bootstrap server: %w", err),
 		}
 	}
-	kubeconfigData, err := kubeconfig.GenerateForCertAndKey(certPEM, keyPEM, &kubeconfig.Config{
-		APIServerFQDN:     cfg.APIServerFQDN,
-		ClusterCAFilePath: cfg.ClusterCAFilePath,
-		CredFilePath:      cfg.CredFilePath,
-	})
-	if err != nil {
-		c.logger.Error("failed to generate kubeconfig for new client cert and key", zap.Error(err))
-		return nil, &BootstrapError{
-			errorType: ErrorTypeGenerateKubeconfigFailure,
-			inner:     fmt.Errorf("failed to generate kubeconfig for new client cert and key: %w", err),
-		}
-	}
-	c.logger.Info("successfully generated new kubeconfig data")
 
-	return kubeconfigData, nil
+	return certPEM, nil
 }
