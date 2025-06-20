@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/bootstrap"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/telemetry"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -66,16 +67,16 @@ func main() {
 }
 
 func run(ctx context.Context) int {
-	logger, err := configureLogging(logFile, verbose)
-	if err != nil {
-		fmt.Printf("unable to construct zap logger: %s\n", err)
+	logger, finalErr := configureLogging(logFile, verbose)
+	if finalErr != nil {
+		fmt.Printf("unable to construct zap logger: %s\n", finalErr)
 		return 1
 	}
 	defer flush(logger)
 
-	bootstrapClient, err := bootstrap.NewClient(logger)
-	if err != nil {
-		fmt.Printf("unable to construct bootstrap client: %s\n", err)
+	bootstrapClient, finalErr := bootstrap.NewClient(logger)
+	if finalErr != nil {
+		fmt.Printf("unable to construct bootstrap client: %s\n", finalErr)
 		return 1
 	}
 
@@ -83,37 +84,39 @@ func run(ctx context.Context) int {
 	bootstrapDeadline := bootstrapStartTime.Add(bootstrapConfig.Deadline)
 	logger.Info("set bootstrap deadline", zap.Time("deadline", bootstrapDeadline))
 
-	bootstrapCtx, cancel := context.WithDeadline(ctx, bootstrapDeadline)
+	bootstrapCtx := telemetry.WithTracer(ctx, telemetry.NewTracer())
+	bootstrapCtx, cancel := context.WithDeadline(bootstrapCtx, bootstrapDeadline)
 	defer cancel()
 
-	err, bootstrapErrors := bootstrap.PerformBootstrapping(bootstrapCtx, logger, bootstrapClient, bootstrapConfig)
+	finalErr, errs, traces := bootstrap.Bootstrap(bootstrapCtx, bootstrapClient, bootstrapConfig)
 	bootstrapEndTime := time.Now()
 
 	var exitCode int
 	bootstrapResult := &bootstrap.Result{
 		Status:              bootstrap.StatusSuccess,
 		ElapsedMilliseconds: bootstrapEndTime.Sub(bootstrapStartTime).Milliseconds(),
-		BootstrapErrors:     bootstrapErrors,
+		Errors:              errs,
+		Traces:              traces,
 	}
 
-	if err != nil {
+	if finalErr != nil {
 		bootstrapResult.Status = bootstrap.StatusFailure
 
 		switch {
-		case errors.Is(err, context.Canceled):
+		case errors.Is(finalErr, context.Canceled):
 			logger.Error("context was cancelled before bootstrapping could complete")
-		case errors.Is(err, context.DeadlineExceeded):
+		case errors.Is(finalErr, context.DeadlineExceeded):
 			logger.Error(
 				"failed to successfully bootstrap before the specified deadline",
-				zap.Error(errors.Unwrap(err)),
+				zap.Error(errors.Unwrap(finalErr)),
 				zap.Time("deadline", bootstrapDeadline),
 				zap.Duration("deadlineDuration", bootstrapConfig.Deadline),
 			)
 		default:
-			logger.Error("failed to bootstrap", zap.Error(errors.Unwrap(err)))
+			logger.Error("failed to bootstrap", zap.Error(errors.Unwrap(finalErr)))
 		}
 
-		bootstrapResult.FinalError = err.Error()
+		bootstrapResult.FinalError = errors.Unwrap(finalErr).Error()
 		exitCode = 1
 	}
 
@@ -121,9 +124,9 @@ func run(ctx context.Context) int {
 		Start: bootstrapStartTime,
 		End:   bootstrapEndTime,
 	}
-	eventFilePath, err := bootstrapEvent.WriteWithResult(bootstrapResult)
-	if err != nil {
-		logger.Error("unable to write bootstrap guest agent event to disk", zap.Error(err))
+	eventFilePath, finalErr := bootstrapEvent.WriteWithResult(bootstrapResult)
+	if finalErr != nil {
+		logger.Error("unable to write bootstrap guest agent event to disk", zap.Error(finalErr))
 	}
 	if eventFilePath == "" {
 		logger.Warn("guest agent event path does not exist, not guest agent event telemetry will be written", zap.String("eventMessage", bootstrapEvent.Message))

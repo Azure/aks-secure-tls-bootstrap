@@ -20,10 +20,13 @@ import (
 	"google.golang.org/grpc/credentials/oauth"
 )
 
-// getServiceClientFunc returns a new SecureTLSBootstrapServiceClient over a gRPC connection, fake implementations given in unit tests.
-type getServiceClientFunc func(token string, cfg *Config) (akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient, func() error, error)
+// closeFunc closes a gRPC client connection, fake implementations given in unit tests.
+type closeFunc func() error
 
-func getServiceClient(token string, cfg *Config) (akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient, func() error, error) {
+// getServiceClientFunc returns a new SecureTLSBootstrapServiceClient over a gRPC connection, fake implementations given in unit tests.
+type getServiceClientFunc func(token string, cfg *Config) (akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient, closeFunc, error)
+
+func getServiceClient(token string, cfg *Config) (akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient, closeFunc, error) {
 	clusterCAData, err := os.ReadFile(cfg.ClusterCAFilePath)
 	if err != nil {
 		return nil, nil, fmt.Errorf("reading cluster CA data from %s: %w", cfg.ClusterCAFilePath, err)

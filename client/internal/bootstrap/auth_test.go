@@ -4,200 +4,203 @@
 package bootstrap
 
 import (
+	"errors"
+	"testing"
 	"time"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/cloud"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/telemetry"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/testutil"
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure"
 )
 
-var _ = Describe("Auth", Ordered, func() {
-	var (
-		logger          *zap.Logger
-		bootstrapClient *Client
-	)
-
-	BeforeAll(func() {
-		logger, _ = zap.NewDevelopment()
-	})
-
-	BeforeEach(func() {
-		bootstrapClient = &Client{
-			logger: logger,
+func TestGetAuthToken(t *testing.T) {
+	var testTenantID = "d87a2c3e-0c0c-42b2-a883-e48cd8723e22"
+	tests := []struct {
+		name                     string
+		customClientID           string
+		setupCloudProviderConfig func(*testing.T, *cloud.ProviderConfig)
+		extractAccessTokenFunc   func(token *adal.ServicePrincipalToken) (string, error)
+		expectedToken            string
+		expectedErr              error
+	}{
+		{
+			name:           "error generating MSI access token",
+			customClientID: "",
+			setupCloudProviderConfig: func(t *testing.T, config *cloud.ProviderConfig) {
+				config.UserAssignedIdentityID = "kubelet-identity-id"
+			},
 			extractAccessTokenFunc: func(token *adal.ServicePrincipalToken) (string, error) {
-				Expect(token).ToNot(BeNil())
+				return "", errors.New("generating MSI access token")
+			},
+			expectedToken: "",
+			expectedErr:   errors.New("generating MSI access token"),
+		},
+		{
+			name:           "error getting azure environment config for specified cloud",
+			customClientID: "",
+			setupCloudProviderConfig: func(t *testing.T, config *cloud.ProviderConfig) {
+				config.CloudName = "invalid"
+				config.ClientID = "service-principal-id"
+				config.ClientSecret = "secret"
+			},
+			extractAccessTokenFunc: func(token *adal.ServicePrincipalToken) (string, error) {
+				return "", errors.New(`getting azure environment config for cloud "invalid"`)
+			},
+			expectedToken: "",
+			expectedErr:   errors.New(`getting azure environment config for cloud "invalid"`),
+		},
+		{
+			name:           "there is an error generating a service principal access token with username and password",
+			customClientID: "",
+			setupCloudProviderConfig: func(t *testing.T, config *cloud.ProviderConfig) {
+				config.CloudName = azure.PublicCloud.Name
+				config.ClientID = "service-principal-id"
+				config.ClientSecret = ""
+			},
+			extractAccessTokenFunc: func(token *adal.ServicePrincipalToken) (string, error) {
+				return "", errors.New("generating SPN access token with username and password")
+			},
+			expectedToken: "",
+			expectedErr:   errors.New("generating SPN access token with username and password"),
+		},
+		{
+			name:           "there is an error b64-decoding the certificate data",
+			customClientID: "",
+			setupCloudProviderConfig: func(t *testing.T, config *cloud.ProviderConfig) {
+				config.CloudName = azure.PublicCloud.Name
+				config.ClientID = "service-principal-id"
+				config.ClientSecret = "certificate:YW55IGNhcm5hbCBwbGVhc3U======" // invalid b64-encoding
+			},
+			extractAccessTokenFunc: func(token *adal.ServicePrincipalToken) (string, error) {
+				return "", errors.New("b64-decoding certificate data in client secret")
+			},
+			expectedToken: "",
+			expectedErr:   errors.New("b64-decoding certificate data in client secret"),
+		},
+		{
+			name:           "there is an error decoding the pfx certificate data",
+			customClientID: "",
+			setupCloudProviderConfig: func(t *testing.T, config *cloud.ProviderConfig) {
+				config.CloudName = azure.PublicCloud.Name
+				config.ClientID = "service-principal-id"
+				config.ClientSecret = "certificate:dGVzdAo=" // b64-encoding of "test"
+			},
+			extractAccessTokenFunc: func(token *adal.ServicePrincipalToken) (string, error) {
+				return "", errors.New("decoding pfx certificate data in client secret")
+			},
+			expectedToken: "",
+			expectedErr:   errors.New("decoding pfx certificate data in client secret"),
+		},
+		{
+			name:           "there is an error generating a service principal token with certificate data",
+			customClientID: "",
+			setupCloudProviderConfig: func(t *testing.T, config *cloud.ProviderConfig) {
+				certData, err := testutil.GenerateCertAndKeyAsEncodedPFXData(testutil.CertTemplate{
+					CommonName:   "aad",
+					Organization: "azure",
+					Expiration:   time.Now().Add(time.Hour),
+				})
+				assert.NoError(t, err)
+
+				config.CloudName = azure.PublicCloud.Name
+				config.ClientID = "service-principal-id"
+				config.ClientSecret = "certificate:" + certData
+			},
+			extractAccessTokenFunc: func(token *adal.ServicePrincipalToken) (string, error) {
+				return "", errors.New("generating SPN access token with certificate")
+			},
+			expectedToken: "",
+			expectedErr:   errors.New("generating SPN access token with certificate"),
+		},
+		{
+			name:           "UserAssignedIdentityID is specified in cloud provider config",
+			customClientID: "",
+			setupCloudProviderConfig: func(t *testing.T, config *cloud.ProviderConfig) {
+				config.UserAssignedIdentityID = "kubelet-identity-id"
+			},
+			extractAccessTokenFunc: func(token *adal.ServicePrincipalToken) (string, error) {
 				return "token", nil
 			},
-		}
-	})
-
-	Context("getAuthToken", func() {
-		var testResource = "resource"
-		var testTenantID = "d87a2c3e-0c0c-42b2-a883-e48cd8723e22"
-
-		When("there is an error generating an MSI access token", func() {
-			It("should return an error", func() {
-				cloudProviderConfig := &cloud.ProviderConfig{
-					UserAssignedIdentityID: "kubelet-identity-id",
-					TenantID:               testTenantID,
-				}
-
-				token, err := bootstrapClient.getAccessToken("", "", cloudProviderConfig) // pass an empty resource to force a failure
-				Expect(token).To(BeEmpty())
-				Expect(err).To(MatchError(ContainSubstring("generating MSI access token")))
-			})
-		})
-
-		When("there is an error getting the azure environment config for the specified cloud", func() {
-			It("should return an error", func() {
-				cloudProviderConfig := &cloud.ProviderConfig{
-					CloudName:    "invalid",
-					ClientID:     "service-principal-id",
-					ClientSecret: "secret",
-					TenantID:     testTenantID,
-				}
-
-				token, err := bootstrapClient.getAccessToken("", testResource, cloudProviderConfig)
-				Expect(token).To(BeEmpty())
-				Expect(err).To(MatchError(ContainSubstring(`getting azure environment config for cloud "invalid"`)))
-			})
-		})
-
-		When("there is an error generating a service principal access token with username and password", func() {
-			It("should return an error", func() {
-				cloudProviderConfig := &cloud.ProviderConfig{
-					CloudName:    azure.PublicCloud.Name,
-					ClientID:     "service-principal-id",
-					ClientSecret: "", // empty secret to force a failure
-					TenantID:     testTenantID,
-				}
-
-				token, err := bootstrapClient.getAccessToken("", testResource, cloudProviderConfig)
-				Expect(token).To(BeEmpty())
-				Expect(err).To(MatchError(ContainSubstring("generating SPN access token with username and password")))
-			})
-		})
-
-		When("there is an error b64-decoding the certificate data", func() {
-			It("should return an error", func() {
-				cloudProviderConfig := &cloud.ProviderConfig{
-					CloudName:    azure.PublicCloud.Name,
-					ClientID:     "service-principal-id",
-					ClientSecret: "certificate:YW55IGNhcm5hbCBwbGVhc3U======", // invalid b64-encoding
-					TenantID:     testTenantID,
-				}
-
-				token, err := bootstrapClient.getAccessToken("", testResource, cloudProviderConfig)
-				Expect(token).To(BeEmpty())
-				Expect(err).To(MatchError(ContainSubstring("b64-decoding certificate data in client secret")))
-			})
-		})
-
-		When("there is an error decoding the pfx certificate data", func() {
-			It("should return an error", func() {
-				cloudProviderConfig := &cloud.ProviderConfig{
-					CloudName:    azure.PublicCloud.Name,
-					ClientID:     "service-principal-id",
-					ClientSecret: "certificate:dGVzdAo=", // b64-encoding of "test"
-					TenantID:     testTenantID,
-				}
-
-				token, err := bootstrapClient.getAccessToken("", testResource, cloudProviderConfig)
-				Expect(token).To(BeEmpty())
-				Expect(err).To(MatchError(ContainSubstring("decoding pfx certificate data in client secret")))
-			})
-		})
-
-		When("there is an error generating a service principal token with certificate data", func() {
-			It("should return an error", func() {
+			expectedToken: "token",
+			expectedErr:   nil,
+		},
+		{
+			name:           "a custom client ID is specified",
+			customClientID: "custom",
+			setupCloudProviderConfig: func(t *testing.T, config *cloud.ProviderConfig) {
+				config.UserAssignedIdentityID = "kubelet-identity-id"
+			},
+			extractAccessTokenFunc: func(token *adal.ServicePrincipalToken) (string, error) {
+				return "token", nil
+			},
+			expectedToken: "token",
+			expectedErr:   nil,
+		},
+		{
+			name:           "service principal client secret does not contain certificate data",
+			customClientID: "",
+			setupCloudProviderConfig: func(t *testing.T, config *cloud.ProviderConfig) {
+				config.CloudName = azure.PublicCloud.Name
+				config.ClientID = "service-principal-id"
+				config.ClientSecret = "secret"
+			},
+			extractAccessTokenFunc: func(token *adal.ServicePrincipalToken) (string, error) {
+				return "token", nil
+			},
+			expectedToken: "token",
+			expectedErr:   nil,
+		},
+		{
+			name:           "service principal client secret contains certificate data",
+			customClientID: "",
+			setupCloudProviderConfig: func(t *testing.T, config *cloud.ProviderConfig) {
 				certData, err := testutil.GenerateCertAndKeyAsEncodedPFXData(testutil.CertTemplate{
 					CommonName:   "aad",
 					Organization: "azure",
 					Expiration:   time.Now().Add(time.Hour),
 				})
-				Expect(err).To(BeNil())
+				assert.NoError(t, err)
 
-				cloudProviderConfig := &cloud.ProviderConfig{
-					CloudName:    azure.PublicCloud.Name,
-					ClientID:     "service-principal-id",
-					ClientSecret: "certificate:" + certData,
-					TenantID:     testTenantID,
-				}
+				config.CloudName = azure.PublicCloud.Name
+				config.ClientID = "service-principal-id"
+				config.ClientSecret = "certificate:" + certData
+			},
+			extractAccessTokenFunc: func(token *adal.ServicePrincipalToken) (string, error) {
+				return "token", nil
+			},
+			expectedToken: "token",
+			expectedErr:   nil,
+		},
+	}
 
-				token, err := bootstrapClient.getAccessToken("", "", cloudProviderConfig) // pass an empty resource to force a failure
-				Expect(token).To(BeEmpty())
-				Expect(err).To(MatchError(ContainSubstring("generating SPN access token with certificate")))
-			})
+	logger, _ := zap.NewDevelopment()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := telemetry.NewContext()
+			bootstrapClient := &Client{
+				logger:                 logger,
+				extractAccessTokenFunc: tt.extractAccessTokenFunc,
+			}
+			providerCfg := &cloud.ProviderConfig{
+				TenantID: testTenantID,
+			}
+			tt.setupCloudProviderConfig(t, providerCfg)
+
+			token, err := bootstrapClient.getAccessToken(ctx, tt.customClientID, "resource", providerCfg)
+			if tt.expectedErr != nil {
+				assert.Error(t, err)
+				assert.ErrorContains(t, err, tt.expectedErr.Error())
+				assert.Empty(t, token)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expectedToken, token)
+			}
 		})
-
-		When("UserAssignedIdentityID is specified in cloud provider config", func() {
-			It("should return a corresponding MSI access token", func() {
-				cloudProviderConfig := &cloud.ProviderConfig{
-					UserAssignedIdentityID: "kubelet-identity-id",
-					TenantID:               testTenantID,
-				}
-
-				token, err := bootstrapClient.getAccessToken("", testResource, cloudProviderConfig)
-				Expect(err).To(BeNil())
-				Expect(token).To(Equal("token"))
-			})
-		})
-
-		When("a custom client ID is specified", func() {
-			It("should return a corresponding MSI access token from IMDS", func() {
-				customClientID := "custom"
-				cloudProviderConfig := &cloud.ProviderConfig{
-					UserAssignedIdentityID: "kubelet-identity-id",
-					TenantID:               testTenantID,
-				}
-
-				token, err := bootstrapClient.getAccessToken(customClientID, testResource, cloudProviderConfig)
-				Expect(err).To(BeNil())
-				Expect(token).To(Equal("token"))
-			})
-		})
-
-		When("service principal client secret does not contain certificate data", func() {
-			It("should return a corresponding SPN access token using username + password auth", func() {
-				cloudProviderConfig := &cloud.ProviderConfig{
-					CloudName:    azure.PublicCloud.Name,
-					ClientID:     "service-principal-id",
-					ClientSecret: "secret",
-					TenantID:     testTenantID,
-				}
-
-				token, err := bootstrapClient.getAccessToken("", testResource, cloudProviderConfig)
-				Expect(err).To(BeNil())
-				Expect(token).To(Equal("token"))
-			})
-		})
-
-		When("service principal client secret contains certificate data", func() {
-			It("should return a corresponding SPN access token using certificate auth", func() {
-				certData, err := testutil.GenerateCertAndKeyAsEncodedPFXData(testutil.CertTemplate{
-					CommonName:   "aad",
-					Organization: "azure",
-					Expiration:   time.Now().Add(time.Hour),
-				})
-				Expect(err).To(BeNil())
-
-				cloudProviderConfig := &cloud.ProviderConfig{
-					CloudName:    azure.PublicCloud.Name,
-					ClientID:     "service-principal-id",
-					ClientSecret: "certificate:" + certData,
-					TenantID:     testTenantID,
-				}
-
-				token, err := bootstrapClient.getAccessToken("", testResource, cloudProviderConfig)
-				Expect(err).To(BeNil())
-				Expect(token).To(Equal("token"))
-			})
-		})
-
-	})
-})
+	}
+}

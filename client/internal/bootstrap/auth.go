@@ -4,11 +4,13 @@
 package bootstrap
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"strings"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/cloud"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/telemetry"
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"go.uber.org/zap"
@@ -30,7 +32,12 @@ func extractAccessToken(token *adal.ServicePrincipalToken) (string, error) {
 
 // getAccessToken retrieves an AAD access token (JWT) using the specified custom client ID, resource, and cloud provider config.
 // MSI access tokens are retrieved from IMDS, while service principal tokens are retrieved directly from AAD.
-func (c *Client) getAccessToken(customClientID, resource string, cloudProviderConfig *cloud.ProviderConfig) (string, error) {
+func (c *Client) getAccessToken(ctx context.Context, customClientID, resource string, cloudProviderConfig *cloud.ProviderConfig) (string, error) {
+	spanName := "GetAccessToken"
+	tracer := telemetry.MustGetTracer(ctx)
+	tracer.StartSpan(spanName)
+	defer tracer.EndSpan(spanName)
+
 	userAssignedID := cloudProviderConfig.UserAssignedIdentityID
 	if customClientID != "" {
 		userAssignedID = customClientID
