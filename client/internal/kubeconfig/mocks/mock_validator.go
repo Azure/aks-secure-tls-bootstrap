@@ -13,6 +13,7 @@
 package mocks
 
 import (
+	context "context"
 	reflect "reflect"
 
 	gomock "go.uber.org/mock/gomock"
@@ -43,15 +44,15 @@ func (m *MockValidator) EXPECT() *MockValidatorMockRecorder {
 }
 
 // Validate mocks base method.
-func (m *MockValidator) Validate(kubeconfigPath string, ensureAuthorizedClient bool) error {
+func (m *MockValidator) Validate(ctx context.Context, kubeconfigPath string, ensureAuthorizedClient bool) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Validate", kubeconfigPath, ensureAuthorizedClient)
+	ret := m.ctrl.Call(m, "Validate", ctx, kubeconfigPath, ensureAuthorizedClient)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Validate indicates an expected call of Validate.
-func (mr *MockValidatorMockRecorder) Validate(kubeconfigPath, ensureAuthorizedClient any) *gomock.Call {
+func (mr *MockValidatorMockRecorder) Validate(ctx, kubeconfigPath, ensureAuthorizedClient any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Validate", reflect.TypeOf((*MockValidator)(nil).Validate), kubeconfigPath, ensureAuthorizedClient)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Validate", reflect.TypeOf((*MockValidator)(nil).Validate), ctx, kubeconfigPath, ensureAuthorizedClient)
 }

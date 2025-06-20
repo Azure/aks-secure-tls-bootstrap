@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/telemetry"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
@@ -138,7 +139,7 @@ func TestValidateKubeconfig(t *testing.T) {
 				logger: logger,
 			}
 			tt.setupFunc(v)
-			err := v.Validate("path", false)
+			err := v.Validate(telemetry.NewContext(), "path", false)
 			if len(tt.expectedErrs) > 0 {
 				assert.Error(t, err)
 				for _, expectedErr := range tt.expectedErrs {
@@ -233,7 +234,7 @@ func TestEnsureAuthorizedClient(t *testing.T) {
 			}
 
 			tt.setupFunc(v, clientset)
-			err := v.Validate("path", true)
+			err := v.Validate(telemetry.NewContext(), "path", true)
 
 			if len(tt.expectedErrs) > 0 {
 				assert.Error(t, err)

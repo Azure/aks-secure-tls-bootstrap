@@ -4,6 +4,7 @@
 package bootstrap
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	internalhttp "github.com/Azure/aks-secure-tls-bootstrap/client/internal/http"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/telemetry"
 	akssecuretlsbootstrapv1 "github.com/Azure/aks-secure-tls-bootstrap/service/pkg/gen/akssecuretlsbootstrap/v1"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/retry"
 	"golang.org/x/oauth2"
@@ -21,9 +23,13 @@ import (
 )
 
 // getServiceClientFunc returns a new SecureTLSBootstrapServiceClient over a gRPC connection, fake implementations given in unit tests.
-type getServiceClientFunc func(token string, cfg *Config) (akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient, func() error, error)
+type getServiceClientFunc func(ctx context.Context, token string, cfg *Config) (akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient, func() error, error)
 
-func getServiceClient(token string, cfg *Config) (akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient, func() error, error) {
+func getServiceClient(ctx context.Context, token string, cfg *Config) (akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient, func() error, error) {
+	recorder := telemetry.MustGetTaskRecorder(ctx)
+	recorder.Start("GetServiceClient")
+	defer recorder.Stop("GetServiceClient")
+
 	clusterCAData, err := os.ReadFile(cfg.ClusterCAFilePath)
 	if err != nil {
 		return nil, nil, fmt.Errorf("reading cluster CA data from %s: %w", cfg.ClusterCAFilePath, err)

@@ -6,12 +6,14 @@ package kubeconfig
 //go:generate ../../bin/mockgen -copyright_file=../../../hack/copyright_header.txt -destination=./mocks/mock_validator.go -package=mocks github.com/Azure/aks-secure-tls-bootstrap/client/internal/kubeconfig Validator
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
 	"time"
 
 	internalhttp "github.com/Azure/aks-secure-tls-bootstrap/client/internal/http"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/telemetry"
 	"github.com/hashicorp/go-retryablehttp"
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -31,7 +33,7 @@ type clientConfigLoaderFunc func(kubeconfigPath string) (*restclient.Config, err
 type clientsetLoaderFunc func(clientConfig *restclient.Config) (kubernetes.Interface, error)
 
 type Validator interface {
-	Validate(kubeconfigPath string, ensureAuthorizedClient bool) error
+	Validate(ctx context.Context, kubeconfigPath string, ensureAuthorizedClient bool) error
 }
 
 type validator struct {
@@ -69,7 +71,11 @@ func NewValidator(logger *zap.Logger) Validator {
 	}
 }
 
-func (v *validator) Validate(kubeconfigPath string, ensureAuthorizedClient bool) error {
+func (v *validator) Validate(ctx context.Context, kubeconfigPath string, ensureAuthorizedClient bool) error {
+	recorder := telemetry.MustGetTaskRecorder(ctx)
+	recorder.Start("ValidateKubeconfig")
+	defer recorder.Stop("ValidateKubeconfig")
+
 	clientConfig, err := v.clientConfigLoader(kubeconfigPath)
 	if err != nil {
 		return fmt.Errorf("failed to create REST client config from kubeconfig: %w", err)

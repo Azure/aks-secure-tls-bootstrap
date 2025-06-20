@@ -5,9 +5,11 @@ package kubeconfig
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/telemetry"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
@@ -21,7 +23,11 @@ type Config struct {
 // GenerateForCertAndKey generates a valid kubeconfig with the specified cert, key, and configuration.
 // The cert and key will have their PEM-encodings written out to a single credential file to be
 // referenced within the generated kubeconfig.
-func GenerateForCertAndKey(certPEM, keyPEM []byte, cfg *Config) (*clientcmdapi.Config, error) {
+func GenerateForCertAndKey(ctx context.Context, certPEM, keyPEM []byte, cfg *Config) (*clientcmdapi.Config, error) {
+	recorder := telemetry.MustGetTaskRecorder(ctx)
+	recorder.Start("GenerateKubeconfig")
+	defer recorder.Stop("GenerateKubeconfig")
+
 	var credBytes bytes.Buffer
 	if _, err := credBytes.Write(certPEM); err != nil {
 		return nil, fmt.Errorf("writing client cert PEM bytes to buffer: %w", err)

@@ -12,6 +12,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/cloud"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/telemetry"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/testutil"
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure"
@@ -178,9 +179,10 @@ func TestGetAuthToken(t *testing.T) {
 	}
 
 	logger, _ := zap.NewDevelopment()
-	var testResource = "resource"
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctx := telemetry.NewContext()
 			bootstrapClient := &Client{
 				logger:                 logger,
 				extractAccessTokenFunc: tt.extractAccessTokenFunc,
@@ -189,8 +191,8 @@ func TestGetAuthToken(t *testing.T) {
 				TenantID: testTenantID,
 			}
 			tt.setupCloudProviderConfig(t, providerCfg)
-			token, err := bootstrapClient.getAccessToken(tt.customClientID, testResource, providerCfg)
 
+			token, err := bootstrapClient.getAccessToken(ctx, tt.customClientID, "resource", providerCfg)
 			if tt.expectedErr != nil {
 				assert.Error(t, err)
 				assert.ErrorContains(t, err, tt.expectedErr.Error())

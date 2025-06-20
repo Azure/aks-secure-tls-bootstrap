@@ -12,6 +12,7 @@ import (
 
 	"google.golang.org/grpc/test/bufconn"
 
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/telemetry"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/testutil"
 	"github.com/stretchr/testify/assert"
 )
@@ -83,7 +84,7 @@ func TestGetServiceClient(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := tt.setupFunc(t)
-			client, closeFn, err := getServiceClient("token", cfg)
+			client, closeFn, err := getServiceClient(telemetry.NewContext(), "token", cfg)
 
 			if len(tt.errorSubstr) > 0 {
 				assert.Error(t, err)
