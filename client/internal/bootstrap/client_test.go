@@ -31,8 +31,6 @@ import (
 )
 
 func TestBootstrapKubeletClientCredential(t *testing.T) {
-	logger, _ := zap.NewDevelopment()
-
 	tests := []struct {
 		name       string
 		setupMocks func(context.Context, *Config, *imdsmocks.MockClient,
@@ -255,6 +253,7 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 		},
 	}
 
+	logger, _ := zap.NewDevelopment()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
