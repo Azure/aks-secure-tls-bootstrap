@@ -176,6 +176,7 @@ func TestGetAuthToken(t *testing.T) {
 			expectedErr:   nil,
 		},
 	}
+
 	logger, _ := zap.NewDevelopment()
 	var testResource = "resource"
 	for _, tt := range tests {
