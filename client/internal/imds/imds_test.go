@@ -12,7 +12,6 @@ import (
 	"testing"
 
 	internalhttp "github.com/Azure/aks-secure-tls-bootstrap/client/internal/http"
-	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/telemetry"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 )
@@ -103,10 +102,10 @@ func TestGetInstanceData(t *testing.T) {
 	}
 
 	logger, _ := zap.NewDevelopment()
+	ctx := context.Background()
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := telemetry.NewContext()
 			imds := mockIMDSWithAssertions(t, tt.json, func(r *http.Request) {
 				assert.Equal(t, "/metadata/instance", r.URL.Path)
 				queryParameters := r.URL.Query()
@@ -162,9 +161,10 @@ func TestGetAttestedData(t *testing.T) {
 	}
 
 	logger, _ := zap.NewDevelopment()
+	ctx := context.Background()
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := telemetry.NewContext()
 			imds := mockIMDSWithAssertions(t, tt.json, func(r *http.Request) {
 				assert.Equal(t, "/metadata/attested/document", r.URL.Path)
 				queryParameters := r.URL.Query()
