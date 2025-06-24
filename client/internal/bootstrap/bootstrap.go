@@ -12,14 +12,12 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
-// Bootstrap performs the secure TLS bootstrapping process with
-// the provided client, wrapped in a retry loop. The retry loop will continue
-// indefinitely until the specified context is done, whether that be through a timeout or cancellation.
-// If all retries fail, the last error encountered will be returned in finalErr. In any case,
-// a record of all errors encountered during the bootstrap process will be returned
-// in errs, where error type is mapped to the corresponding occurrence count.
-// Additionally, a map of traces is returned in traces, which records how long each bootstrapping step took,
-// mapping task name to a corresponding time.Duration. Trace data is separately recorded for each retry attempt.
+// Bootstrap performs the secure TLS bootstrapping process with the provided client, wrapped in a retry loop.
+// The retry loop will continue indefinitely until the specified context is done, whether that be through a timeout or cancellation.
+// If all retries fail, the last error encountered will be returned in finalErr.
+// In any case, a record of all errors encountered during the bootstrap process will be returned in errs, where error type is mapped to the corresponding occurrence count.
+// Additionally, a map of traces is returned in traces, which records how long each bootstrapping step took, mapping task name to a corresponding time.Duration.
+// Trace data is separately recorded for each retry attempt.
 func Bootstrap(ctx context.Context, client *Client, config *Config) (finalErr error, errs map[ErrorType]int, traces map[int]telemetry.Trace) {
 	errs = map[ErrorType]int{}
 	traces = map[int]telemetry.Trace{}

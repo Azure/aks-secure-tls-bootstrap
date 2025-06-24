@@ -11,6 +11,7 @@ type span struct {
 	start, end time.Time
 }
 
+// Trace is a mapping of span names to their corresponding durations as measured by a Tracer.
 type Trace map[string]time.Duration
 
 var _ json.Marshaler = (Trace)(nil)
