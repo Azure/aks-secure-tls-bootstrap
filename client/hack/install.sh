@@ -1,6 +1,9 @@
 #!/bin/bash
 set -euxo pipefail
 
+# this script can be used to install an arbitrary version of aks-secure-tls-bootstrap-client
+# on a running AKS node for development/testing.
+
 STORAGE_ACCOUNT_NAME="${STORAGE_ACCOUNT_NAME:-}"
 VERSION="${VERSION:-}"
 [ -z "$VERSION" ] && echo "VERSION must be specified" && exit 1
