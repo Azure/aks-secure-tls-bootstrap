@@ -48,7 +48,7 @@ func (c *Client) getAccessToken(customClientID, resource string, cloudProviderCo
 		if err != nil {
 			return "", fmt.Errorf("generating MSI access token: %w", err)
 		}
-		// to avoid falling too deep into exponential backoff implemented by adal,which follows the public retry guidance
+		// to avoid falling too deep into exponential backoff implemented by adal, which follows the public retry guidance
 		// https://learn.microsoft.com/en-us/entra/identity/managed-identities-azure-resources/how-to-use-vm-token#retry-guidance
 		token.MaxMSIRefreshAttempts = maxMSIRefreshAttempts
 		return c.extractAccessTokenFunc(token)
