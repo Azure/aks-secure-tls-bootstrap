@@ -16,7 +16,7 @@ func TestTracer(t *testing.T) {
 	tracer, ok := (newTracer).(*tracer)
 	assert.True(t, ok)
 
-	spanName := "test-span"
+	spanName := "TestSpan"
 	tracer.StartSpan(spanName)
 	span, ok := tracer.spans[spanName]
 	assert.True(t, ok)
@@ -53,7 +53,7 @@ func TestTracer(t *testing.T) {
 
 	traceString := string(traceBytes)
 	assert.Contains(t, traceString, spanName)
-	assert.Equal(t, traceString, fmt.Sprintf(`{"test-span":%d}`, duration.Milliseconds()))
+	assert.Equal(t, traceString, fmt.Sprintf(`{"TestSpanMilliseconds":%d}`, duration.Milliseconds()))
 }
 
 func TestNewContext(t *testing.T) {

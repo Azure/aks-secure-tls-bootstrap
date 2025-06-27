@@ -21,7 +21,8 @@ var _ json.Marshaler = (Trace)(nil)
 func (t Trace) MarshalJSON() ([]byte, error) {
 	result := make(map[string]int64, len(t))
 	for spanName, spanDuration := range t {
-		result[spanName] = spanDuration.Milliseconds()
+		name := spanName + "Milliseconds"
+		result[name] = spanDuration.Milliseconds()
 	}
 	return json.Marshal(result)
 }
