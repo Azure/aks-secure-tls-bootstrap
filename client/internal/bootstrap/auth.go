@@ -18,6 +18,10 @@ const (
 	certificateSecretPrefix = "certificate:"
 )
 
+const (
+	maxMSIRefreshAttempts = 3
+)
+
 // extractAccessTokenFunc extracts an oauth access token from the specified service principal token after a refresh, fake implementations given in unit tests.
 type extractAccessTokenFunc func(token *adal.ServicePrincipalToken) (string, error)
 
@@ -44,6 +48,9 @@ func (c *Client) getAccessToken(customClientID, resource string, cloudProviderCo
 		if err != nil {
 			return "", fmt.Errorf("generating MSI access token: %w", err)
 		}
+		// to avoid falling too deep into exponential backoff implemented by adal, which follows the public retry guidance
+		// https://learn.microsoft.com/en-us/entra/identity/managed-identities-azure-resources/how-to-use-vm-token#retry-guidance
+		token.MaxMSIRefreshAttempts = maxMSIRefreshAttempts
 		return c.extractAccessTokenFunc(token)
 	}
 
