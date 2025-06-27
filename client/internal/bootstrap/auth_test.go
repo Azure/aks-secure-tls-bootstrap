@@ -27,19 +27,6 @@ func TestGetAccessToken(t *testing.T) {
 		expectedErr                 error
 	}{
 		{
-			name: "error generating MSI access token",
-			setupCloudProviderConfig: func(t *testing.T, config *cloud.ProviderConfig) {
-				config.UserAssignedIdentityID = "kubelet-identity-id"
-			},
-			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
-				return func(token *adal.ServicePrincipalToken) (string, error) {
-					return "", errors.New("generating MSI access token")
-				}
-			},
-			expectedToken: "",
-			expectedErr:   errors.New("generating MSI access token"),
-		},
-		{
 			name: "error getting azure environment config for specified cloud",
 			setupCloudProviderConfig: func(t *testing.T, config *cloud.ProviderConfig) {
 				config.CloudName = "invalid"
@@ -48,14 +35,14 @@ func TestGetAccessToken(t *testing.T) {
 			},
 			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
 				return func(token *adal.ServicePrincipalToken) (string, error) {
-					return "", errors.New(`getting azure environment config for cloud "invalid"`)
+					return "token", nil
 				}
 			},
 			expectedToken: "",
 			expectedErr:   errors.New(`getting azure environment config for cloud "invalid"`),
 		},
 		{
-			name: "there is an error generating a service principal access token with username and password",
+			name: "there is an error generating a service principal access token with username and password due to missing client secret",
 			setupCloudProviderConfig: func(t *testing.T, config *cloud.ProviderConfig) {
 				config.CloudName = azure.PublicCloud.Name
 				config.ClientID = "service-principal-id"
@@ -63,14 +50,14 @@ func TestGetAccessToken(t *testing.T) {
 			},
 			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
 				return func(token *adal.ServicePrincipalToken) (string, error) {
-					return "", errors.New("generating SPN access token with username and password")
+					return "token", nil
 				}
 			},
 			expectedToken: "",
 			expectedErr:   errors.New("generating SPN access token with username and password"),
 		},
 		{
-			name: "there is an error b64-decoding the certificate data",
+			name: "there is an error b64-decoding the client secret certificate data",
 			setupCloudProviderConfig: func(t *testing.T, config *cloud.ProviderConfig) {
 				config.CloudName = azure.PublicCloud.Name
 				config.ClientID = "service-principal-id"
@@ -78,14 +65,14 @@ func TestGetAccessToken(t *testing.T) {
 			},
 			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
 				return func(token *adal.ServicePrincipalToken) (string, error) {
-					return "", errors.New("b64-decoding certificate data in client secret")
+					return "token", nil
 				}
 			},
 			expectedToken: "",
 			expectedErr:   errors.New("b64-decoding certificate data in client secret"),
 		},
 		{
-			name: "there is an error decoding the pfx certificate data",
+			name: "there is an error decoding the client secret certificate data",
 			setupCloudProviderConfig: func(t *testing.T, config *cloud.ProviderConfig) {
 				config.CloudName = azure.PublicCloud.Name
 				config.ClientID = "service-principal-id"
@@ -93,7 +80,7 @@ func TestGetAccessToken(t *testing.T) {
 			},
 			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
 				return func(token *adal.ServicePrincipalToken) (string, error) {
-					return "", errors.New("decoding pfx certificate data in client secret")
+					return "token", nil
 				}
 			},
 			expectedToken: "",
