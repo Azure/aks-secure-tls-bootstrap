@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"time"
+
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/telemetry"
 )
 
 const (
@@ -53,10 +55,11 @@ const (
 )
 
 type Result struct {
-	Status              Status            `json:"Status"`
-	ElapsedMilliseconds int64             `json:"ElapsedMilliseconds"`
-	BootstrapErrors     map[ErrorType]int `json:"BootstrapErrors,omitempty"`
-	FinalError          string            `json:"Error,omitempty"`
+	Status              Status                  `json:"Status"`
+	ElapsedMilliseconds int64                   `json:"ElapsedMilliseconds"`
+	Errors              map[ErrorType]int       `json:"Errors,omitempty"`
+	Traces              map[int]telemetry.Trace `json:"Traces,omitempty"`
+	FinalError          string                  `json:"FinalError,omitempty"`
 }
 
 type Event struct {

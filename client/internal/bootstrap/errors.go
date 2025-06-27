@@ -5,15 +5,15 @@ import "fmt"
 type ErrorType string
 
 const (
-	ErrorTypeGetAccessTokenFailure       ErrorType = "GetAccessTokenFailure"
-	ErrorTypeGetServiceClientFailure     ErrorType = "GetServiceClientFailure"
-	ErrorTypeGetInstanceDataFailure      ErrorType = "GetInstanceDataFailure"
-	ErrorTypeGetAttestedDataFailure      ErrorType = "GetAttestedDataFailure"
-	ErrorTypeGetNonceFailure             ErrorType = "GetNonceFailure"
-	ErrorTypeMakeKubeletClientCSRFailure ErrorType = "MakeKubeletClientCSRFailure"
-	ErrorTypeGetCredentialFailure        ErrorType = "GetCredentialFailure"
-	ErrorTypeGenerateKubeconfigFailure   ErrorType = "GenerateKubeconfigFailure"
-	ErrorTypeWriteKubeconfigFailure      ErrorType = "WriteKubeconfigFailure"
+	ErrorTypeGetAccessTokenFailure     ErrorType = "GetAccessTokenFailure"
+	ErrorTypeGetServiceClientFailure   ErrorType = "GetServiceClientFailure"
+	ErrorTypeGetInstanceDataFailure    ErrorType = "GetInstanceDataFailure"
+	ErrorTypeGetAttestedDataFailure    ErrorType = "GetAttestedDataFailure"
+	ErrorTypeGetNonceFailure           ErrorType = "GetNonceFailure"
+	ErrorTypeGetCSRFailure             ErrorType = "GetCSRFailure"
+	ErrorTypeGetCredentialFailure      ErrorType = "GetCredentialFailure"
+	ErrorTypeGenerateKubeconfigFailure ErrorType = "GenerateKubeconfigFailure"
+	ErrorTypeWriteKubeconfigFailure    ErrorType = "WriteKubeconfigFailure"
 )
 
 type BootstrapError struct {

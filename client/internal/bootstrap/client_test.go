@@ -19,6 +19,7 @@ import (
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/imds"
 	imdsmocks "github.com/Azure/aks-secure-tls-bootstrap/client/internal/imds/mocks"
 	kubeconfigmocks "github.com/Azure/aks-secure-tls-bootstrap/client/internal/kubeconfig/mocks"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/telemetry"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/testutil"
 	akssecuretlsbootstrapv1 "github.com/Azure/aks-secure-tls-bootstrap/service/pkg/gen/akssecuretlsbootstrap/v1"
 	akssecuretlsbootstrapv1_mocks "github.com/Azure/aks-secure-tls-bootstrap/service/pkg/gen/mocks/akssecuretlsbootstrap/v1"
@@ -63,7 +64,7 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 			},
 			expectedError: &BootstrapError{
 				errorType: ErrorTypeGetAccessTokenFailure,
-				inner:     fmt.Errorf("failed to generate access token for gRPC connection"),
+				inner:     fmt.Errorf("generating SPN access token with username and password"),
 			},
 			assertKubeconfigData: func(t *testing.T, data *clientcmdapi.Config, _ *Config, _ []byte) {
 				assert.Nil(t, data)
@@ -120,7 +121,7 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 			},
 			expectedError: &BootstrapError{
 				errorType: ErrorTypeGetAttestedDataFailure,
-				inner:     fmt.Errorf("failed to retrieve attested data"),
+				inner:     fmt.Errorf("failed to retrieve instance attested data"),
 			},
 			assertKubeconfigData: func(t *testing.T, data *clientcmdapi.Config, _ *Config, _ []byte) {
 				assert.Nil(t, data)
@@ -259,7 +260,7 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 
-			ctx := context.Background()
+			ctx := telemetry.NewContext()
 			imdsClient := imdsmocks.NewMockClient(mockCtrl)
 			kubeconfigValidator := kubeconfigmocks.NewMockValidator(mockCtrl)
 			serviceClient := akssecuretlsbootstrapv1_mocks.NewMockSecureTLSBootstrapServiceClient(mockCtrl)
@@ -268,7 +269,7 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 				logger:              logger,
 				imdsClient:          imdsClient,
 				kubeconfigValidator: kubeconfigValidator,
-				getServiceClientFunc: func(_ string, _ *Config) (akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient, func() error, error) {
+				getServiceClientFunc: func(_ string, _ *Config) (akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient, closeFunc, error) {
 					return serviceClient, func() error { return nil }, nil
 				},
 				extractAccessTokenFunc: func(token *adal.ServicePrincipalToken) (string, error) {

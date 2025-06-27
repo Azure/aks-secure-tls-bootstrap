@@ -3,8 +3,6 @@
 
 package kubeconfig
 
-//go:generate ../../bin/mockgen -copyright_file=../../../hack/copyright_header.txt -destination=./mocks/mock_validator.go -package=mocks github.com/Azure/aks-secure-tls-bootstrap/client/internal/kubeconfig Validator
-
 import (
 	"fmt"
 	"net/http"
@@ -29,6 +27,8 @@ type clientConfigLoaderFunc func(kubeconfigPath string) (*restclient.Config, err
 // clientsetLoaderFunc provides an interface for creating a kubernetes.Interface
 // from a specified REST client config.
 type clientsetLoaderFunc func(clientConfig *restclient.Config) (kubernetes.Interface, error)
+
+//go:generate ../../bin/mockgen -copyright_file=../../../hack/copyright_header.txt -destination=./mocks/mock_validator.go -package=mocks github.com/Azure/aks-secure-tls-bootstrap/client/internal/kubeconfig Validator
 
 type Validator interface {
 	Validate(kubeconfigPath string, ensureAuthorizedClient bool) error

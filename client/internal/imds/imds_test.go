@@ -62,14 +62,13 @@ func TestCallIMDS(t *testing.T) {
 
 	logger, _ := zap.NewDevelopment()
 	for _, tt := range tests {
+		ctx := context.Background()
 		imdsClient := &client{
 			httpClient: internalhttp.NewClient(logger),
 			logger:     logger,
 		}
 		imds := tt.setupTestServer(tt.params)
 		defer imds.Close()
-
-		ctx := context.Background()
 
 		err := imdsClient.callIMDS(ctx, imds.URL, tt.params, &VMInstanceData{})
 		assert.NoError(t, err)
@@ -103,6 +102,8 @@ func TestGetInstanceData(t *testing.T) {
 	}
 
 	logger, _ := zap.NewDevelopment()
+	ctx := context.Background()
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			imds := mockIMDSWithAssertions(t, tt.json, func(r *http.Request) {
@@ -119,11 +120,7 @@ func TestGetInstanceData(t *testing.T) {
 				baseURL:    imds.URL,
 			}
 
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
 			instanceData, err := imdsClient.GetInstanceData(ctx)
-
 			if tt.expectedErr != "" {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tt.expectedErr)
@@ -164,6 +161,8 @@ func TestGetAttestedData(t *testing.T) {
 	}
 
 	logger, _ := zap.NewDevelopment()
+	ctx := context.Background()
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			imds := mockIMDSWithAssertions(t, tt.json, func(r *http.Request) {
@@ -181,12 +180,7 @@ func TestGetAttestedData(t *testing.T) {
 				baseURL:    imds.URL,
 			}
 
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			nonce := "nonce"
-			attestedData, err := imdsClient.GetAttestedData(ctx, nonce)
-
+			attestedData, err := imdsClient.GetAttestedData(ctx, "nonce")
 			if tt.expectedErr != "" {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tt.expectedErr)

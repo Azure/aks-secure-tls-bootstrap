@@ -3,8 +3,6 @@
 
 package imds
 
-//go:generate ../../bin/mockgen -copyright_file=../../../hack/copyright_header.txt -destination=./mocks/mock_imds.go -package=mocks github.com/Azure/aks-secure-tls-bootstrap/client/internal/imds Client
-
 import (
 	"context"
 	"encoding/json"
@@ -15,6 +13,8 @@ import (
 	internalhttp "github.com/Azure/aks-secure-tls-bootstrap/client/internal/http"
 	"go.uber.org/zap"
 )
+
+//go:generate ../../bin/mockgen -copyright_file=../../../hack/copyright_header.txt -destination=./mocks/mock_imds.go -package=mocks github.com/Azure/aks-secure-tls-bootstrap/client/internal/imds Client
 
 type Client interface {
 	GetInstanceData(ctx context.Context) (*VMInstanceData, error)
