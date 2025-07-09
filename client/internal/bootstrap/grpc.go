@@ -49,7 +49,7 @@ func getServiceClient(token string, cfg *Config) (akssecuretlsbootstrapv1.Secure
 		grpc.WithUnaryInterceptor(retry.UnaryClientInterceptor(
 			retry.WithBackoff(retry.BackoffExponentialWithJitterBounded(100*time.Millisecond, 0.75, 2*time.Second)),
 			retry.WithCodes(codes.Aborted, codes.Unavailable),
-			retry.WithMax(30),
+			retry.WithMax(10),
 		)),
 	)
 	if err != nil {
