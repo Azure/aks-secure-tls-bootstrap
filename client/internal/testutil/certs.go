@@ -45,7 +45,7 @@ func GenerateCertAndKeyAsEncodedPFXData(template CertTemplate) (string, error) {
 	x509Template.KeyUsage = x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature
 	x509Template.BasicConstraintsValid = true
 
-	privateKey, err := rsa.GenerateKey(cryptorand.Reader, 2048)
+	privateKey, err := rsa.GenerateKey(cryptorand.Reader, 1024)
 	if err != nil {
 		return "", err
 	}
