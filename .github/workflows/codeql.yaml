@@ -1,4 +1,4 @@
-name: Client CodeQL
+name: CodeQL
 on:
   push:
     branches:
@@ -8,7 +8,7 @@ on:
       - main
 
 jobs:
-  client-codeql:
+  codeql:
     runs-on: ubuntu-latest
     permissions:
       security-events: write
