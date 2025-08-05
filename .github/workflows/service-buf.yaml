@@ -1,5 +1,8 @@
 name: Service Buf CI
-on: pull_request
+on:
+  pull_request:
+    paths:
+      - service/**
 
 permissions:
   contents: read

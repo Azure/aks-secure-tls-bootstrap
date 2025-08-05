@@ -2,7 +2,7 @@ name: Client golangci-lint
 on: pull_request
 
 jobs:
-  client-golangci:
+  client-golangci-lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
