@@ -16,7 +16,7 @@ import (
 	context "context"
 	reflect "reflect"
 
-	datamodel "github.com/Azure/aks-secure-tls-bootstrap/client/internal/datamodel"
+	imds "github.com/Azure/aks-secure-tls-bootstrap/client/internal/imds"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -45,10 +45,10 @@ func (m *MockClient) EXPECT() *MockClientMockRecorder {
 }
 
 // GetAttestedData mocks base method.
-func (m *MockClient) GetAttestedData(ctx context.Context, nonce string) (*datamodel.VMSSAttestedData, error) {
+func (m *MockClient) GetAttestedData(ctx context.Context, nonce string) (*imds.VMAttestedData, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetAttestedData", ctx, nonce)
-	ret0, _ := ret[0].(*datamodel.VMSSAttestedData)
+	ret0, _ := ret[0].(*imds.VMAttestedData)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -60,10 +60,10 @@ func (mr *MockClientMockRecorder) GetAttestedData(ctx, nonce any) *gomock.Call {
 }
 
 // GetInstanceData mocks base method.
-func (m *MockClient) GetInstanceData(ctx context.Context) (*datamodel.VMSSInstanceData, error) {
+func (m *MockClient) GetInstanceData(ctx context.Context) (*imds.VMInstanceData, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetInstanceData", ctx)
-	ret0, _ := ret[0].(*datamodel.VMSSInstanceData)
+	ret0, _ := ret[0].(*imds.VMInstanceData)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

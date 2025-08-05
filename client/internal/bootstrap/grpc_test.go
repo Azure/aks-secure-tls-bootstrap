@@ -7,147 +7,153 @@ import (
 	"crypto/x509"
 	"os"
 	"path/filepath"
+	"testing"
 	"time"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-	"go.uber.org/zap"
 	"google.golang.org/grpc/test/bufconn"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/testutil"
+	"github.com/stretchr/testify/assert"
 )
 
-var _ = Describe("grpc", Ordered, func() {
-	var (
-		clusterCACertPEM []byte
-		logger           *zap.Logger
-	)
-
-	BeforeAll(func() {
-		logger, _ = zap.NewDevelopment()
-
-		var err error
-		clusterCACertPEM, _, err = testutil.GenerateCertPEM(testutil.CertTemplate{
-			CommonName:   "hcp",
-			Organization: "aks",
-			IsCA:         true,
-			Expiration:   time.Now().Add(time.Hour),
-		})
-		Expect(err).To(BeNil())
+func TestGetServiceClient(t *testing.T) {
+	clusterCACertPEM, _, err := testutil.GenerateCertPEM(testutil.CertTemplate{
+		CommonName:   "hcp",
+		Organization: "aks",
+		IsCA:         true,
+		Expiration:   time.Now().Add(time.Hour),
 	})
+	assert.NoError(t, err)
 
-	Context("secureTLSBootstrapServiceClientFactory", func() {
-		When("cluster ca data cannot be read", func() {
-			It("should return an error", func() {
-				serviceClient, close, err := getServiceClient(logger, "token", &Config{
+	tests := []struct {
+		name        string
+		setupFunc   func(*testing.T) *Config
+		errorSubstr []string
+	}{
+		{
+			name: "cluster ca data cannot be read",
+			setupFunc: func(t *testing.T) *Config {
+				return &Config{
 					ClusterCAFilePath: "does/not/exist.crt",
 					NextProto:         "nextProto",
 					APIServerFQDN:     "fqdn",
-				})
-
-				Expect(serviceClient).To(BeNil())
-				Expect(close).To(BeNil())
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("reading cluster CA data from does/not/exist.crt"))
-
-			})
-		})
-		When("cluster ca data is invalid", func() {
-			It("should return an error", func() {
-				tempDir := GinkgoT().TempDir()
+				}
+			},
+			errorSubstr: []string{"reading cluster CA data from does/not/exist.crt"},
+		},
+		{
+			name: "cluster ca data is invalid",
+			setupFunc: func(t *testing.T) *Config {
+				tempDir := t.TempDir()
 				caFilePath := filepath.Join(tempDir, "ca.crt")
 				err := os.WriteFile(caFilePath, []byte("SGVsbG8gV29ybGQh"), os.ModePerm)
-				Expect(err).To(BeNil())
+				assert.NoError(t, err)
 
-				serviceClient, close, err := getServiceClient(logger, "token", &Config{
+				return &Config{
 					ClusterCAFilePath: caFilePath,
 					NextProto:         "nextProto",
 					APIServerFQDN:     "fqdn",
-				})
-
-				Expect(serviceClient).To(BeNil())
-				Expect(close).To(BeNil())
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("failed to get TLS config"))
-				Expect(err.Error()).To(ContainSubstring("unable to construct new cert pool using cluster CA data"))
-			})
-		})
-
-		When("client connection can be created with provided auth token", func() {
-			It("should create the connection without error", func() {
-				tempDir := GinkgoT().TempDir()
-				caFilePath := filepath.Join(tempDir, "ca.crt")
-				err := os.WriteFile(caFilePath, clusterCACertPEM, os.ModePerm)
-				Expect(err).To(BeNil())
-
+				}
+			},
+			errorSubstr: []string{
+				"failed to get TLS config",
+				"unable to construct new cert pool using cluster CA data",
+			},
+		},
+		{
+			name: "client connection can be created with provided auth token",
+			setupFunc: func(t *testing.T) *Config {
 				lis := bufconn.Listen(1024)
 				defer lis.Close()
+				tempDir := t.TempDir()
+				caFilePath := filepath.Join(tempDir, "ca.crt")
+				err := os.WriteFile(caFilePath, clusterCACertPEM, os.ModePerm)
+				assert.NoError(t, err)
 
-				serviceClient, close, err := getServiceClient(logger, "token", &Config{
+				return &Config{
 					ClusterCAFilePath: caFilePath,
 					NextProto:         "nextProto",
 					APIServerFQDN:     lis.Addr().String(),
-				})
+				}
+			},
+			errorSubstr: nil,
+		},
+	}
 
-				Expect(err).To(BeNil())
-				Expect(close).ToNot(BeNil())
-				Expect(serviceClient).ToNot(BeNil())
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := tt.setupFunc(t)
+			client, closeFn, err := getServiceClient("token", cfg)
 
-				_ = close()
-			})
+			if len(tt.errorSubstr) > 0 {
+				assert.Error(t, err)
+				for _, substr := range tt.errorSubstr {
+					assert.Contains(t, err.Error(), substr)
+				}
+				assert.Nil(t, client)
+				assert.Nil(t, closeFn)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, client)
+				assert.NotNil(t, closeFn)
+				closeFn := closeFn()
+				assert.NoError(t, closeFn)
+			}
 		})
+	}
+}
+
+func TestGetTLSConfig(t *testing.T) {
+	clusterCACertPEM, _, err := testutil.GenerateCertPEM(testutil.CertTemplate{
+		CommonName:   "hcp",
+		Organization: "aks",
+		IsCA:         true,
+		Expiration:   time.Now().Add(time.Hour),
 	})
+	assert.NoError(t, err)
+	rootPool := x509.NewCertPool()
+	ok := rootPool.AppendCertsFromPEM(clusterCACertPEM)
+	assert.True(t, ok)
 
-	Context("getTLSConfig tests", func() {
-		var rootPool *x509.CertPool
-
-		BeforeEach(func() {
-			rootPool = x509.NewCertPool()
-			ok := rootPool.AppendCertsFromPEM(clusterCACertPEM)
-			Expect(ok).To(BeTrue())
+	tests := []struct {
+		name               string
+		nextProto          string
+		insecureSkipVerify bool
+		expectedNextProtos []string
+	}{
+		{
+			name:               "without nextProto",
+			nextProto:          "",
+			insecureSkipVerify: false,
+			expectedNextProtos: nil,
+		},
+		{
+			name:               "with nextProto",
+			nextProto:          "bootstrap",
+			insecureSkipVerify: false,
+			expectedNextProtos: []string{"bootstrap", "h2"},
+		},
+		{
+			name:               "insecureSkipVerify false",
+			nextProto:          "nextProto",
+			insecureSkipVerify: false,
+			expectedNextProtos: []string{"nextProto", "h2"},
+		},
+		{
+			name:               "insecureSkipVerify true",
+			nextProto:          "nextProto",
+			insecureSkipVerify: true,
+			expectedNextProtos: []string{"nextProto", "h2"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config, err := getTLSConfig(clusterCACertPEM, tt.nextProto, tt.insecureSkipVerify)
+			assert.NoError(t, err)
+			assert.NotNil(t, config)
+			assert.Equal(t, tt.expectedNextProtos, config.NextProtos)
+			assert.Equal(t, tt.insecureSkipVerify, config.InsecureSkipVerify)
+			assert.True(t, config.RootCAs.Equal(rootPool))
 		})
-
-		When("nextProto is not supplied", func() {
-			It("should not include NextProtos in returned config", func() {
-				config, err := getTLSConfig(clusterCACertPEM, "", false)
-				Expect(err).To(BeNil())
-				Expect(config).ToNot(BeNil())
-				Expect(config.NextProtos).To(BeNil())
-				Expect(config.InsecureSkipVerify).To(BeFalse())
-				Expect(config.RootCAs.Equal(rootPool)).To(BeTrue())
-			})
-		})
-
-		When("nextProto is supplied", func() {
-			It("should include NextProtos in returned config", func() {
-				config, err := getTLSConfig(clusterCACertPEM, "bootstrap", false)
-				Expect(err).To(BeNil())
-				Expect(config).NotTo(BeNil())
-				Expect(config.NextProtos).NotTo(BeNil())
-				Expect(config.NextProtos).To(Equal([]string{"bootstrap", "h2"}))
-				Expect(config.InsecureSkipVerify).To(BeFalse())
-				Expect(config.RootCAs.Equal(rootPool)).To(BeTrue())
-			})
-		})
-
-		When("insecureSkipVerify is false", func() {
-			It("should return config with false value of InsecureSkipVerify", func() {
-				config, err := getTLSConfig(clusterCACertPEM, "nextProto", false)
-				Expect(err).To(BeNil())
-				Expect(config).NotTo(BeNil())
-				Expect(config.InsecureSkipVerify).To(BeFalse())
-				Expect(config.RootCAs.Equal(rootPool)).To(BeTrue())
-			})
-		})
-
-		When("insecureSkipVerify is true", func() {
-			It("should return config with true value of InsecureSkipVerify", func() {
-				config, err := getTLSConfig(clusterCACertPEM, "nextProto", true)
-				Expect(err).To(BeNil())
-				Expect(config).NotTo(BeNil())
-				Expect(config.InsecureSkipVerify).To(BeTrue())
-				Expect(config.RootCAs.Equal(rootPool)).To(BeTrue())
-			})
-		})
-	})
-})
+	}
+}

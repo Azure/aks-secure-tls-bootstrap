@@ -4,68 +4,62 @@
 package kubeconfig
 
 import (
-	"crypto/x509"
 	"encoding/pem"
 	"os"
 	"path/filepath"
+	"testing"
 	"time"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/testutil"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
 )
 
-var _ = Describe("kubeconfig tests", func() {
-	Context("GenerateKubeconfigForCertAndKey", func() {
-		It("should generate a valid kubeconfig containing the kubelet client credential", func() {
-			tempDir := GinkgoT().TempDir()
-			certPath := filepath.Join(tempDir, "client.crt")
-			keyPath := filepath.Join(tempDir, "client.key")
+func TestKubeconfigGeneration(t *testing.T) {
+	tempDir := t.TempDir()
+	credPath := filepath.Join(tempDir, "client.pem")
 
-			certPEM, keyPEM, err := testutil.GenerateCertPEM(testutil.CertTemplate{
-				CommonName:   "system:node:node",
-				Organization: "system:nodes",
-				Expiration:   time.Now().Add(time.Hour),
-			})
-			Expect(err).To(BeNil())
-			block, rest := pem.Decode(keyPEM)
-			Expect(rest).To(BeEmpty())
-			privateKey, err := x509.ParseECPrivateKey(block.Bytes)
-			Expect(err).To(BeNil())
-
-			cfg := &Config{
-				APIServerFQDN:     "host",
-				ClusterCAFilePath: "path",
-				CertFilePath:      certPath,
-				KeyFilePath:       keyPath,
-			}
-
-			kubeconfigData, err := GenerateForCertAndKey(certPEM, privateKey, cfg)
-			Expect(err).To(BeNil())
-			Expect(kubeconfigData.Clusters).To(HaveKey("default-cluster"))
-			defaultCluster := kubeconfigData.Clusters["default-cluster"]
-			Expect(defaultCluster.Server).To(Equal("https://host:443"))
-			Expect(defaultCluster.CertificateAuthority).To(Equal(cfg.ClusterCAFilePath))
-
-			Expect(kubeconfigData.AuthInfos).To(HaveKey("default-auth"))
-			defaultAuth := kubeconfigData.AuthInfos["default-auth"]
-			Expect(defaultAuth.ClientCertificate).To(Equal(certPath))
-			Expect(defaultAuth.ClientKey).To(Equal(keyPath))
-
-			Expect(kubeconfigData.Contexts).To(HaveKey("default-context"))
-			defaultContext := kubeconfigData.Contexts["default-context"]
-			Expect(defaultContext.Cluster).To(Equal("default-cluster"))
-			Expect(defaultContext.AuthInfo).To(Equal("default-auth"))
-
-			Expect(kubeconfigData.CurrentContext).To(Equal("default-context"))
-
-			certData, err := os.ReadFile(certPath)
-			Expect(err).To(BeNil())
-			Expect(certData).ToNot(BeEmpty())
-
-			keyData, err := os.ReadFile(keyPath)
-			Expect(err).To(BeNil())
-			Expect(keyData).ToNot(BeEmpty())
-		})
+	certPEM, keyPEM, err := testutil.GenerateCertPEM(testutil.CertTemplate{
+		CommonName:   "system:node:node",
+		Organization: "system:nodes",
+		Expiration:   time.Now().Add(time.Hour),
 	})
-})
+	assert.NoError(t, err)
+
+	cfg := &Config{
+		APIServerFQDN:     "host",
+		ClusterCAFilePath: "path",
+		CredFilePath:      credPath,
+	}
+
+	kubeconfigData, err := GenerateForCertAndKey(certPEM, keyPEM, cfg)
+	assert.NoError(t, err)
+	assert.Contains(t, kubeconfigData.Clusters, "default-cluster")
+	defaultCluster := kubeconfigData.Clusters["default-cluster"]
+	assert.Equal(t, "https://host:443", defaultCluster.Server)
+	assert.Equal(t, cfg.ClusterCAFilePath, defaultCluster.CertificateAuthority)
+
+	assert.Contains(t, kubeconfigData.AuthInfos, "default-auth")
+	defaultAuth := kubeconfigData.AuthInfos["default-auth"]
+	assert.Equal(t, credPath, defaultAuth.ClientCertificate)
+	assert.Equal(t, credPath, defaultAuth.ClientKey)
+	assert.Contains(t, kubeconfigData.Contexts, "default-context")
+	defaultContext := kubeconfigData.Contexts["default-context"]
+	assert.Equal(t, "default-cluster", defaultContext.Cluster)
+	assert.Equal(t, "default-auth", defaultContext.AuthInfo)
+
+	assert.Equal(t, "default-context", kubeconfigData.CurrentContext)
+
+	credData, err := os.ReadFile(credPath)
+	assert.NoError(t, err)
+	assert.NotNil(t, credData)
+	certBlock, rest := pem.Decode(credData)
+
+	assert.NotNil(t, certBlock)
+	assert.Equal(t, "CERTIFICATE", certBlock.Type)
+	assert.NotEmpty(t, rest)
+
+	keyBlock, rest := pem.Decode(rest)
+	assert.NotNil(t, keyBlock)
+	assert.Equal(t, "EC PRIVATE KEY", keyBlock.Type)
+	assert.Empty(t, rest)
+}

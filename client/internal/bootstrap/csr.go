@@ -15,14 +15,13 @@ import (
 	"strings"
 )
 
-// makeKubeletClientCSR returns a valid kubelet client CSR for the bootstrapping host,
-// along with the associated (ECDSA) private key.
-func makeKubeletClientCSR() (csrPEM []byte, privateKey *ecdsa.PrivateKey, err error) {
+// makeKubeletClientCSR returns a valid kubelet client CSR for the bootstrapping host, along with the associated (ECDSA) private key.
+func makeKubeletClientCSR() (csrPEM, keyPEM []byte, err error) {
 	hostName, err := getHostname()
 	if err != nil {
 		return nil, nil, fmt.Errorf("resolving hostname: %w", err)
 	}
-	privateKey, err = ecdsa.GenerateKey(elliptic.P256(), cryptorand.Reader)
+	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), cryptorand.Reader)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to generate ECDSA 256 private key for kubelet client CSR: %w", err)
 	}
@@ -39,20 +38,28 @@ func makeKubeletClientCSR() (csrPEM []byte, privateKey *ecdsa.PrivateKey, err er
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to create kubelet client certificate request from template: %w", err)
 	}
-
-	block := &pem.Block{
+	csrBlock := &pem.Block{
 		Type:  "CERTIFICATE REQUEST",
 		Bytes: csrDER,
 	}
 
-	return pem.EncodeToMemory(block), privateKey, nil
+	keyDER, err := x509.MarshalECPrivateKey(privateKey)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to marshal new EC private key: %w", err)
+	}
+	keyBlock := &pem.Block{
+		Type:  "EC PRIVATE KEY",
+		Bytes: keyDER,
+	}
+
+	return pem.EncodeToMemory(csrBlock), pem.EncodeToMemory(keyBlock), nil
 }
 
 // Returns the canonicalized (trimmed and lowercased) hostname of the VM.
 func getHostname() (string, error) {
 	hostName, err := os.Hostname()
 	if err != nil {
-		return "", fmt.Errorf("couldn't determine hostname: %w", err)
+		return "", fmt.Errorf("resolving hostname: %w", err)
 	}
 
 	// Trim whitespaces first to avoid getting an empty hostname
