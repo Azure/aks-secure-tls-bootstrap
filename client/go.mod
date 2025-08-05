@@ -3,7 +3,7 @@ module github.com/Azure/aks-secure-tls-bootstrap/client
 go 1.23.6
 
 require (
-	github.com/Azure/aks-secure-tls-bootstrap/service v1.0.1
+	github.com/Azure/aks-secure-tls-bootstrap/service v1.0.2
 	github.com/Azure/go-autorest/autorest v0.11.29
 	github.com/Azure/go-autorest/autorest/adal v0.9.22
 	github.com/avast/retry-go/v4 v4.6.1
@@ -12,7 +12,7 @@ require (
 	github.com/stretchr/testify v1.10.0
 	go.uber.org/mock v0.5.0
 	go.uber.org/zap v1.26.0
-	golang.org/x/oauth2 v0.24.0
+	golang.org/x/oauth2 v0.27.0
 	google.golang.org/grpc v1.70.0
 	k8s.io/apimachinery v0.29.1
 	k8s.io/client-go v0.29.1
@@ -20,6 +20,7 @@ require (
 )
 
 require (
+	buf.build/gen/go/service-hub/loggable/protocolbuffers/go v1.36.5-20231012175355-a349f6324a7e.1 // indirect
 	cloud.google.com/go/compute/metadata v0.5.2 // indirect
 	github.com/Azure/go-autorest v14.2.0+incompatible // indirect
 	github.com/Azure/go-autorest/autorest/date v0.3.0 // indirect

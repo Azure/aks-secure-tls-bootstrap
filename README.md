@@ -1,9 +1,5 @@
 # aks-secure-tls-bootstrap
 
-[![Client module test coverage](https://github.com/Azure/aks-secure-tls-bootstrap/actions/workflows/client-coverage.yaml/badge.svg)](https://github.com/Azure/aks-secure-tls-bootstrap/actions/workflows/client-coverage.yaml)
-[![Client module coverage Status](https://coveralls.io/repos/github/Azure/aks-secure-tls-bootstrap/badge.svg?branch=main)](https://coveralls.io/github/Azure/aks-secure-tls-bootstrap?branch=main)
-[![golangci-lint](https://github.com/Azure/aks-secure-tls-bootstrap/actions/workflows/golangci-lint.yaml/badge.svg)](https://github.com/Azure/aks-secure-tls-bootstrap/actions/workflows/golangci-lint.yaml)
-
 This repo contains the following:
 
 - The [client](client/) module, which holds the implementation of the AKS secure TLS bootstrap client.
