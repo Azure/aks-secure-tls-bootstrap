@@ -1,19 +1,8 @@
-name: Client module unit tests
-on:
-  push:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/client-coverage.yaml"
-      - "client/**"
-  pull_request:
-    types: [opened, synchronize, reopened, labeled, unlabeled]
-    paths:
-      - ".github/workflows/client-coverage.yaml"
-      - "client/**"
+name: Client Unit Tests
+on: pull_request
     
 jobs:
-  unit_tests:
+  go-test-client-coveralls:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
