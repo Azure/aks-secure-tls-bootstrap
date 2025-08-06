@@ -137,4 +137,15 @@ func TestTraceStore(t *testing.T) {
 	summary = store.GetTraceSummary()
 	assert.Len(t, summary, 1)
 	assert.Equal(t, time.Second, summary["span"])
+
+	store = NewTraceStore()
+	store.Add(trace0)
+
+	traces = store.GetLastNTraces(3)
+	assert.Len(t, traces, 1)
+	assert.Equal(t, trace0, traces[0])
+
+	summary = store.GetTraceSummary()
+	assert.Len(t, summary, 1)
+	assert.Equal(t, 100*time.Millisecond, summary["span"])
 }
