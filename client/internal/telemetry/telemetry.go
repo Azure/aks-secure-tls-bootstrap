@@ -55,6 +55,43 @@ func (r *tracer) GetTrace() Trace {
 	return trace
 }
 
+// TraceStore is a fixed-capacity store of Trace objects.
+type TraceStore struct {
+	traces []Trace
+}
+
+func NewTraceStore() *TraceStore {
+	return &TraceStore{
+		traces: make([]Trace, 0),
+	}
+}
+
+// Add adds the specific trace the store, using the specified ID. IDs must be added sequentially.
+// If the store is at capacity, the oldest trace will be evicted.
+func (t *TraceStore) Add(trace Trace) {
+	t.traces = append(t.traces, trace)
+}
+
+// GetLastNTraces returns the last N traces in within the TraceStore.
+func (t *TraceStore) GetLastNTraces(n int) map[int]Trace {
+	result := make(map[int]Trace, n)
+	for id := len(t.traces) - n; id < len(t.traces); id++ {
+		result[id] = t.traces[id]
+	}
+	return result
+}
+
+// GetTraceSummary returns a Trace which summarizes the total duration of each span across all stored traces.
+func (t *TraceStore) GetTraceSummary() Trace {
+	total := make(Trace)
+	for _, trace := range t.traces {
+		for spanName, duration := range trace {
+			total[spanName] += duration
+		}
+	}
+	return total
+}
+
 // NewContext returns a new context object, attached with a newly initialized Tracer.
 func NewContext() context.Context {
 	return context.WithValue(context.Background(), tracerContextKey{}, NewTracer())
