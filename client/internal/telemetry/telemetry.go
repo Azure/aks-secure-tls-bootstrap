@@ -73,6 +73,7 @@ func (t *TraceStore) Add(trace Trace) {
 }
 
 // GetLastNTraces returns the last N traces in within the TraceStore.
+// If N is >= the number of traces stored, all traces are returned.
 func (t *TraceStore) GetLastNTraces(n int) map[int]Trace {
 	result := make(map[int]Trace, n)
 	for id := max(len(t.traces)-n, 0); id < len(t.traces); id++ {
