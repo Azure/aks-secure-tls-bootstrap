@@ -4,13 +4,14 @@
 package http
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/build"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/log"
 	"github.com/hashicorp/go-retryablehttp"
-	"go.uber.org/zap"
 )
 
 const (
@@ -23,12 +24,12 @@ func GetUserAgentValue() string {
 }
 
 // NewClient returns an http.Client shimed into a *retryablehttp.Client with a custom transport.
-func NewClient(logger *zap.Logger) *http.Client {
-	return NewRetryableClient(logger).StandardClient()
+func NewClient(ctx context.Context) *http.Client {
+	return NewRetryableClient(ctx).StandardClient()
 }
 
 // NewRetryableClient returns a *retryablehttp.Client with a custom transport.
-func NewRetryableClient(logger *zap.Logger) *retryablehttp.Client {
+func NewRetryableClient(ctx context.Context) *retryablehttp.Client {
 	c := retryablehttp.NewClient()
 	c.RetryMax = 5
 	c.RetryWaitMin = 300 * time.Millisecond
@@ -37,9 +38,7 @@ func NewRetryableClient(logger *zap.Logger) *retryablehttp.Client {
 	c.HTTPClient.Transport = &customTransport{
 		base: transport,
 	}
-	c.Logger = &leveledLoggerShim{
-		logger: logger,
-	}
+	c.Logger = log.NewLeveledLoggerShim(log.MustGetLogger(ctx))
 	return c
 }
 

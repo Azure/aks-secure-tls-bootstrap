@@ -10,6 +10,7 @@ import (
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/imds"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/kubeconfig"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/log"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/telemetry"
 	akssecuretlsbootstrapv1 "github.com/Azure/aks-secure-tls-bootstrap/service/pkg/gen/akssecuretlsbootstrap/v1"
 	"go.uber.org/zap"
@@ -17,44 +18,44 @@ import (
 )
 
 type Client struct {
-	logger                 *zap.Logger
 	imdsClient             imds.Client
 	kubeconfigValidator    kubeconfig.Validator
 	getServiceClientFunc   getServiceClientFunc
 	extractAccessTokenFunc extractAccessTokenFunc
 }
 
-func NewClient(logger *zap.Logger) (*Client, error) {
+func NewClient(ctx context.Context) (*Client, error) {
 	return &Client{
-		logger:                 logger,
-		imdsClient:             imds.NewClient(logger),
-		kubeconfigValidator:    kubeconfig.NewValidator(logger),
+		imdsClient:             imds.NewClient(ctx),
+		kubeconfigValidator:    kubeconfig.NewValidator(),
 		getServiceClientFunc:   getServiceClient,
 		extractAccessTokenFunc: extractAccessToken,
 	}, nil
 }
 
 func (c *Client) BootstrapKubeletClientCredential(ctx context.Context, cfg *Config) (*clientcmdapi.Config, error) {
+	logger := log.MustGetLogger(ctx)
+
 	err := c.validateKubeconfig(ctx, cfg.KubeconfigPath, cfg.EnsureAuthorizedClient)
 	if err == nil {
-		c.logger.Info("existing kubeconfig is valid, will skip bootstrapping", zap.String("kubeconfig", cfg.KubeconfigPath))
+		logger.Info("existing kubeconfig is valid, will skip bootstrapping", zap.String("kubeconfig", cfg.KubeconfigPath))
 		return nil, nil
 	}
-	c.logger.Info("failed to validate existing kubeconfig, will bootstrap a new client credential", zap.String("kubeconfig", cfg.KubeconfigPath), zap.Error(err))
+	logger.Info("failed to validate existing kubeconfig, will bootstrap a new client credential", zap.String("kubeconfig", cfg.KubeconfigPath), zap.Error(err))
 
 	token, err := c.getAccessToken(ctx, cfg.CustomClientID, cfg.AADResource, &cfg.ProviderConfig)
 	if err != nil {
-		c.logger.Error(err.Error())
+		logger.Error(err.Error())
 		return nil, &BootstrapError{
 			errorType: ErrorTypeGetAccessTokenFailure,
 			inner:     err,
 		}
 	}
-	c.logger.Info("generated access token for gRPC connection")
+	logger.Info("generated access token for gRPC connection")
 
 	serviceClient, closer, err := c.getServiceClient(ctx, token, cfg)
 	if err != nil {
-		c.logger.Error(err.Error())
+		logger.Error(err.Error())
 		return nil, &BootstrapError{
 			errorType: ErrorTypeGetServiceClientFailure,
 			inner:     err,
@@ -62,52 +63,52 @@ func (c *Client) BootstrapKubeletClientCredential(ctx context.Context, cfg *Conf
 	}
 	defer func() {
 		if err := closer(); err != nil {
-			c.logger.Error("failed to close gRPC client connection", zap.Error(err))
+			logger.Error("failed to close gRPC client connection", zap.Error(err))
 		}
 	}()
-	c.logger.Info("created bootstrap service gRPC client")
+	logger.Info("created bootstrap service gRPC client")
 
 	instanceData, err := c.getInstanceData(ctx)
 	if err != nil {
-		c.logger.Error(err.Error())
+		logger.Error(err.Error())
 		return nil, &BootstrapError{
 			errorType: ErrorTypeGetInstanceDataFailure,
 			inner:     err,
 		}
 	}
-	c.logger.Info("retrieved instance metadata from IMDS", zap.String("resourceId", instanceData.Compute.ResourceID))
+	logger.Info("retrieved instance metadata from IMDS", zap.String("resourceId", instanceData.Compute.ResourceID))
 
 	nonce, err := c.getNonce(ctx, serviceClient, &akssecuretlsbootstrapv1.GetNonceRequest{
 		ResourceId: instanceData.Compute.ResourceID,
 	})
 	if err != nil {
-		c.logger.Error(err.Error())
+		logger.Error(err.Error())
 		return nil, &BootstrapError{
 			errorType: ErrorTypeGetNonceFailure,
 			inner:     err,
 		}
 	}
-	c.logger.Info("received new nonce from bootstrap server")
+	logger.Info("received new nonce from bootstrap server")
 
 	attestedData, err := c.getAttestedData(ctx, nonce)
 	if err != nil {
-		c.logger.Error(err.Error())
+		logger.Error(err.Error())
 		return nil, &BootstrapError{
 			errorType: ErrorTypeGetAttestedDataFailure,
 			inner:     err,
 		}
 	}
-	c.logger.Info("retrieved instance attested data from IMDS")
+	logger.Info("retrieved instance attested data from IMDS")
 
 	csrPEM, keyPEM, err := c.getCSR(ctx)
 	if err != nil {
-		c.logger.Error(err.Error())
+		logger.Error(err.Error())
 		return nil, &BootstrapError{
 			errorType: ErrorTypeGetCSRFailure,
 			inner:     err,
 		}
 	}
-	c.logger.Info("generated kubelet client CSR and associated private key")
+	logger.Info("generated kubelet client CSR and associated private key")
 
 	certPEM, err := c.getCredential(ctx, serviceClient, &akssecuretlsbootstrapv1.GetCredentialRequest{
 		ResourceId:    instanceData.Compute.ResourceID,
@@ -116,13 +117,13 @@ func (c *Client) BootstrapKubeletClientCredential(ctx context.Context, cfg *Conf
 		EncodedCsrPem: base64.StdEncoding.EncodeToString(csrPEM),
 	})
 	if err != nil {
-		c.logger.Error(err.Error())
+		logger.Error(err.Error())
 		return nil, &BootstrapError{
 			errorType: ErrorTypeGetCredentialFailure,
 			inner:     err,
 		}
 	}
-	c.logger.Info("received valid kubelet client credential from bootstrap server")
+	logger.Info("received valid kubelet client credential from bootstrap server")
 
 	kubeconfigData, err := c.generateKubeconfig(ctx, certPEM, keyPEM, &kubeconfig.Config{
 		APIServerFQDN:     cfg.APIServerFQDN,
@@ -130,13 +131,13 @@ func (c *Client) BootstrapKubeletClientCredential(ctx context.Context, cfg *Conf
 		CredFilePath:      cfg.CredFilePath,
 	})
 	if err != nil {
-		c.logger.Error(err.Error())
+		logger.Error(err.Error())
 		return nil, &BootstrapError{
 			errorType: ErrorTypeGenerateKubeconfigFailure,
 			inner:     err,
 		}
 	}
-	c.logger.Info("successfully generated new kubeconfig data")
+	logger.Info("successfully generated new kubeconfig data")
 
 	return kubeconfigData, nil
 }
@@ -147,7 +148,7 @@ func (c *Client) validateKubeconfig(ctx context.Context, kubeconfigPath string, 
 	tracer.StartSpan(spanName)
 	defer tracer.EndSpan(spanName)
 
-	if err := c.kubeconfigValidator.Validate(kubeconfigPath, ensureAuthorizedClient); err != nil {
+	if err := c.kubeconfigValidator.Validate(ctx, kubeconfigPath, ensureAuthorizedClient); err != nil {
 		return fmt.Errorf("failed to validate kubeconfig: %w", err)
 	}
 	return nil
@@ -235,7 +236,7 @@ func (c *Client) getCredential(
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve new kubelet client credential from bootstrap server: %w", err)
 	}
-	c.logger.Info("received credential response from bootstrap server")
+	log.MustGetLogger(ctx).Info("received credential response from bootstrap server")
 
 	encodedCertPEM := credentialResponse.GetEncodedCertPem()
 	if encodedCertPEM == "" {

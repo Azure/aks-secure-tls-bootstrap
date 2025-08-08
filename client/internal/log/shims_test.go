@@ -1,7 +1,4 @@
-// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT license.
-
-package http
+package log
 
 import (
 	"bufio"
@@ -25,16 +22,16 @@ func (cw customWriter) Sync() error {
 	return nil
 }
 
-func TestHttpLog(t *testing.T) {
+func TestLeveledLoggerShim(t *testing.T) {
 	tests := []struct {
 		name                     string
-		logFunc                  func(*leveledLoggerShim)
+		logFunc                  func(*LeveledLoggerShim)
 		expectedStdoutSubstrs    []string
 		notExpectedStdoutSubstrs []string
 	}{
 		{
 			name: "should correctly shim into a zap.Logger",
-			logFunc: func(shim *leveledLoggerShim) {
+			logFunc: func(shim *LeveledLoggerShim) {
 				shim.Info("info", "field", "value")
 				shim.Warn("warn", "field", "value")
 				shim.Error("error", "field", "value")
@@ -44,7 +41,7 @@ func TestHttpLog(t *testing.T) {
 		},
 		{
 			name: "unexpected number of keys and values are specified",
-			logFunc: func(shim *leveledLoggerShim) {
+			logFunc: func(shim *LeveledLoggerShim) {
 				shim.Info("info", "field", "value", "otherField")
 				shim.Warn("warn", "field", "value", "otherField")
 				shim.Error("error", "field", "value", "otherField")
@@ -76,7 +73,7 @@ func TestHttpLog(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			shim := &leveledLoggerShim{
+			shim := &LeveledLoggerShim{
 				logger: logger,
 			}
 			tt.logFunc(shim)
