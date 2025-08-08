@@ -88,7 +88,7 @@ func run(ctx context.Context) int {
 	bootstrapCtx, cancel := context.WithDeadline(bootstrapCtx, bootstrapDeadline)
 	defer cancel()
 
-	finalErr, errs, traceStore := bootstrap.Bootstrap(bootstrapCtx, bootstrapClient, bootstrapConfig)
+	finalErr, errs, traces := bootstrap.Bootstrap(bootstrapCtx, bootstrapClient, bootstrapConfig)
 	bootstrapEndTime := time.Now()
 
 	var exitCode int
@@ -96,8 +96,8 @@ func run(ctx context.Context) int {
 		Status:              bootstrap.StatusSuccess,
 		ElapsedMilliseconds: bootstrapEndTime.Sub(bootstrapStartTime).Milliseconds(),
 		Errors:              errs,
-		Traces:              traceStore.GetLastNTraces(3), // only keep the last 3 traces to avoid truncating guest agent event data
-		TraceSummary:        traceStore.GetTraceSummary(),
+		Traces:              traces.GetLastNTraces(3), // only keep the last 3 traces to avoid truncating guest agent event data
+		TraceSummary:        traces.GetTraceSummary(),
 	}
 
 	if finalErr != nil {
