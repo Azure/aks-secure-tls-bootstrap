@@ -4,12 +4,14 @@
 package kubeconfig
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
 	"time"
 
 	internalhttp "github.com/Azure/aks-secure-tls-bootstrap/client/internal/http"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/log"
 	"github.com/hashicorp/go-retryablehttp"
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -31,18 +33,17 @@ type clientsetLoaderFunc func(clientConfig *restclient.Config) (kubernetes.Inter
 //go:generate ../../bin/mockgen -copyright_file=../../../hack/copyright_header.txt -destination=./mocks/mock_validator.go -package=mocks github.com/Azure/aks-secure-tls-bootstrap/client/internal/kubeconfig Validator
 
 type Validator interface {
-	Validate(kubeconfigPath string, ensureAuthorizedClient bool) error
+	Validate(ctx context.Context, kubeconfigPath string, ensureAuthorizedClient bool) error
 }
 
 type validator struct {
 	clientConfigLoader clientConfigLoaderFunc
 	clientsetLoader    clientsetLoaderFunc
-	logger             *zap.Logger
 }
 
 var _ Validator = (*validator)(nil)
 
-func NewValidator(logger *zap.Logger) Validator {
+func NewValidator() Validator {
 	return &validator{
 		clientConfigLoader: func(kubeconfigPath string) (*restclient.Config, error) {
 			if _, err := os.Stat(kubeconfigPath); err != nil {
@@ -65,11 +66,10 @@ func NewValidator(logger *zap.Logger) Validator {
 		clientsetLoader: func(clientConfig *restclient.Config) (kubernetes.Interface, error) {
 			return kubernetes.NewForConfig(clientConfig)
 		},
-		logger: logger,
 	}
 }
 
-func (v *validator) Validate(kubeconfigPath string, ensureAuthorizedClient bool) error {
+func (v *validator) Validate(ctx context.Context, kubeconfigPath string, ensureAuthorizedClient bool) error {
 	clientConfig, err := v.clientConfigLoader(kubeconfigPath)
 	if err != nil {
 		return fmt.Errorf("failed to create REST client config from kubeconfig: %w", err)
@@ -82,7 +82,7 @@ func (v *validator) Validate(kubeconfigPath string, ensureAuthorizedClient bool)
 	}
 	restclient.AddUserAgent(clientConfig, internalhttp.GetUserAgentValue())
 	clientConfig.Wrap(func(rt http.RoundTripper) http.RoundTripper {
-		c := internalhttp.NewRetryableClient(v.logger)
+		c := internalhttp.NewRetryableClient(ctx)
 		c.HTTPClient = &http.Client{Transport: rt}
 		return &retryablehttp.RoundTripper{Client: c}
 	})
@@ -93,7 +93,7 @@ func (v *validator) Validate(kubeconfigPath string, ensureAuthorizedClient bool)
 	if err := ensureAuthorized(clientset); err != nil {
 		return fmt.Errorf("failed to ensure client authorization: %w", err)
 	}
-	v.logger.Info("ensured existing clientset is authorized", zap.String("kubeconfig", kubeconfigPath))
+	log.MustGetLogger(ctx).Info("ensured existing clientset is authorized", zap.String("kubeconfig", kubeconfigPath))
 	return nil
 }
 

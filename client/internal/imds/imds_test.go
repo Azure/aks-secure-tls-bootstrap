@@ -4,7 +4,6 @@
 package imds
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -12,8 +11,8 @@ import (
 	"testing"
 
 	internalhttp "github.com/Azure/aks-secure-tls-bootstrap/client/internal/http"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/log"
 	"github.com/stretchr/testify/assert"
-	"go.uber.org/zap"
 )
 
 func TestCallIMDS(t *testing.T) {
@@ -60,12 +59,11 @@ func TestCallIMDS(t *testing.T) {
 		},
 	}
 
-	logger, _ := zap.NewDevelopment()
+	ctx := log.NewTestContext()
+
 	for _, tt := range tests {
-		ctx := context.Background()
 		imdsClient := &client{
-			httpClient: internalhttp.NewClient(logger),
-			logger:     logger,
+			httpClient: internalhttp.NewClient(ctx),
 		}
 		imds := tt.setupTestServer(tt.params)
 		defer imds.Close()
@@ -101,8 +99,7 @@ func TestGetInstanceData(t *testing.T) {
 		},
 	}
 
-	logger, _ := zap.NewDevelopment()
-	ctx := context.Background()
+	ctx := log.NewTestContext()
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -115,8 +112,7 @@ func TestGetInstanceData(t *testing.T) {
 			defer imds.Close()
 
 			imdsClient := &client{
-				httpClient: internalhttp.NewClient(logger),
-				logger:     logger,
+				httpClient: internalhttp.NewClient(ctx),
 				baseURL:    imds.URL,
 			}
 
@@ -160,8 +156,7 @@ func TestGetAttestedData(t *testing.T) {
 		},
 	}
 
-	logger, _ := zap.NewDevelopment()
-	ctx := context.Background()
+	ctx := log.NewTestContext()
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -175,8 +170,7 @@ func TestGetAttestedData(t *testing.T) {
 			defer imds.Close()
 
 			imdsClient := &client{
-				httpClient: internalhttp.NewClient(logger),
-				logger:     logger,
+				httpClient: internalhttp.NewClient(ctx),
 				baseURL:    imds.URL,
 			}
 

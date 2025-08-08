@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/cloud"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/log"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/telemetry"
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure"
@@ -42,13 +43,15 @@ func (c *Client) getAccessToken(ctx context.Context, customClientID, resource st
 	tracer.StartSpan(spanName)
 	defer tracer.EndSpan(spanName)
 
+	logger := log.MustGetLogger(ctx)
+
 	userAssignedID := cloudProviderConfig.UserAssignedIdentityID
 	if customClientID != "" {
 		userAssignedID = customClientID
 	}
 
 	if userAssignedID != "" {
-		c.logger.Info("generating MSI access token", zap.String("clientId", userAssignedID))
+		logger.Info("generating MSI access token", zap.String("clientId", userAssignedID))
 		token, err := adal.NewServicePrincipalTokenFromManagedIdentity(resource, &adal.ManagedIdentityOptions{
 			ClientID: userAssignedID,
 		})
@@ -71,7 +74,7 @@ func (c *Client) getAccessToken(ctx context.Context, customClientID, resource st
 	}
 
 	if !strings.HasPrefix(cloudProviderConfig.ClientSecret, certificateSecretPrefix) {
-		c.logger.Info("generating SPN access token with username and password", zap.String("clientId", cloudProviderConfig.ClientID))
+		logger.Info("generating SPN access token with username and password", zap.String("clientId", cloudProviderConfig.ClientID))
 		token, err := adal.NewServicePrincipalToken(*oauthConfig, cloudProviderConfig.ClientID, cloudProviderConfig.ClientSecret, resource)
 		if err != nil {
 			return "", fmt.Errorf("generating SPN access token with username and password: %w", err)
@@ -79,7 +82,7 @@ func (c *Client) getAccessToken(ctx context.Context, customClientID, resource st
 		return c.extractAccessTokenFunc(token)
 	}
 
-	c.logger.Info("client secret contains certificate data, using certificate to generate SPN access token", zap.String("clientId", cloudProviderConfig.ClientID))
+	logger.Info("client secret contains certificate data, using certificate to generate SPN access token", zap.String("clientId", cloudProviderConfig.ClientID))
 
 	certData, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(cloudProviderConfig.ClientSecret, certificateSecretPrefix))
 	if err != nil {
@@ -90,7 +93,7 @@ func (c *Client) getAccessToken(ctx context.Context, customClientID, resource st
 		return "", fmt.Errorf("decoding pfx certificate data in client secret: %w", err)
 	}
 
-	c.logger.Info("generating SPN access token with certificate", zap.String("clientId", cloudProviderConfig.ClientID))
+	logger.Info("generating SPN access token with certificate", zap.String("clientId", cloudProviderConfig.ClientID))
 	token, err := adal.NewServicePrincipalTokenFromCertificate(*oauthConfig, cloudProviderConfig.ClientID, certificate, privateKey, resource)
 	if err != nil {
 		return "", fmt.Errorf("generating SPN access token with certificate: %w", err)

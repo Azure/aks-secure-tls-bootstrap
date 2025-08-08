@@ -10,14 +10,13 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 	"time"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/bootstrap"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/log"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/telemetry"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
 var bootstrapConfig = new(bootstrap.Config)
@@ -67,14 +66,16 @@ func main() {
 }
 
 func run(ctx context.Context) int {
-	logger, finalErr := configureLogging(logFile, verbose)
+	logger, flusher, finalErr := log.NewProductionLogger(logFile, verbose)
 	if finalErr != nil {
 		fmt.Printf("unable to construct zap logger: %s\n", finalErr)
 		return 1
 	}
-	defer flush(logger)
+	defer flusher(logger)
 
-	bootstrapClient, finalErr := bootstrap.NewClient(logger)
+	ctx = log.WithLogger(ctx, logger)
+
+	bootstrapClient, finalErr := bootstrap.NewClient(ctx)
 	if finalErr != nil {
 		fmt.Printf("unable to construct bootstrap client: %s\n", finalErr)
 		return 1
@@ -135,45 +136,4 @@ func run(ctx context.Context) int {
 	}
 
 	return exitCode
-}
-
-func configureLogging(logFile string, verbose bool) (*zap.Logger, error) {
-	encoderConfig := zap.NewProductionEncoderConfig()
-	encoderConfig.TimeKey = "timestamp"
-	encoderConfig.EncodeTime = zapcore.RFC3339NanoTimeEncoder
-
-	level := zap.InfoLevel
-	if verbose {
-		level = zap.DebugLevel
-	}
-
-	cores := []zapcore.Core{
-		zapcore.NewCore(
-			zapcore.NewConsoleEncoder(encoderConfig),
-			zapcore.AddSync(os.Stdout),
-			level,
-		),
-	}
-
-	if logFile != "" {
-		if err := os.MkdirAll(filepath.Dir(logFile), 0755); err != nil {
-			return nil, fmt.Errorf("failed to create log directory: %w", err)
-		}
-		logFileHandle, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-		if err != nil {
-			return nil, fmt.Errorf("failed to open log file: %w", err)
-		}
-		cores = append(cores, zapcore.NewCore(
-			zapcore.NewJSONEncoder(encoderConfig),
-			zapcore.AddSync(logFileHandle),
-			level,
-		))
-	}
-
-	return zap.New(zapcore.NewTee(cores...)), nil
-}
-
-func flush(logger *zap.Logger) {
-	// per guidance from: https://github.com/uber-go/zap/issues/328
-	_ = logger.Sync()
 }
