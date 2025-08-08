@@ -66,12 +66,12 @@ func main() {
 }
 
 func run(ctx context.Context) int {
-	logger, flusher, finalErr := log.NewProductionLogger(logFile, verbose)
+	logger, flush, finalErr := log.NewProductionLogger(logFile, verbose)
 	if finalErr != nil {
 		fmt.Printf("unable to construct zap logger: %s\n", finalErr)
 		return 1
 	}
-	defer flusher(logger)
+	defer flush(logger)
 
 	ctx = log.WithLogger(ctx, logger)
 
