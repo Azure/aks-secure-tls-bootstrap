@@ -96,7 +96,8 @@ func run(ctx context.Context) int {
 		Status:              bootstrap.StatusSuccess,
 		ElapsedMilliseconds: bootstrapEndTime.Sub(bootstrapStartTime).Milliseconds(),
 		Errors:              errs,
-		Traces:              traces,
+		Traces:              traces.GetLastNTraces(3), // only keep the last 3 traces to avoid truncating guest agent event data
+		TraceSummary:        traces.GetTraceSummary(),
 	}
 
 	if finalErr != nil {

@@ -113,6 +113,7 @@ func TestGetAccessToken(t *testing.T) {
 			name: "UserAssignedIdentityID is specified in cloud provider config",
 			setupCloudProviderConfig: func(t *testing.T, config *cloud.ProviderConfig) {
 				config.UserAssignedIdentityID = "kubelet-identity-id"
+				config.ClientID = clientIDForMSI
 			},
 			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
 				return func(token *adal.ServicePrincipalToken) (string, error) {
@@ -124,10 +125,25 @@ func TestGetAccessToken(t *testing.T) {
 			expectedErr:   nil,
 		},
 		{
+			name: "UserAssignedIdentityID is not specified in cloud provider config, but client ID indicates MSI usage",
+			setupCloudProviderConfig: func(t *testing.T, config *cloud.ProviderConfig) {
+				config.UserAssignedIdentityID = ""
+				config.ClientID = clientIDForMSI
+			},
+			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
+				return func(token *adal.ServicePrincipalToken) (string, error) {
+					return "token", nil
+				}
+			},
+			expectedToken: "",
+			expectedErr:   errors.New("client ID within cloud provider config indicates usage of a managed identity, though no user-assigned identity ID was provided"),
+		},
+		{
 			name:           "a custom client ID is specified",
 			customClientID: "custom",
 			setupCloudProviderConfig: func(t *testing.T, config *cloud.ProviderConfig) {
 				config.UserAssignedIdentityID = "kubelet-identity-id"
+				config.ClientID = clientIDForMSI
 			},
 			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
 				return func(token *adal.ServicePrincipalToken) (string, error) {
