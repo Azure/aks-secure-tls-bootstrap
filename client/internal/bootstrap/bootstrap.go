@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/telemetry"
@@ -64,6 +66,13 @@ func writeKubeconfig(ctx context.Context, config *clientcmdapi.Config, path stri
 	tracer := telemetry.MustGetTracer(ctx)
 	tracer.StartSpan(traceName)
 	defer tracer.EndSpan(traceName)
+
+	if err := os.MkdirAll(filepath.Dir(path), 0600); err != nil {
+		return &BootstrapError{
+			errorType: ErrorTypeWriteKubeconfigFailure,
+			inner:     fmt.Errorf("creating parent directories for kubeconfig path: %w", err),
+		}
+	}
 
 	if err := clientcmd.WriteToFile(*config, path); err != nil {
 		return &BootstrapError{
