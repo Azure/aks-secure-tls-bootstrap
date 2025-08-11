@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
 // Package telemetry provides a simple functionality to measure the duration of individual tasks, or "spans".
 // This allows us to track, for every top-level bootstrapping step/operation, how long it took to complete.
 // While inspired by OTel distributed tracing concepts, all tracing functionality provided by this package is strictly local.
