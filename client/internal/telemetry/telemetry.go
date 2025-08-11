@@ -58,7 +58,7 @@ func (r *tracer) GetTrace() Trace {
 	return trace
 }
 
-// TraceStore is a fixed-capacity store of Trace objects.
+// TraceStore stores a collection of traces in-memory.
 type TraceStore struct {
 	traces []Trace
 }
@@ -69,13 +69,12 @@ func NewTraceStore() *TraceStore {
 	}
 }
 
-// Add adds the specific trace the store, using the specified ID. IDs must be added sequentially.
-// If the store is at capacity, the oldest trace will be evicted.
+// Add adds the specified trace to the TraceStore.
 func (t *TraceStore) Add(trace Trace) {
 	t.traces = append(t.traces, trace)
 }
 
-// GetLastNTraces returns the last N traces in within the TraceStore.
+// GetLastNTraces returns the latest N traces within the TraceStore.
 // If N is >= the number of traces stored, all traces are returned.
 func (t *TraceStore) GetLastNTraces(n int) map[int]Trace {
 	result := make(map[int]Trace, n)
@@ -96,12 +95,12 @@ func (t *TraceStore) GetTraceSummary() Trace {
 	return total
 }
 
-// NewContext returns a new context object, attached with a newly initialized Tracer.
+// NewContext returns a context with a newly initialized Tracer.
 func NewContext() context.Context {
 	return context.WithValue(context.Background(), tracerContextKey{}, NewTracer())
 }
 
-// WithTracer returns creates a child context off the specified context with a new Tracer attached.
+// WithTracer returns a child context with a new Tracer attached.
 func WithTracer(ctx context.Context, tracer Tracer) context.Context {
 	return context.WithValue(ctx, tracerContextKey{}, tracer)
 }
