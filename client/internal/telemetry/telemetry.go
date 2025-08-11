@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
 // Package telemetry provides a simple functionality to measure the duration of individual tasks, or "spans".
 // This allows us to track, for every top-level bootstrapping step/operation, how long it took to complete.
 // While inspired by OTel distributed tracing concepts, all tracing functionality provided by this package is strictly local.
@@ -55,12 +58,49 @@ func (r *tracer) GetTrace() Trace {
 	return trace
 }
 
-// NewContext returns a new context object, attached with a newly initialized Tracer.
+// TraceStore stores a collection of traces in-memory.
+type TraceStore struct {
+	traces []Trace
+}
+
+func NewTraceStore() *TraceStore {
+	return &TraceStore{
+		traces: make([]Trace, 0),
+	}
+}
+
+// Add adds the specified trace to the TraceStore.
+func (t *TraceStore) Add(trace Trace) {
+	t.traces = append(t.traces, trace)
+}
+
+// GetLastNTraces returns the latest N traces within the TraceStore.
+// If N is >= the number of traces stored, all traces are returned.
+func (t *TraceStore) GetLastNTraces(n int) map[int]Trace {
+	result := make(map[int]Trace, n)
+	for id := max(len(t.traces)-n, 0); id < len(t.traces); id++ {
+		result[id] = t.traces[id]
+	}
+	return result
+}
+
+// GetTraceSummary returns a Trace which summarizes the total duration of each span across all stored traces.
+func (t *TraceStore) GetTraceSummary() Trace {
+	total := make(Trace)
+	for _, trace := range t.traces {
+		for spanName, duration := range trace {
+			total[spanName] += duration
+		}
+	}
+	return total
+}
+
+// NewContext returns a context with a newly initialized Tracer.
 func NewContext() context.Context {
 	return context.WithValue(context.Background(), tracerContextKey{}, NewTracer())
 }
 
-// WithTracer returns creates a child context off the specified context with a new Tracer attached.
+// WithTracer returns a child context with a new Tracer attached.
 func WithTracer(ctx context.Context, tracer Tracer) context.Context {
 	return context.WithValue(ctx, tracerContextKey{}, tracer)
 }

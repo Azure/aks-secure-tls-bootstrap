@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
 package bootstrap
 
 import "fmt"
@@ -19,6 +22,19 @@ const (
 type BootstrapError struct {
 	errorType ErrorType
 	inner     error
+}
+
+func (e *BootstrapError) Retryable() bool {
+	switch e.errorType {
+	case ErrorTypeGetAccessTokenFailure,
+		ErrorTypeGetInstanceDataFailure,
+		ErrorTypeGetAttestedDataFailure,
+		ErrorTypeGetNonceFailure,
+		ErrorTypeGetCredentialFailure:
+		return true
+	default:
+		return false
+	}
 }
 
 func (e *BootstrapError) Error() string {

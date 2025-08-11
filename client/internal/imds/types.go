@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
 package imds
 
 // ComputeData encapsulates the compute-related fields we need from VM instance data.
