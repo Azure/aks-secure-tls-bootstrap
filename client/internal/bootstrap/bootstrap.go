@@ -20,14 +20,14 @@ import (
 // In any case, a record of all errors encountered during the bootstrap process will be returned in errs, where error type is mapped to the corresponding occurrence count.
 // Additionally, a map of traces is returned in traces, which records how long each bootstrapping step took, mapping task name to a corresponding time.Duration.
 // Trace data is separately recorded for each retry attempt.
-func Bootstrap(ctx context.Context, client *Client, config *Config) (finalErr error, errs map[ErrorType]int, traceStore *telemetry.TraceStore) {
-	errs = make(map[ErrorType]int)
-	traceStore = telemetry.NewTraceStore()
+func Bootstrap(ctx context.Context, client *Client, config *Config) (finalErr error, errLog map[ErrorType]int, traces *telemetry.TraceStore) {
+	errLog = make(map[ErrorType]int)
+	traces = telemetry.NewTraceStore()
 
 	finalErr = retry.Do(
 		func() error {
 			defer func() {
-				traceStore.Add(telemetry.MustGetTracer(ctx).GetTrace())
+				traces.Add(telemetry.MustGetTracer(ctx).GetTrace())
 			}()
 
 			kubeconfigData, err := client.BootstrapKubeletClientCredential(ctx, config)
@@ -44,10 +44,11 @@ func Bootstrap(ctx context.Context, client *Client, config *Config) (finalErr er
 		},
 		retry.RetryIf(func(err error) bool {
 			var bootstrapErr *BootstrapError
-			if errors.As(err, &bootstrapErr) {
-				errs[bootstrapErr.Type()]++
+			if !errors.As(err, &bootstrapErr) {
+				return false
 			}
-			return true
+			errLog[bootstrapErr.Type()]++
+			return bootstrapErr.Retryable()
 		}),
 		retry.Context(ctx),
 		retry.WrapContextErrorWithLastError(true),
@@ -58,7 +59,7 @@ func Bootstrap(ctx context.Context, client *Client, config *Config) (finalErr er
 		retry.Attempts(0), // retry indefinitely according to the context deadline
 	)
 
-	return finalErr, errs, traceStore
+	return finalErr, errLog, traces
 }
 
 func writeKubeconfig(ctx context.Context, config *clientcmdapi.Config, path string) error {

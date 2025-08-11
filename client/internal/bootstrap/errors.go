@@ -21,6 +21,19 @@ type BootstrapError struct {
 	inner     error
 }
 
+func (e *BootstrapError) Retryable() bool {
+	switch e.errorType {
+	case ErrorTypeGetAccessTokenFailure,
+		ErrorTypeGetInstanceDataFailure,
+		ErrorTypeGetAttestedDataFailure,
+		ErrorTypeGetNonceFailure,
+		ErrorTypeGetCredentialFailure:
+		return true
+	default:
+		return false
+	}
+}
+
 func (e *BootstrapError) Error() string {
 	return fmt.Sprintf("%s: %s", e.errorType, e.inner.Error())
 }
