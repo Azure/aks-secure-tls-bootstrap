@@ -4,21 +4,27 @@
 package bootstrap
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"os"
 	"time"
 
 	internalhttp "github.com/Azure/aks-secure-tls-bootstrap/client/internal/http"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/log"
 	akssecuretlsbootstrapv1 "github.com/Azure/aks-secure-tls-bootstrap/service/pkg/gen/akssecuretlsbootstrap/v1"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/retry"
+	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/oauth"
 )
+
+var lastGRPCRetryError error
 
 // closeFunc closes a gRPC client connection, fake implementations given in unit tests.
 type closeFunc func() error
@@ -47,6 +53,7 @@ func getServiceClient(token string, cfg *Config) (akssecuretlsbootstrapv1.Secure
 			}),
 		}),
 		grpc.WithUnaryInterceptor(retry.UnaryClientInterceptor(
+			retry.WithOnRetryCallback(getGRPCOnRetryCallbackFunc()),
 			retry.WithBackoff(retry.BackoffExponentialWithJitterBounded(100*time.Millisecond, 0.75, 2*time.Second)),
 			retry.WithCodes(codes.Aborted, codes.Unavailable),
 			retry.WithMax(30),
@@ -57,6 +64,25 @@ func getServiceClient(token string, cfg *Config) (akssecuretlsbootstrapv1.Secure
 	}
 
 	return akssecuretlsbootstrapv1.NewSecureTLSBootstrapServiceClient(conn), conn.Close, nil
+}
+
+func getGRPCOnRetryCallbackFunc() retry.OnRetryCallback {
+	// this function is called after every retry attempt assuming the attempt failed,
+	// and the failure was not caused by a context error (e.g. DeadlineExceeded or Cancelled),
+	// see: https://github.com/grpc-ecosystem/go-grpc-middleware/blob/main/interceptors/retry/retry.go.
+	// it stores the error within lastGRPCRetryError and logs it using the logger attached to the context.
+	return func(ctx context.Context, attempt uint, err error) {
+		log.MustGetLogger(ctx).Error("gRPC request failed", zap.Error(err), zap.Uint("attempt", attempt))
+		lastGRPCRetryError = err
+	}
+}
+
+// withLastGRPCRetryErrorIfDeadlineExceeded wraps the error with lastGRPCRetryError if the error is a context.DeadlineExceeded.
+func withLastGRPCRetryErrorIfDeadlineExceeded(err error) error {
+	if lastGRPCRetryError == nil || !errors.Is(err, context.DeadlineExceeded) {
+		return err
+	}
+	return fmt.Errorf("%w: last error: %s", err, lastGRPCRetryError)
 }
 
 func getTLSConfig(caPEM []byte, nextProto string, insecureSkipVerify bool) (*tls.Config, error) {

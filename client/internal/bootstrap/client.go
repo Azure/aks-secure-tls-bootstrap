@@ -205,6 +205,7 @@ func (c *Client) getNonce(
 
 	nonceResponse, err := serviceClient.GetNonce(ctx, req)
 	if err != nil {
+		err = withLastGRPCRetryErrorIfDeadlineExceeded(err)
 		return "", fmt.Errorf("failed to retrieve a nonce from bootstrap server: %w", err)
 	}
 	return nonceResponse.GetNonce(), nil
@@ -234,6 +235,7 @@ func (c *Client) getCredential(
 
 	credentialResponse, err := serviceClient.GetCredential(ctx, req)
 	if err != nil {
+		err = withLastGRPCRetryErrorIfDeadlineExceeded(err)
 		return nil, fmt.Errorf("failed to retrieve new kubelet client credential from bootstrap server: %w", err)
 	}
 	log.MustGetLogger(ctx).Info("received credential response from bootstrap server")

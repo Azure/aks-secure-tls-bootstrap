@@ -4,7 +4,10 @@
 package bootstrap
 
 import (
+	"context"
 	"crypto/x509"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -12,6 +15,7 @@ import (
 
 	"google.golang.org/grpc/test/bufconn"
 
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/log"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/testutil"
 	"github.com/stretchr/testify/assert"
 )
@@ -154,6 +158,59 @@ func TestGetTLSConfig(t *testing.T) {
 			assert.Equal(t, tt.expectedNextProtos, config.NextProtos)
 			assert.Equal(t, tt.insecureSkipVerify, config.InsecureSkipVerify)
 			assert.True(t, config.RootCAs.Equal(rootPool))
+		})
+	}
+}
+
+func TestGetGRPCOnRetryCallbackFunc(t *testing.T) {
+	t.Cleanup(func() {
+		lastGRPCRetryError = nil
+	})
+	ctx := log.NewTestContext()
+	errs := []error{errors.New("e0"), errors.New("e1"), errors.New("e2")}
+
+	fn := getGRPCOnRetryCallbackFunc()
+	for idx, err := range errs {
+		fn(ctx, uint(idx+1), err)
+	}
+	assert.Equal(t, errs[len(errs)-1], lastGRPCRetryError)
+}
+
+func TestWithLastGRPCRetryErrorIfDeadlineExceeded(t *testing.T) {
+	cases := []struct {
+		name               string
+		err                error
+		lastGRPCRetryError error
+		expectedErr        error
+	}{
+		{
+			name:               "last GRPC retry error is nil",
+			err:                errors.New("non-retryable error"),
+			lastGRPCRetryError: nil,
+			expectedErr:        errors.New("non-retryable error"),
+		},
+		{
+			name:               "err is not a context.DeadlineExceeded",
+			err:                errors.New("an error"),
+			lastGRPCRetryError: errors.New("service unavailable"),
+			expectedErr:        errors.New("an error"),
+		},
+		{
+			name:               "err is a context.DeadlineExceeded and last GRPC retry error is non-nil",
+			err:                context.DeadlineExceeded,
+			lastGRPCRetryError: errors.New("service unavailable"),
+			expectedErr:        fmt.Errorf("%w: last error: %s", context.DeadlineExceeded, errors.New("service unavailable")),
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Cleanup(func() {
+				lastGRPCRetryError = nil
+			})
+			lastGRPCRetryError = c.lastGRPCRetryError
+
+			assert.Equal(t, c.expectedErr, withLastGRPCRetryErrorIfDeadlineExceeded(c.err))
 		})
 	}
 }
