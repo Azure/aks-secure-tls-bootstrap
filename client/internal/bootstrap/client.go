@@ -238,7 +238,6 @@ func (c *Client) getCredential(
 		err = withLastGRPCRetryErrorIfDeadlineExceeded(err)
 		return nil, fmt.Errorf("failed to retrieve new kubelet client credential from bootstrap server: %w", err)
 	}
-	log.MustGetLogger(ctx).Info("received credential response from bootstrap server")
 
 	encodedCertPEM := credentialResponse.GetEncodedCertPem()
 	if encodedCertPEM == "" {
