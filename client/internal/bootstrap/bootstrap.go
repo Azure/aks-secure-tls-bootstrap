@@ -30,7 +30,7 @@ func Bootstrap(ctx context.Context, client *Client, config *Config) (finalErr er
 	finalErr = retry.Do(
 		func() error {
 			defer func() {
-				traces.Add(telemetry.MustGetTracer(ctx).GetTrace())
+				traces.Add(telemetry.GetTrace(ctx))
 			}()
 
 			kubeconfigData, err := client.BootstrapKubeletClientCredential(ctx, config)
@@ -66,10 +66,8 @@ func Bootstrap(ctx context.Context, client *Client, config *Config) (finalErr er
 }
 
 func writeKubeconfig(ctx context.Context, config *clientcmdapi.Config, path string) error {
-	traceName := "WriteKubeconfig"
-	tracer := telemetry.MustGetTracer(ctx)
-	tracer.StartSpan(traceName)
-	defer tracer.EndSpan(traceName)
+	endSpan := telemetry.StartSpan(ctx, "WriteKubeconfig")
+	defer endSpan()
 
 	if err := os.MkdirAll(filepath.Dir(path), 0600); err != nil {
 		return &BootstrapError{

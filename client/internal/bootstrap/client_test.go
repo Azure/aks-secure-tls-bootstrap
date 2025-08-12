@@ -259,7 +259,7 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 
-			ctx := telemetry.WithTracer(log.NewTestContext(), telemetry.NewTracer())
+			ctx := telemetry.WithTracing(log.NewTestContext())
 
 			imdsClient := imdsmocks.NewMockClient(mockCtrl)
 			kubeconfigValidator := kubeconfigmocks.NewMockValidator(mockCtrl)

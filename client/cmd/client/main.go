@@ -73,7 +73,7 @@ func run(ctx context.Context) int {
 	}
 	defer flush(logger)
 
-	ctx = log.WithLogger(ctx, logger)
+	ctx = log.WithLogger(telemetry.WithTracing(ctx), logger)
 
 	bootstrapClient, finalErr := bootstrap.NewClient(ctx)
 	if finalErr != nil {
@@ -85,8 +85,7 @@ func run(ctx context.Context) int {
 	bootstrapDeadline := bootstrapStartTime.Add(bootstrapConfig.Deadline)
 	logger.Info("set bootstrap deadline", zap.Time("deadline", bootstrapDeadline))
 
-	bootstrapCtx := telemetry.WithTracer(ctx, telemetry.NewTracer())
-	bootstrapCtx, cancel := context.WithDeadline(bootstrapCtx, bootstrapDeadline)
+	bootstrapCtx, cancel := context.WithDeadline(ctx, bootstrapDeadline)
 	defer cancel()
 
 	finalErr, errLog, traces := bootstrap.Bootstrap(bootstrapCtx, bootstrapClient, bootstrapConfig)

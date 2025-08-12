@@ -12,36 +12,34 @@ import (
 	"time"
 )
 
-// Tracer provides methods to start and stop "spans" for measuring execution times.
-type Tracer interface {
-	// StartSpan creates and starts a new span with the given name.
-	StartSpan(spanName string)
-	// EndSpan stops the span with the given name, if it exists.
-	EndSpan(spanName string)
-	// GetTrace returns the duration of all spans recorded since the tracer was originally created,
-	// OR the last time GetTrace was called. After calling this method, all span data is cleared.
-	GetTrace() Trace
+// span represents a unit of work measured by a start and end time.
+type span struct {
+	start, end time.Time
 }
+
+// spanEnder is a function which ends a particular span on a Tracer.
+type spanEnder func()
+
+// tracerContextKey is used to store tracers on context objects.
+type tracerContextKey struct{}
 
 type tracer struct {
 	spans map[string]*span
 }
 
-var _ Tracer = (*tracer)(nil)
-
-func NewTracer() Tracer {
+func newTracer() *tracer {
 	return &tracer{
 		spans: make(map[string]*span),
 	}
 }
 
-func (r *tracer) StartSpan(spanName string) {
+func (r *tracer) startSpan(spanName string) {
 	r.spans[spanName] = &span{
 		start: time.Now(),
 	}
 }
 
-func (r *tracer) EndSpan(spanName string) {
+func (r *tracer) endSpan(spanName string) {
 	endTime := time.Now()
 	if _, ok := r.spans[spanName]; !ok {
 		return
@@ -49,13 +47,44 @@ func (r *tracer) EndSpan(spanName string) {
 	r.spans[spanName].end = endTime
 }
 
-func (r *tracer) GetTrace() Trace {
+// GetTrace returns the duration of all spans recorded since the tracer was originally created,
+// OR the last time GetTrace was called. After calling this method, all span data is cleared.
+func (r *tracer) getTrace() Trace {
 	trace := make(Trace, len(r.spans))
 	for spanName, span := range r.spans {
 		trace[spanName] = span.end.Sub(span.start)
 	}
 	r.spans = make(map[string]*span)
 	return trace
+}
+
+// WithTracing returns a child context with tracing capabilities.
+func WithTracing(ctx context.Context) context.Context {
+	return context.WithValue(ctx, tracerContextKey{}, newTracer())
+}
+
+// StartSpan starts a span with the given name. This function panics if the context
+// or any of its parents wasn't created by WithTracing.
+func StartSpan(ctx context.Context, spanName string) spanEnder {
+	tracer := mustGetTracer(ctx)
+	tracer.startSpan(spanName)
+	return func() {
+		tracer.endSpan(spanName)
+	}
+}
+
+// GetTrace returns the currently-stored trace on the context. This function panics if
+// the context or any of its parents wasn't created by WithTracing.
+func GetTrace(ctx context.Context) Trace {
+	return mustGetTracer(ctx).getTrace()
+}
+
+func mustGetTracer(ctx context.Context) *tracer {
+	tracer, ok := ctx.Value(tracerContextKey{}).(*tracer)
+	if !ok {
+		panic("Tracer is missing from context")
+	}
+	return tracer
 }
 
 // TraceStore stores a collection of traces in-memory.
@@ -93,24 +122,4 @@ func (t *TraceStore) GetTraceSummary() Trace {
 		}
 	}
 	return total
-}
-
-// NewContext returns a context with a newly initialized Tracer.
-func NewContext() context.Context {
-	return context.WithValue(context.Background(), tracerContextKey{}, NewTracer())
-}
-
-// WithTracer returns a child context with a new Tracer attached.
-func WithTracer(ctx context.Context, tracer Tracer) context.Context {
-	return context.WithValue(ctx, tracerContextKey{}, tracer)
-}
-
-// MustGetTracer retrieves the Tracer from the specified context.
-// If a Tracer is not found on the context, it panics.
-func MustGetTracer(ctx context.Context) Tracer {
-	tracer, ok := ctx.Value(tracerContextKey{}).(Tracer)
-	if !ok {
-		panic("Tracer is missing from context")
-	}
-	return tracer
 }

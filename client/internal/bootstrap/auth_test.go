@@ -198,7 +198,7 @@ func TestGetAccessToken(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			ctx := telemetry.WithTracer(log.NewTestContext(), telemetry.NewTracer())
+			ctx := telemetry.WithTracing(log.NewTestContext())
 			client := &Client{
 				extractAccessTokenFunc: c.setupExtractAccessTokenFunc(t),
 			}

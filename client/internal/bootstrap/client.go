@@ -143,10 +143,8 @@ func (c *Client) BootstrapKubeletClientCredential(ctx context.Context, cfg *Conf
 }
 
 func (c *Client) validateKubeconfig(ctx context.Context, kubeconfigPath string, ensureAuthorizedClient bool) error {
-	spanName := "ValidateKubeconfig"
-	tracer := telemetry.MustGetTracer(ctx)
-	tracer.StartSpan(spanName)
-	defer tracer.EndSpan(spanName)
+	endSpan := telemetry.StartSpan(ctx, "ValidateKubeconfig")
+	defer endSpan()
 
 	if err := c.kubeconfigValidator.Validate(ctx, kubeconfigPath, ensureAuthorizedClient); err != nil {
 		return fmt.Errorf("failed to validate kubeconfig: %w", err)
@@ -155,10 +153,8 @@ func (c *Client) validateKubeconfig(ctx context.Context, kubeconfigPath string, 
 }
 
 func (c *Client) getServiceClient(ctx context.Context, token string, cfg *Config) (akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient, closeFunc, error) {
-	spanName := "GetServiceClient"
-	tracer := telemetry.MustGetTracer(ctx)
-	tracer.StartSpan(spanName)
-	defer tracer.EndSpan(spanName)
+	endSpan := telemetry.StartSpan(ctx, "GetServiceClient")
+	defer endSpan()
 
 	serviceClient, closer, err := c.getServiceClientFunc(token, cfg)
 	if err != nil {
@@ -169,10 +165,8 @@ func (c *Client) getServiceClient(ctx context.Context, token string, cfg *Config
 }
 
 func (c *Client) getInstanceData(ctx context.Context) (*imds.VMInstanceData, error) {
-	spanName := "GetInstanceData"
-	tracer := telemetry.MustGetTracer(ctx)
-	tracer.StartSpan(spanName)
-	defer tracer.EndSpan(spanName)
+	endSpan := telemetry.StartSpan(ctx, "GetInstanceData")
+	defer endSpan()
 
 	instanceData, err := c.imdsClient.GetInstanceData(ctx)
 	if err != nil {
@@ -182,10 +176,8 @@ func (c *Client) getInstanceData(ctx context.Context) (*imds.VMInstanceData, err
 }
 
 func (c *Client) getAttestedData(ctx context.Context, nonce string) (*imds.VMAttestedData, error) {
-	spanName := "GetAttestedData"
-	tracer := telemetry.MustGetTracer(ctx)
-	tracer.StartSpan(spanName)
-	defer tracer.EndSpan(spanName)
+	endSpan := telemetry.StartSpan(ctx, "GetAttestedData")
+	defer endSpan()
 
 	attestedData, err := c.imdsClient.GetAttestedData(ctx, nonce)
 	if err != nil {
@@ -198,10 +190,8 @@ func (c *Client) getNonce(
 	ctx context.Context,
 	serviceClient akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient,
 	req *akssecuretlsbootstrapv1.GetNonceRequest) (string, error) {
-	spanName := "GetNonce"
-	tracer := telemetry.MustGetTracer(ctx)
-	tracer.StartSpan(spanName)
-	defer tracer.EndSpan(spanName)
+	endSpan := telemetry.StartSpan(ctx, "GetNonce")
+	defer endSpan()
 
 	nonceResponse, err := serviceClient.GetNonce(ctx, req)
 	if err != nil {
@@ -212,10 +202,8 @@ func (c *Client) getNonce(
 }
 
 func (c *Client) getCSR(ctx context.Context) ([]byte, []byte, error) {
-	spanName := "GetCSR"
-	tracer := telemetry.MustGetTracer(ctx)
-	tracer.StartSpan(spanName)
-	defer tracer.EndSpan(spanName)
+	endSpan := telemetry.StartSpan(ctx, "GetCSR")
+	defer endSpan()
 
 	csrPEM, keyPEM, err := makeKubeletClientCSR()
 	if err != nil {
@@ -228,10 +216,8 @@ func (c *Client) getCredential(
 	ctx context.Context,
 	serviceClient akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient,
 	req *akssecuretlsbootstrapv1.GetCredentialRequest) ([]byte, error) {
-	spanName := "GetCredential"
-	tracer := telemetry.MustGetTracer(ctx)
-	tracer.StartSpan(spanName)
-	defer tracer.EndSpan(spanName)
+	endSpan := telemetry.StartSpan(ctx, "GetCredential")
+	defer endSpan()
 
 	credentialResponse, err := serviceClient.GetCredential(ctx, req)
 	if err != nil {
@@ -251,10 +237,8 @@ func (c *Client) getCredential(
 }
 
 func (c *Client) generateKubeconfig(ctx context.Context, certPEM, keyPEM []byte, cfg *kubeconfig.Config) (*clientcmdapi.Config, error) {
-	spanName := "GenerateKubeconfig"
-	tracer := telemetry.MustGetTracer(ctx)
-	tracer.StartSpan(spanName)
-	defer tracer.EndSpan(spanName)
+	endSpan := telemetry.StartSpan(ctx, "GenerateKubeconfig")
+	defer endSpan()
 
 	kubeconfigData, err := kubeconfig.GenerateForCertAndKey(certPEM, keyPEM, cfg)
 	if err != nil {
