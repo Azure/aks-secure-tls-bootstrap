@@ -75,7 +75,6 @@ func writeKubeconfig(ctx context.Context, config *clientcmdapi.Config, path stri
 			inner:     fmt.Errorf("creating parent directories for kubeconfig path: %w", err),
 		}
 	}
-
 	if err := clientcmd.WriteToFile(*config, path); err != nil {
 		return &BootstrapError{
 			errorType: ErrorTypeWriteKubeconfigFailure,

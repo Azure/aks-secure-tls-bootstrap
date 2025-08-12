@@ -4,7 +4,6 @@
 package bootstrap
 
 import (
-	"context"
 	"crypto/x509"
 	"errors"
 	"fmt"
@@ -13,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/test/bufconn"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/log"
@@ -197,9 +198,9 @@ func TestWithLastGRPCRetryErrorIfDeadlineExceeded(t *testing.T) {
 		},
 		{
 			name:               "err is a context.DeadlineExceeded and last GRPC retry error is non-nil",
-			err:                context.DeadlineExceeded,
+			err:                status.Error(codes.DeadlineExceeded, "context deadline exceeded"),
 			lastGRPCRetryError: errors.New("service unavailable"),
-			expectedErr:        fmt.Errorf("%w: last error: %s", context.DeadlineExceeded, errors.New("service unavailable")),
+			expectedErr:        fmt.Errorf("%w: last error: %s", status.Error(codes.DeadlineExceeded, "context deadline exceeded"), errors.New("service unavailable")),
 		},
 	}
 

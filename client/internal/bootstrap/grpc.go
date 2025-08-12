@@ -7,7 +7,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -22,6 +21,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/oauth"
+	"google.golang.org/grpc/status"
 )
 
 var lastGRPCRetryError error
@@ -79,7 +79,7 @@ func getGRPCOnRetryCallbackFunc() retry.OnRetryCallback {
 
 // withLastGRPCRetryErrorIfDeadlineExceeded wraps the error with lastGRPCRetryError if the error is a context.DeadlineExceeded.
 func withLastGRPCRetryErrorIfDeadlineExceeded(err error) error {
-	if lastGRPCRetryError == nil || !errors.Is(err, context.DeadlineExceeded) {
+	if lastGRPCRetryError == nil || status.Code(err) != codes.DeadlineExceeded {
 		return err
 	}
 	return fmt.Errorf("%w: last error: %s", err, lastGRPCRetryError)
