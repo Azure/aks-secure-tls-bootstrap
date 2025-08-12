@@ -71,7 +71,7 @@ func run(ctx context.Context) int {
 		fmt.Printf("unable to construct zap logger: %s\n", finalErr)
 		return 1
 	}
-	defer flush(logger)
+	defer flush()
 
 	ctx = log.WithLogger(telemetry.WithTracing(ctx), logger)
 

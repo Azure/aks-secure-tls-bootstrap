@@ -12,7 +12,7 @@ import (
 
 type contextKey struct{}
 
-type flushFunc func(logger *zap.Logger)
+type flushFunc func()
 
 func NewProductionLogger(logFile string, verbose bool) (*zap.Logger, flushFunc, error) {
 	encoderConfig := zap.NewProductionEncoderConfig()
@@ -47,12 +47,14 @@ func NewProductionLogger(logFile string, verbose bool) (*zap.Logger, flushFunc, 
 		))
 	}
 
-	flush := func(logger *zap.Logger) {
+	logger := zap.New(zapcore.NewTee(cores...))
+
+	flush := func() {
 		// per guidance from: https://github.com/uber-go/zap/issues/328
 		_ = logger.Sync()
 	}
 
-	return zap.New(zapcore.NewTee(cores...)), flush, nil
+	return logger, flush, nil
 }
 
 func WithLogger(ctx context.Context, logger *zap.Logger) context.Context {
@@ -60,11 +62,7 @@ func WithLogger(ctx context.Context, logger *zap.Logger) context.Context {
 }
 
 func MustGetLogger(ctx context.Context) *zap.Logger {
-	v := ctx.Value(contextKey{})
-	if v == nil {
-		panic("logger not found on context")
-	}
-	logger, ok := v.(*zap.Logger)
+	logger, ok := ctx.Value(contextKey{}).(*zap.Logger)
 	if !ok {
 		panic("logger not found on context")
 	}
