@@ -1,9 +1,14 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
 package bootstrap
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/telemetry"
@@ -18,16 +23,14 @@ import (
 // In any case, a record of all errors encountered during the bootstrap process will be returned in errs, where error type is mapped to the corresponding occurrence count.
 // Additionally, a map of traces is returned in traces, which records how long each bootstrapping step took, mapping task name to a corresponding time.Duration.
 // Trace data is separately recorded for each retry attempt.
-func Bootstrap(ctx context.Context, client *Client, config *Config) (finalErr error, errs map[ErrorType]int, traces map[int]telemetry.Trace) {
-	errs = map[ErrorType]int{}
-	traces = map[int]telemetry.Trace{}
-	var retryCount int
+func Bootstrap(ctx context.Context, client *Client, config *Config) (finalErr error, errLog map[ErrorType]int, traces *telemetry.TraceStore) {
+	errLog = make(map[ErrorType]int)
+	traces = telemetry.NewTraceStore()
 
 	finalErr = retry.Do(
 		func() error {
 			defer func() {
-				traces[retryCount] = telemetry.MustGetTracer(ctx).GetTrace()
-				retryCount++
+				traces.Add(telemetry.MustGetTracer(ctx).GetTrace())
 			}()
 
 			kubeconfigData, err := client.BootstrapKubeletClientCredential(ctx, config)
@@ -44,10 +47,11 @@ func Bootstrap(ctx context.Context, client *Client, config *Config) (finalErr er
 		},
 		retry.RetryIf(func(err error) bool {
 			var bootstrapErr *BootstrapError
-			if errors.As(err, &bootstrapErr) {
-				errs[bootstrapErr.Type()]++
+			if !errors.As(err, &bootstrapErr) {
+				return false
 			}
-			return true
+			errLog[bootstrapErr.Type()]++
+			return bootstrapErr.Retryable()
 		}),
 		retry.Context(ctx),
 		retry.WrapContextErrorWithLastError(true),
@@ -58,7 +62,7 @@ func Bootstrap(ctx context.Context, client *Client, config *Config) (finalErr er
 		retry.Attempts(0), // retry indefinitely according to the context deadline
 	)
 
-	return finalErr, errs, traces
+	return finalErr, errLog, traces
 }
 
 func writeKubeconfig(ctx context.Context, config *clientcmdapi.Config, path string) error {
@@ -66,6 +70,13 @@ func writeKubeconfig(ctx context.Context, config *clientcmdapi.Config, path stri
 	tracer := telemetry.MustGetTracer(ctx)
 	tracer.StartSpan(traceName)
 	defer tracer.EndSpan(traceName)
+
+	if err := os.MkdirAll(filepath.Dir(path), 0600); err != nil {
+		return &BootstrapError{
+			errorType: ErrorTypeWriteKubeconfigFailure,
+			inner:     fmt.Errorf("creating parent directories for kubeconfig path: %w", err),
+		}
+	}
 
 	if err := clientcmd.WriteToFile(*config, path); err != nil {
 		return &BootstrapError{

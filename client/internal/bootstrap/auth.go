@@ -22,6 +22,10 @@ const (
 )
 
 const (
+	clientIDForMSI = "msi"
+)
+
+const (
 	maxMSIRefreshAttempts = 3
 )
 
@@ -58,10 +62,14 @@ func (c *Client) getAccessToken(ctx context.Context, customClientID, resource st
 		if err != nil {
 			return "", fmt.Errorf("generating MSI access token: %w", err)
 		}
-		// to avoid falling too deep into exponential backoff implemented by adal, which follows the public retry guidance
+		// to avoid falling too deep into exponential backoff implemented by adal, which follows the public retry guidance:
 		// https://learn.microsoft.com/en-us/entra/identity/managed-identities-azure-resources/how-to-use-vm-token#retry-guidance
 		token.MaxMSIRefreshAttempts = maxMSIRefreshAttempts
 		return c.extractAccessTokenFunc(token)
+	}
+
+	if cloudProviderConfig.ClientID == clientIDForMSI {
+		return "", fmt.Errorf("client ID within cloud provider config indicates usage of a managed identity, though no user-assigned identity ID was provided")
 	}
 
 	env, err := azure.EnvironmentFromName(cloudProviderConfig.CloudName)
