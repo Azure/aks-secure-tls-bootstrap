@@ -30,7 +30,7 @@ func GenerateForCertAndKey(certPEM, keyPEM []byte, cfg *Config) (*clientcmdapi.C
 	if _, err := credBytes.Write(keyPEM); err != nil {
 		return nil, fmt.Errorf("writing client key PEM bytes to buffer: %w", err)
 	}
-	if err := os.MkdirAll(filepath.Dir(cfg.CredFilePath), 0600); err != nil {
+	if err := os.MkdirAll(filepath.Dir(cfg.CredFilePath), 0755); err != nil {
 		return nil, fmt.Errorf("creating parent directories for cred file path: %w", err)
 	}
 	if err := os.WriteFile(cfg.CredFilePath, credBytes.Bytes(), 0600); err != nil {
