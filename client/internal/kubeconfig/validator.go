@@ -80,7 +80,7 @@ func (v *validator) Validate(ctx context.Context, kubeconfigPath string, ensureA
 	if !ensureAuthorizedClient {
 		return nil
 	}
-	restclient.AddUserAgent(clientConfig, internalhttp.GetUserAgentValue())
+	restclient.AddUserAgent(clientConfig, internalhttp.UserAgent())
 	clientConfig.Wrap(func(rt http.RoundTripper) http.RoundTripper {
 		c := internalhttp.NewRetryableClient(ctx)
 		c.HTTPClient = &http.Client{Transport: rt}
