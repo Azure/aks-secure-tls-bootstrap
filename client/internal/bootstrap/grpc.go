@@ -24,6 +24,8 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// used to store any errors encountered by the gRPC client when making RPCs to the remote
+// within the retry loop configured by retry.UnaryClientInterceptor
 var lastGRPCRetryError error
 
 // closeFunc closes a gRPC client connection, fake implementations given in unit tests.
@@ -70,14 +72,15 @@ func getGRPCOnRetryCallbackFunc() retry.OnRetryCallback {
 	// this function is called after every retry attempt assuming the attempt failed,
 	// and the failure was not caused by a context error (e.g. DeadlineExceeded or Cancelled),
 	// see: https://github.com/grpc-ecosystem/go-grpc-middleware/blob/main/interceptors/retry/retry.go.
-	// it stores the error within lastGRPCRetryError and logs it using the logger attached to the context.
+	// the error is logged and stored within lastGRPCRetryError.
 	return func(ctx context.Context, attempt uint, err error) {
 		log.MustGetLogger(ctx).Error("gRPC request failed", zap.Error(err), zap.Uint("attempt", attempt))
 		lastGRPCRetryError = err
 	}
 }
 
-// withLastGRPCRetryErrorIfDeadlineExceeded wraps the error with lastGRPCRetryError if the error is a context.DeadlineExceeded.
+// withLastGRPCRetryErrorIfDeadlineExceeded wraps the error with lastGRPCRetryError if the error
+// was caused by a context.DeadlineExceeded.
 func withLastGRPCRetryErrorIfDeadlineExceeded(err error) error {
 	if lastGRPCRetryError == nil || status.Code(err) != codes.DeadlineExceeded {
 		return err
