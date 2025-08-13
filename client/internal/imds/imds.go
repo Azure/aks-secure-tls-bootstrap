@@ -11,6 +11,7 @@ import (
 	"net/http"
 
 	internalhttp "github.com/Azure/aks-secure-tls-bootstrap/client/internal/http"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/log"
 	"go.uber.org/zap"
 )
 
@@ -24,22 +25,20 @@ type Client interface {
 type client struct {
 	baseURL    string
 	httpClient *http.Client
-	logger     *zap.Logger
 }
 
 var _ Client = (*client)(nil)
 
-func NewClient(logger *zap.Logger) Client {
+func NewClient(ctx context.Context) Client {
 	return &client{
 		baseURL:    imdsURL,
-		httpClient: internalhttp.NewClient(logger),
-		logger:     logger,
+		httpClient: internalhttp.NewClient(ctx),
 	}
 }
 
 func (c *client) GetInstanceData(ctx context.Context) (*VMInstanceData, error) {
 	url := fmt.Sprintf("%s/%s", c.baseURL, instanceDataEndpoint)
-	c.logger.Info("calling IMDS instance data endpoint", zap.String("url", url))
+	log.MustGetLogger(ctx).Info("calling IMDS instance data endpoint", zap.String("url", url))
 
 	params := getCommonParameters()
 
@@ -53,7 +52,7 @@ func (c *client) GetInstanceData(ctx context.Context) (*VMInstanceData, error) {
 
 func (c *client) GetAttestedData(ctx context.Context, nonce string) (*VMAttestedData, error) {
 	url := fmt.Sprintf("%s/%s", c.baseURL, attestedDataEndpoint)
-	c.logger.Info("calling IMDS attested data endpoint", zap.String("url", url))
+	log.MustGetLogger(ctx).Info("calling IMDS attested data endpoint", zap.String("url", url))
 
 	params := getCommonParameters()
 	params[nonceParameterKey] = nonce

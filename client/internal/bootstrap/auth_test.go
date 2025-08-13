@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"go.uber.org/zap"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/cloud"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/log"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/telemetry"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/testutil"
 	"github.com/Azure/go-autorest/autorest/adal"
@@ -193,15 +193,13 @@ func TestGetAccessToken(t *testing.T) {
 		},
 	}
 
-	logger, _ := zap.NewDevelopment()
 	testTenantID := "d87a2c3e-0c0c-42b2-a883-e48cd8723e22"
 	testResource := "resource"
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			ctx := telemetry.NewContext()
+			ctx := telemetry.WithTracing(log.NewTestContext())
 			client := &Client{
-				logger:                 logger,
 				extractAccessTokenFunc: c.setupExtractAccessTokenFunc(t),
 			}
 			providerCfg := &cloud.ProviderConfig{

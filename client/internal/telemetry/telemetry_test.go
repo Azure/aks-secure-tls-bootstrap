@@ -14,37 +14,34 @@ import (
 )
 
 func TestTracer(t *testing.T) {
-	newTracer := NewTracer()
-	assert.NotNil(t, newTracer)
-
-	tracer, ok := (newTracer).(*tracer)
-	assert.True(t, ok)
+	tracer := newTracer()
+	assert.NotNil(t, tracer)
 
 	spanName := "TestSpan"
-	tracer.StartSpan(spanName)
+	tracer.startSpan(spanName)
 	span, ok := tracer.spans[spanName]
 	assert.True(t, ok)
 	assert.NotNil(t, span)
 	assert.NotZero(t, span.start)
 	assert.Zero(t, span.end)
-	tracer.StartSpan(spanName)
+	tracer.startSpan(spanName)
 	span, ok = tracer.spans[spanName]
 	assert.True(t, ok)
 	assert.NotNil(t, span)
 	assert.NotZero(t, span.start)
 	assert.Zero(t, span.end)
 
-	tracer.EndSpan(spanName)
+	tracer.endSpan(spanName)
 	span, ok = tracer.spans[spanName]
 	assert.True(t, ok)
 	assert.NotNil(t, span)
 	assert.NotZero(t, span.start)
 	assert.NotZero(t, span.end)
 
-	tracer.EndSpan("non-existent-span")
+	tracer.endSpan("non-existent-span")
 	assert.Len(t, tracer.spans, 1)
 
-	trace := tracer.GetTrace()
+	trace := tracer.getTrace()
 	assert.NotNil(t, trace)
 	assert.Empty(t, tracer.spans)
 	assert.Len(t, trace, 1)
@@ -60,34 +57,42 @@ func TestTracer(t *testing.T) {
 	assert.Equal(t, traceString, fmt.Sprintf(`{"TestSpanMilliseconds":%d}`, duration.Milliseconds()))
 }
 
-func TestNewContext(t *testing.T) {
-	ctx := NewContext()
+func TestStartStopSpan(t *testing.T) {
+	ctx := WithTracing(context.Background())
 	assert.NotNil(t, ctx)
 
-	tracer := MustGetTracer(ctx)
-	assert.NotNil(t, tracer)
+	spanName := "TestSpan"
+	endSpan := StartSpan(ctx, spanName)
+	assert.NotNil(t, endSpan)
+
+	endSpan()
+
+	trace := GetTrace(ctx)
+	assert.NotNil(t, trace)
+
+	spanDuration, ok := trace[spanName]
+	assert.True(t, ok)
+	assert.NotZero(t, spanDuration)
+
+	assert.Empty(t, GetTrace(ctx))
 }
 
-func TestWithTracer(t *testing.T) {
-	ctx := context.Background()
-	tracer := NewTracer()
-	assert.NotNil(t, tracer)
-
-	ctx = WithTracer(ctx, tracer)
+func TestWithTracing(t *testing.T) {
+	ctx := WithTracing(context.Background())
 	assert.NotNil(t, ctx)
 
-	tracer = MustGetTracer(ctx)
+	tracer := mustGetTracer(ctx)
 	assert.NotNil(t, tracer)
 }
 
 func TestMustGetTracer(t *testing.T) {
-	ctx := NewContext()
-	tracer := MustGetTracer(ctx)
+	ctx := WithTracing(context.Background())
+	tracer := mustGetTracer(ctx)
 	assert.NotNil(t, tracer)
 
 	ctx = context.Background()
 	assert.Panics(t, func() {
-		MustGetTracer(ctx)
+		mustGetTracer(ctx)
 	})
 }
 

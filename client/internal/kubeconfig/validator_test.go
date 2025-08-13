@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/log"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/testutil"
 	"github.com/stretchr/testify/assert"
-	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	fakediscovery "k8s.io/client-go/discovery/fake"
@@ -21,9 +21,7 @@ import (
 )
 
 func TestNewValidator(t *testing.T) {
-	logger, _ := zap.NewDevelopment()
-
-	v := NewValidator(logger)
+	v := NewValidator()
 	assert.NotNil(t, v)
 
 	vv, ok := v.(*validator)
@@ -33,8 +31,6 @@ func TestNewValidator(t *testing.T) {
 }
 
 func TestValidateKubeconfig(t *testing.T) {
-	logger, _ := zap.NewDevelopment()
-
 	validCertPEM, validKeyPEM, err := testutil.GenerateCertPEM(testutil.CertTemplate{
 		CommonName:   "cn",
 		Organization: "org",
@@ -134,11 +130,11 @@ func TestValidateKubeconfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			v := &validator{
-				logger: logger,
-			}
+			ctx := log.NewTestContext()
+			v := new(validator)
 			tt.setupFunc(v)
-			err := v.Validate("path", false)
+
+			err := v.Validate(ctx, "path", false)
 			if len(tt.expectedErrs) > 0 {
 				assert.Error(t, err)
 				for _, expectedErr := range tt.expectedErrs {
@@ -209,13 +205,10 @@ func TestEnsureAuthorizedClient(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	logger, _ := zap.NewDevelopment()
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			v := &validator{
-				logger: logger,
-			}
+			ctx := log.NewTestContext()
+			v := new(validator)
 
 			clientset := fake.NewSimpleClientset()
 			v.clientConfigLoader = func(kubeconfigPath string) (*restclient.Config, error) {
@@ -233,7 +226,7 @@ func TestEnsureAuthorizedClient(t *testing.T) {
 			}
 
 			tt.setupFunc(v, clientset)
-			err := v.Validate("path", true)
+			err := v.Validate(ctx, "path", true)
 
 			if len(tt.expectedErrs) > 0 {
 				assert.Error(t, err)
