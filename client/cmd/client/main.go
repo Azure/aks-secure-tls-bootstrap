@@ -39,11 +39,10 @@ func init() {
 	flag.StringVar(&bootstrapConfig.NextProto, "next-proto", "", "ALPN next proto value")
 	flag.StringVar(&bootstrapConfig.KubeconfigPath, "kubeconfig", "", "path to the kubeconfig - if this file does not exist, the generated kubeconfig will be placed there")
 	flag.StringVar(&bootstrapConfig.ClusterCAFilePath, "cluster-ca-file", "", "path to the cluster CA file")
-	flag.StringVar(&bootstrapConfig.CredFilePath, "cred-file", "", "path to the file which will contain the PEM-encoded client certificate/key pair, referenced by the generated kubeconfig")
+	flag.StringVar(&bootstrapConfig.CertDir, "cert-dir", "", "the directory where kubelet's new client certificate/key pair will be stored")
 	flag.BoolVar(&bootstrapConfig.InsecureSkipTLSVerify, "insecure-skip-tls-verify", false, "skip TLS verification when connecting to the control plane")
 	flag.BoolVar(&bootstrapConfig.EnsureAuthorizedClient, "ensure-authorized", false, "ensure the specified kubeconfig contains an authorized clientset before bootstrapping")
 	flag.DurationVar(&bootstrapConfig.Deadline, "deadline", 3*time.Minute, "deadline within which bootstrapping must succeed")
-
 	flag.Parse()
 }
 

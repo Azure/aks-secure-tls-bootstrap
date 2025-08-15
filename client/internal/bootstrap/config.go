@@ -22,7 +22,7 @@ type Config struct {
 	AADResource             string        `json:"aadResource"`
 	ClusterCAFilePath       string        `json:"clusterCaFilePath"`
 	KubeconfigPath          string        `json:"kubeconfigPath"`
-	CredFilePath            string        `json:"credFilePath"`
+	CertDir                 string        `json:"credFilePath"`
 	InsecureSkipTLSVerify   bool          `json:"insecureSkipTlsVerify"`
 	EnsureAuthorizedClient  bool          `json:"ensureAuthorizedClient"`
 	Deadline                time.Duration `json:"deadline"`
@@ -47,8 +47,8 @@ func (c *Config) Validate() error {
 	if c.KubeconfigPath == "" {
 		return fmt.Errorf("kubeconfig path must be specified")
 	}
-	if c.CredFilePath == "" {
-		return fmt.Errorf("cred file path must be specified")
+	if c.CertDir == "" {
+		return fmt.Errorf("cert dir must be specified")
 	}
 	if c.Deadline == 0 {
 		return fmt.Errorf("deadline must be specified")
