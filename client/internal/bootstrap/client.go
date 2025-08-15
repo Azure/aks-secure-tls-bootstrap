@@ -128,7 +128,7 @@ func (c *Client) BootstrapKubeletClientCredential(ctx context.Context, cfg *Conf
 	kubeconfigData, err := c.generateKubeconfig(ctx, certPEM, keyPEM, &kubeconfig.Config{
 		APIServerFQDN:     cfg.APIServerFQDN,
 		ClusterCAFilePath: cfg.ClusterCAFilePath,
-		CredFilePath:      cfg.CredFilePath,
+		CertDir:           cfg.CertDir,
 	})
 	if err != nil {
 		logger.Error(err.Error())

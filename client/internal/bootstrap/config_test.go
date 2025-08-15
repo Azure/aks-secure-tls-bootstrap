@@ -65,11 +65,11 @@ func TestConfig(t *testing.T) {
 			expectedErr: errors.New("kubeconfig path must be specified"),
 		},
 		{
-			name: "CredFilePath is empty",
+			name: "CertDir is empty",
 			modify: func(c *Config, t *testing.T) {
-				c.CredFilePath = ""
+				c.CertDir = ""
 			},
-			expectedErr: errors.New("cred file path must be specified"),
+			expectedErr: errors.New("cert dir must be specified"),
 		},
 		{
 			name: "cloud provider config path does not exist",
@@ -116,7 +116,7 @@ func TestConfig(t *testing.T) {
 				AADResource:             "appID",
 				ClusterCAFilePath:       "path",
 				KubeconfigPath:          "path",
-				CredFilePath:            "path",
+				CertDir:                 "path",
 				Deadline:                time.Second,
 			}
 			tt.modify(cfg, t)
@@ -172,7 +172,7 @@ func TestLoadFromFile(t *testing.T) {
 				AADResource:             "appID",
 				ClusterCAFilePath:       "path",
 				KubeconfigPath:          "path",
-				CredFilePath:            "path",
+				CertDir:                 "path",
 			}
 			tt.modify(cfg, t)
 

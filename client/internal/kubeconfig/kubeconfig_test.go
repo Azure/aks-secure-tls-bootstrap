@@ -15,8 +15,16 @@ import (
 )
 
 func TestKubeconfigGeneration(t *testing.T) {
+	originalKubeletClientCertFileName := kubeletClientCertFileName
+	t.Cleanup(func() {
+		kubeletClientCertFileName = originalKubeletClientCertFileName
+	})
+
 	tempDir := t.TempDir()
-	credPath := filepath.Join(tempDir, "client.pem")
+	kubeletClientCertFileName = func() string {
+		return "kubelet-client-test.pem"
+	}
+	certPath := filepath.Join(tempDir, kubeletClientCertFileName())
 
 	certPEM, keyPEM, err := testutil.GenerateCertPEM(testutil.CertTemplate{
 		CommonName:   "system:node:node",
@@ -28,7 +36,7 @@ func TestKubeconfigGeneration(t *testing.T) {
 	cfg := &Config{
 		APIServerFQDN:     "host",
 		ClusterCAFilePath: "path",
-		CredFilePath:      credPath,
+		CertDir:           tempDir,
 	}
 
 	kubeconfigData, err := GenerateForCertAndKey(certPEM, keyPEM, cfg)
@@ -40,22 +48,22 @@ func TestKubeconfigGeneration(t *testing.T) {
 
 	assert.Contains(t, kubeconfigData.AuthInfos, "default-auth")
 	defaultAuth := kubeconfigData.AuthInfos["default-auth"]
-	assert.Equal(t, credPath, defaultAuth.ClientCertificate)
-	assert.Equal(t, credPath, defaultAuth.ClientKey)
+	assert.Equal(t, certPath, defaultAuth.ClientCertificate)
+	assert.Equal(t, certPath, defaultAuth.ClientKey)
 	assert.Contains(t, kubeconfigData.Contexts, "default-context")
 	defaultContext := kubeconfigData.Contexts["default-context"]
 	assert.Equal(t, "default-cluster", defaultContext.Cluster)
 	assert.Equal(t, "default-auth", defaultContext.AuthInfo)
-
 	assert.Equal(t, "default-context", kubeconfigData.CurrentContext)
 
-	credData, err := os.ReadFile(credPath)
+	certData, err := os.ReadFile(certPath)
 	assert.NoError(t, err)
-	assert.NotNil(t, credData)
-	certBlock, rest := pem.Decode(credData)
+	assert.NotNil(t, certData)
 
+	certBlock, rest := pem.Decode(certData)
 	assert.NotNil(t, certBlock)
 	assert.Equal(t, "CERTIFICATE", certBlock.Type)
+	assert.NotEmpty(t, certBlock.Bytes)
 	assert.NotEmpty(t, rest)
 
 	keyBlock, rest := pem.Decode(rest)
