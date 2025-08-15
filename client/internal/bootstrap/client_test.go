@@ -292,6 +292,7 @@ func expectCorrectKubeconfigData(t *testing.T, data *clientcmdapi.Config, cfg *C
 	certBlock, rest := pem.Decode(certPath)
 	assert.NotNil(t, certBlock)
 	assert.NotEmpty(t, rest)
+
 	cert, err := x509.ParseCertificate(certBlock.Bytes)
 	assert.NoError(t, err)
 	assert.NotNil(t, cert)
@@ -301,6 +302,7 @@ func expectCorrectKubeconfigData(t *testing.T, data *clientcmdapi.Config, cfg *C
 	keyData, rest := pem.Decode(rest)
 	assert.NotNil(t, keyData)
 	assert.Empty(t, rest)
+
 	key, err := x509.ParseECPrivateKey(keyData.Bytes)
 	assert.NoError(t, err)
 	assert.NotNil(t, key)

@@ -12,7 +12,7 @@ import (
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/kubeconfig"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/log"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/telemetry"
-	akssecuretlsbootstrapv1 "github.com/Azure/aks-secure-tls-bootstrap/service/pkg/gen/akssecuretlsbootstrap/v1"
+	v1 "github.com/Azure/aks-secure-tls-bootstrap/service/pkg/gen/akssecuretlsbootstrap/v1"
 	"go.uber.org/zap"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
@@ -78,7 +78,7 @@ func (c *Client) BootstrapKubeletClientCredential(ctx context.Context, cfg *Conf
 	}
 	logger.Info("retrieved instance metadata from IMDS", zap.String("resourceId", instanceData.Compute.ResourceID))
 
-	nonce, err := c.getNonce(ctx, serviceClient, &akssecuretlsbootstrapv1.GetNonceRequest{
+	nonce, err := c.getNonce(ctx, serviceClient, &v1.GetNonceRequest{
 		ResourceId: instanceData.Compute.ResourceID,
 	})
 	if err != nil {
@@ -110,7 +110,7 @@ func (c *Client) BootstrapKubeletClientCredential(ctx context.Context, cfg *Conf
 	}
 	logger.Info("generated kubelet client CSR and associated private key")
 
-	certPEM, err := c.getCredential(ctx, serviceClient, &akssecuretlsbootstrapv1.GetCredentialRequest{
+	certPEM, err := c.getCredential(ctx, serviceClient, &v1.GetCredentialRequest{
 		ResourceId:    instanceData.Compute.ResourceID,
 		Nonce:         nonce,
 		AttestedData:  attestedData.Signature,
@@ -152,7 +152,7 @@ func (c *Client) validateKubeconfig(ctx context.Context, kubeconfigPath string, 
 	return nil
 }
 
-func (c *Client) getServiceClient(ctx context.Context, token string, cfg *Config) (akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient, closeFunc, error) {
+func (c *Client) getServiceClient(ctx context.Context, token string, cfg *Config) (v1.SecureTLSBootstrapServiceClient, closeFunc, error) {
 	endSpan := telemetry.StartSpan(ctx, "GetServiceClient")
 	defer endSpan()
 
@@ -186,10 +186,7 @@ func (c *Client) getAttestedData(ctx context.Context, nonce string) (*imds.VMAtt
 	return attestedData, nil
 }
 
-func (c *Client) getNonce(
-	ctx context.Context,
-	serviceClient akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient,
-	req *akssecuretlsbootstrapv1.GetNonceRequest) (string, error) {
+func (c *Client) getNonce(ctx context.Context, serviceClient v1.SecureTLSBootstrapServiceClient, req *v1.GetNonceRequest) (string, error) {
 	endSpan := telemetry.StartSpan(ctx, "GetNonce")
 	defer endSpan()
 
@@ -212,10 +209,7 @@ func (c *Client) getCSR(ctx context.Context) ([]byte, []byte, error) {
 	return csrPEM, keyPEM, nil
 }
 
-func (c *Client) getCredential(
-	ctx context.Context,
-	serviceClient akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient,
-	req *akssecuretlsbootstrapv1.GetCredentialRequest) ([]byte, error) {
+func (c *Client) getCredential(ctx context.Context, serviceClient v1.SecureTLSBootstrapServiceClient, req *v1.GetCredentialRequest) ([]byte, error) {
 	endSpan := telemetry.StartSpan(ctx, "GetCredential")
 	defer endSpan()
 

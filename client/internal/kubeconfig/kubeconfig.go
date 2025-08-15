@@ -13,13 +13,6 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
-// fake implementations given in unit tests
-var kubeletClientCertFileName = func() string {
-	// to emulate kubelet's TLS bootstrapping behavior - see FileStore implementation within client-go/util/certificate:
-	// https://github.com/kubernetes/client-go/blob/d99dd130a2fc7519c0bc2bd7271447b2a16c04a2/util/certificate/certificate_store.go#L205
-	return fmt.Sprintf("kubelet-client-%s.pem", time.Now().Format("2006-01-02-15-04-05"))
-}
-
 // Config is used to configure a newly-generated kubeconfig.
 type Config struct {
 	APIServerFQDN     string
@@ -39,7 +32,7 @@ func GenerateForCertAndKey(certPEM, keyPEM []byte, cfg *Config) (*clientcmdapi.C
 		return nil, fmt.Errorf("writing kubelet client key PEM bytes to buffer: %w", err)
 	}
 
-	certPath := filepath.Join(cfg.CertDir, kubeletClientCertFileName())
+	certPath := filepath.Join(cfg.CertDir, getKubeletClientCertFileName())
 	if err := os.MkdirAll(cfg.CertDir, 0755); err != nil {
 		return nil, fmt.Errorf("creating kubelet cert dir: %w", err)
 	}
@@ -73,4 +66,10 @@ func GenerateForCertAndKey(certPEM, keyPEM []byte, cfg *Config) (*clientcmdapi.C
 	}
 
 	return kubeconfigData, nil
+}
+
+func getKubeletClientCertFileName() string {
+	// to emulate kubelet's TLS bootstrapping behavior - see FileStore implementation within client-go/util/certificate:
+	// https://github.com/kubernetes/client-go/blob/d99dd130a2fc7519c0bc2bd7271447b2a16c04a2/util/certificate/certificate_store.go#L205
+	return fmt.Sprintf("kubelet-client-%s.pem", time.Now().Format("2006-01-02-15-04-05"))
 }
