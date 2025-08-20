@@ -60,6 +60,12 @@ func getServiceClient(token string, cfg *Config) (akssecuretlsbootstrapv1.Secure
 			retry.WithCodes(codes.Aborted, codes.Unavailable),
 			retry.WithMax(30),
 		)),
+		// forcefully disable usage of HTTP proxy, this is needed since on AKS nodes where the client
+		// will be running, the no_proxy environment variable will only contain the FQDN of the apiserver
+		// rather than its IP address. Without this dialer option, only having the FQDN within no_proxy isn't
+		// enough to have the client bypass any proxies when communicating with the cluster's apiserver.
+		// see: https://github.com/grpc/grpc-go/issues/3401 for more details.
+		grpc.WithNoProxy(),
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to dial client connection with context: %w", err)
