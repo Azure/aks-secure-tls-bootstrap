@@ -33,7 +33,7 @@ func NewClient(ctx context.Context) (*Client, error) {
 	}, nil
 }
 
-func (c *Client) BootstrapKubeletClientCredential(ctx context.Context, cfg *Config) (*clientcmdapi.Config, error) {
+func (c *Client) Bootstrap(ctx context.Context, cfg *Config) (*clientcmdapi.Config, error) {
 	logger := log.MustGetLogger(ctx)
 
 	err := c.validateKubeconfig(ctx, cfg.KubeconfigPath, cfg.EnsureAuthorizedClient)

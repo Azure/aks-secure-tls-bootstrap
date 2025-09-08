@@ -244,7 +244,7 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 			}
 			c.setupMocks(config, imdsClient, kubeconfigValidator, serviceClient)
 
-			kubeconfigData, err := client.BootstrapKubeletClientCredential(telemetry.WithTracing(log.NewTestContext()), config)
+			kubeconfigData, err := client.Bootstrap(telemetry.WithTracing(log.NewTestContext()), config)
 			if c.expectedError == nil {
 				assert.NoError(t, err)
 				if !c.skipKubeconfigValidation {
@@ -253,11 +253,8 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 			} else {
 				assert.Nil(t, kubeconfigData)
 				assert.Error(t, err)
-				var bootstrapErr *BootstrapError
-				assert.Error(t, err)
-				assert.True(t, errors.As(err, &bootstrapErr))
-				assert.Equal(t, c.expectedError.Type(), bootstrapErr.Type())
-				assert.ErrorContains(t, bootstrapErr.Unwrap(), c.expectedError.inner.Error())
+				assert.Equal(t, c.expectedError.errorType, GetErrorType(err))
+				assert.ErrorContains(t, err, c.expectedError.inner.Error())
 			}
 		})
 	}

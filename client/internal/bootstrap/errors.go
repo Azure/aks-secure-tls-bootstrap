@@ -3,7 +3,7 @@
 
 package bootstrap
 
-import "fmt"
+import "errors"
 
 type ErrorType string
 
@@ -16,7 +16,7 @@ const (
 	ErrorTypeGetCSRFailure             ErrorType = "GetCSRFailure"
 	ErrorTypeGetCredentialFailure      ErrorType = "GetCredentialFailure"
 	ErrorTypeGenerateKubeconfigFailure ErrorType = "GenerateKubeconfigFailure"
-	ErrorTypeWriteKubeconfigFailure    ErrorType = "WriteKubeconfigFailure"
+	ErrorTypeUnknown                   ErrorType = "Unknown"
 )
 
 type BootstrapError struct {
@@ -24,27 +24,14 @@ type BootstrapError struct {
 	inner     error
 }
 
-func (e *BootstrapError) Retryable() bool {
-	switch e.errorType {
-	case ErrorTypeGetAccessTokenFailure,
-		ErrorTypeGetInstanceDataFailure,
-		ErrorTypeGetAttestedDataFailure,
-		ErrorTypeGetNonceFailure,
-		ErrorTypeGetCredentialFailure:
-		return true
-	default:
-		return false
-	}
-}
-
 func (e *BootstrapError) Error() string {
-	return fmt.Sprintf("%s: %s", e.errorType, e.inner.Error())
+	return e.inner.Error()
 }
 
-func (e *BootstrapError) Type() ErrorType {
-	return e.errorType
-}
-
-func (e *BootstrapError) Unwrap() error {
-	return e.inner
+func GetErrorType(err error) ErrorType {
+	var bootstrapError *BootstrapError
+	if errors.As(err, &bootstrapError) {
+		return bootstrapError.errorType
+	}
+	return ErrorTypeUnknown
 }
