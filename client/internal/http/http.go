@@ -42,10 +42,7 @@ func configureLogger(ctx context.Context, client *retryablehttp.Client) {
 }
 
 func configureRetryPolicy(client *retryablehttp.Client) {
-	// retryablehttp.DefaultBackoff implements an exponential backoff strategy
-	// bounded by RetryWaitMin + RetryWaitMax. It will also attempt to parse out and respect any
-	// Retry-After header from the server's response.
-	client.Backoff = retryablehttp.DefaultBackoff
+	client.Backoff = retryablehttp.LinearJitterBackoff
 	client.RetryMax = 5
 	client.RetryWaitMin = 300 * time.Millisecond
 	client.RetryWaitMax = 3 * time.Second

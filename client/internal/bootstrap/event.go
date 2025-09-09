@@ -62,15 +62,12 @@ type Result struct {
 	Status Status `json:"Status"`
 	// ElapsedMilliseconds measures how long the bootstrapping event took to execute, in milliseconds.
 	ElapsedMilliseconds int64 `json:"ElapsedMilliseconds"`
-	// Errors is a mapping from top-level bootstrapping error type of the number of times it occurred during the event.
-	Errors map[ErrorType]int `json:"Errors,omitempty"`
-	// Traces is a mapping from retry attempt to corresponding Trace. A Trace maps span names to their respective durations.
-	// This will only ever contain data for the last 3 retries to avoid truncating guest agent event data.
-	Traces map[int]telemetry.Trace `json:"Traces,omitempty"`
-	// TraceSummary is a special Trace which maps span names to their total durations across all retry attempts.
-	TraceSummary telemetry.Trace `json:"TraceSummary,omitempty"`
-	// FinalError is the the error returned by the last retry attempt, assuming the overall bootstrapping event failed.
-	FinalError string `json:"FinalError,omitempty"`
+	// Trace shows how long each top-level bootstrapping step took to execute as a part of the event.
+	Trace telemetry.Trace `json:"Trace,omitempty"`
+	// ErrorType is the type of the encountered terminal error.
+	ErrorType ErrorType `json:"ErrorType,omitempty"`
+	// Error is the terminal error indicating why bootstrapping failed.
+	Error string `json:"Error,omitempty"`
 }
 
 type Event struct {

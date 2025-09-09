@@ -5,7 +5,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -17,6 +16,7 @@ import (
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/log"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/telemetry"
 	"go.uber.org/zap"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 var bootstrapConfig = new(bootstrap.Config)
@@ -65,74 +65,71 @@ func main() {
 }
 
 func run(ctx context.Context) int {
-	logger, flush, finalErr := log.NewProductionLogger(logFile, verbose)
-	if finalErr != nil {
-		fmt.Printf("unable to construct zap logger: %s\n", finalErr)
+	logger, flush, err := log.NewProductionLogger(logFile, verbose)
+	if err != nil {
+		fmt.Printf("unable to construct zap logger: %s\n", err)
 		return 1
 	}
 	defer flush()
 
 	ctx = log.WithLogger(telemetry.WithTracing(ctx), logger)
 
-	bootstrapClient, finalErr := bootstrap.NewClient(ctx)
-	if finalErr != nil {
-		fmt.Printf("unable to construct bootstrap client: %s\n", finalErr)
+	bootstrapClient, err := bootstrap.NewClient(ctx)
+	if err != nil {
+		fmt.Printf("unable to construct bootstrap client: %s\n", err)
 		return 1
 	}
 
+	// setup the deadline
 	bootstrapStartTime := time.Now()
 	bootstrapDeadline := bootstrapStartTime.Add(bootstrapConfig.Deadline)
 	logger.Info("set bootstrap deadline", zap.Time("deadline", bootstrapDeadline))
-
 	bootstrapCtx, cancel := context.WithDeadline(ctx, bootstrapDeadline)
 	defer cancel()
 
-	finalErr, errLog, traces := bootstrap.Bootstrap(bootstrapCtx, bootstrapClient, bootstrapConfig)
-	bootstrapEndTime := time.Now()
+	// attempt bootstrapping
+	kubeconfigData, err := bootstrapClient.Bootstrap(bootstrapCtx, bootstrapConfig)
 
-	var exitCode int
+	// process the result
+	bootstrapEndTime := time.Now()
 	bootstrapResult := &bootstrap.Result{
 		Status:              bootstrap.StatusSuccess,
 		ElapsedMilliseconds: bootstrapEndTime.Sub(bootstrapStartTime).Milliseconds(),
-		Errors:              errLog,
-		Traces:              traces.GetLastNTraces(5), // only keep the last 5 traces to avoid truncating guest agent event data
-		TraceSummary:        traces.GetTraceSummary(),
+		Trace:               telemetry.GetTrace(bootstrapCtx),
 	}
+	defer emitGuestAgentEvent(logger, bootstrapStartTime, bootstrapEndTime, bootstrapResult)
 
-	if finalErr != nil {
+	if err != nil {
+		logger.Error("failed to bootstrap", zap.Error(err))
 		bootstrapResult.Status = bootstrap.StatusFailure
+		bootstrapResult.ErrorType = bootstrap.GetErrorType(err)
+		bootstrapResult.Error = err.Error()
+		return 1
+	}
 
-		switch {
-		case errors.Is(finalErr, context.Canceled):
-			logger.Error("context was cancelled before bootstrapping could complete")
-		case errors.Is(finalErr, context.DeadlineExceeded):
-			logger.Error(
-				"failed to successfully bootstrap before the specified deadline",
-				zap.Error(errors.Unwrap(finalErr)),
-				zap.Time("deadline", bootstrapDeadline),
-				zap.Duration("deadlineDuration", bootstrapConfig.Deadline),
-			)
-		default:
-			logger.Error("failed to bootstrap", zap.Error(errors.Unwrap(finalErr)))
+	if kubeconfigData != nil {
+		if err := clientcmd.WriteToFile(*kubeconfigData, bootstrapConfig.KubeconfigPath); err != nil {
+			logger.Error("unable to write kubeconfig file", zap.String("path", bootstrapConfig.KubeconfigPath), zap.Error(err))
+			return 1
 		}
-
-		bootstrapResult.FinalError = errors.Unwrap(finalErr).Error()
-		exitCode = 1
+		logger.Info("kubeconfig written to disk", zap.String("path", bootstrapConfig.KubeconfigPath))
 	}
 
+	return 0
+}
+
+func emitGuestAgentEvent(logger *zap.Logger, startTime, endTime time.Time, result *bootstrap.Result) {
 	bootstrapEvent := &bootstrap.Event{
-		Start: bootstrapStartTime,
-		End:   bootstrapEndTime,
+		Start: startTime,
+		End:   endTime,
 	}
-	eventFilePath, finalErr := bootstrapEvent.WriteWithResult(bootstrapResult)
-	if finalErr != nil {
-		logger.Error("unable to write bootstrap guest agent event to disk", zap.Error(finalErr))
+	eventFilePath, err := bootstrapEvent.WriteWithResult(result)
+	if err != nil {
+		logger.Error("unable to write bootstrap guest agent event to disk", zap.Error(err))
 	}
 	if eventFilePath == "" {
-		logger.Warn("guest agent event path does not exist, not guest agent event telemetry will be written", zap.String("eventMessage", bootstrapEvent.Message))
+		logger.Warn("guest agent event path does not exist, no guest agent event telemetry will be written", zap.String("eventMessage", bootstrapEvent.Message))
 	} else {
 		logger.Info("bootstrapping guest agent event telemetry written to disk", zap.String("path", eventFilePath))
 	}
-
-	return exitCode
 }
