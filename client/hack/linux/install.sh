@@ -5,7 +5,7 @@ set -euxo pipefail
 # on a running AKS node for development/testing.
 
 # download and usage:
-# 1. $ curl -o install-aks-secure-tls-bootstrap-client.sh https://raw.githubusercontent.com/Azure/aks-secure-tls-bootstrap/refs/heads/main/client/hack/install.sh
+# 1. $ curl -o install-aks-secure-tls-bootstrap-client.sh https://raw.githubusercontent.com/Azure/aks-secure-tls-bootstrap/refs/heads/main/client/hack/linux/install.sh
 # 2. $ chmod +x install-aks-secure-tls-bootstrap-client.sh
 # 3. $ VERSION=<version> STORAGE_ACCOUNT_NAME=<storage-account-name> ./install-aks-secure-tls-bootstrap-client.sh
 
