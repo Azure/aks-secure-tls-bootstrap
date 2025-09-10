@@ -5,7 +5,7 @@ SUBSCRIPTION="${SUBSCRIPTION:-}"
 RESOURCE_GROUP="${RESOURCE_GROUP:-}"
 STORAGE_ACCOUNT_NAME="${STORAGE_ACCOUNT_NAME:-}"
 VERSION="${VERSION:-}"
-OS="${OS:-linux}"
+OS="${OS:-all}"
 
 [ -z "$SUBSCRIPTION" ] && echo "SUBSCRIPTION must be specified" && exit 1
 [ -z "$RESOURCE_GROUP" ] && echo "RESOURCE_GROUP must be specified" && exit 1
@@ -57,11 +57,17 @@ build_and_upload_windows_amd64() {
 
 rm -rf "bin/"
 
-if [ "${OS}" == "linux" ]; then
+if [ "${OS}" = "all" ]; then
+    echo "uploading for both linux and windows - amd64"
     build_and_upload_linux_amd64
-elif [ "${OS}" == "windows" ]; then
+    build_and_upload_windows_amd64
+elif [ "${OS}" = "linux" ]; then
+    echo "uploading for linux - amd64"
+    build_and_upload_linux_amd64
+elif [ "${OS}" = "windows" ]; then
+    echo "uploading for windows - amd64"
     build_and_upload_windows_amd64
 else
-    echo "unsupported OS: $OS, must be \"linux\" or \"windows\""
+    echo "unsupported OS: $OS, must be \"all\", \"linux\", or \"windows\""
     exit 1
 fi
