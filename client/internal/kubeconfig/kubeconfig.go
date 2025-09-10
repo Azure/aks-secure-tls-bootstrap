@@ -87,12 +87,15 @@ func createClientCertFile(certPEM, keyPEM []byte, certDir string) (string, error
 	return certPath, nil
 }
 
-// createCurrentClientSymlink creates a symlink at <certDir>/kubelet-client-current.pem that points to the specified certPath.
-// If this symlink already exists, this function is a no-op.
+// createCurrentClientSymlink creates a symlink at certDir/kubelet-client-current.pem that points to the specified certPath.
+// Any existing kubelet client current symlink will be replaced with a new pointing to certPath.
 func createCurrentClientSymlink(certDir, certPath string) (string, error) {
 	symlinkPath := filepath.Join(certDir, kubeletClientCurrentSymlinkName)
-	if _, err := os.Stat(symlinkPath); err == nil {
-		return "", fmt.Errorf("a kubelet client current symlink already exists at %s, will not modify", symlinkPath)
+	if _, err := os.Lstat(symlinkPath); err == nil {
+		// remove the existing symlink if needed
+		if err := os.Remove(symlinkPath); err != nil {
+			return "", fmt.Errorf("removing existing kubelet client current symlink: %w", err)
+		}
 	} else if !os.IsNotExist(err) {
 		return "", fmt.Errorf("checking for existing kubelet client current symlink: %w", err)
 	}
