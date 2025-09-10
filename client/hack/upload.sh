@@ -19,7 +19,7 @@ display_download_url() {
 }
 
 build_and_upload_linux_amd64() {
-    make build OS=linux ARCH=amd64
+    make build OS=linux ARCH=amd64 VERSION="${VERSION}"
 
     if [ ! -f "bin/aks-secure-tls-bootstrap-client-amd64" ]; then
         echo "could not find client binary aks-secure-tls-bootstrap-client-amd64 for upload within bin/"
@@ -38,7 +38,7 @@ build_and_upload_linux_amd64() {
 }
 
 build_and_upload_windows_amd64() {
-    make build OS=windows ARCH=amd64 EXTENSION=.exe
+    make build OS=windows ARCH=amd64 EXTENSION=.exe VERSION="${VERSION}"
 
     if [ ! -f "bin/aks-secure-tls-bootstrap-client-amd64.exe" ]; then
         echo "could not find client binary aks-secure-tls-bootstrap-client-amd64.exe for upload within bin/"
