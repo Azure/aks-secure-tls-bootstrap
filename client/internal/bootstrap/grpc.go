@@ -58,12 +58,12 @@ func getServiceClient(token string, cfg *Config) (akssecuretlsbootstrapv1.Secure
 			retry.WithOnRetryCallback(getGRPCOnRetryCallbackFunc()),
 			retry.WithBackoff(retry.BackoffExponentialWithJitterBounded(100*time.Millisecond, 0.75, 2*time.Second)),
 			retry.WithCodes(codes.Aborted, codes.Unavailable),
-			retry.WithMax(1000), // to provide effectively unlimited retries, with respect to the context deadline
+			retry.WithMax(30),
 		)),
-		// forcefully disable usage of any HTTP proxy - this is needed since on AKS nodes, the no_proxy
-		// environment variable will only contain the FQDN of the apiserver rather than its IP address.
-		// Without this option, only having the FQDN within no_proxy isn't enough to have the client bypass
-		// configured HTTP proxies when communicating with the bootstrap server within the control plane.
+		// forcefully disable usage of HTTP proxy, this is needed since on AKS nodes where the client
+		// will be running, the no_proxy environment variable will only contain the FQDN of the apiserver
+		// rather than its IP address. Without this dialer option, only having the FQDN within no_proxy isn't
+		// enough to have the client bypass any proxies when communicating with the cluster's apiserver.
 		// see: https://github.com/grpc/grpc-go/issues/3401 for more details.
 		grpc.WithNoProxy(),
 	)
