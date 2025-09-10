@@ -275,6 +275,7 @@ func expectCorrectKubeconfigData(t *testing.T, data *clientcmdapi.Config, cfg *C
 
 	defaultAuth := data.AuthInfos["default-auth"]
 	assert.NotNil(t, defaultAuth)
+	assert.Equal(t, "kubelet-client-current.pem", filepath.Base(defaultAuth.ClientCertificate))
 	assert.Equal(t, cfg.CertDir, filepath.Dir(defaultAuth.ClientCertificate))
 	assert.Equal(t, cfg.CertDir, filepath.Dir(defaultAuth.ClientKey))
 	assert.Contains(t, data.Contexts, "default-context")
@@ -283,9 +284,14 @@ func expectCorrectKubeconfigData(t *testing.T, data *clientcmdapi.Config, cfg *C
 	assert.NotNil(t, defaultContext)
 	assert.Equal(t, "default-cluster", defaultContext.Cluster)
 	assert.Equal(t, "default-auth", defaultContext.AuthInfo)
+
 	assert.Equal(t, "default-context", data.CurrentContext)
 
 	// validate cert file contents
+	fi, err := os.Lstat(defaultAuth.ClientCertificate)
+	assert.NoError(t, err)
+	assert.True(t, fi.Mode()&os.ModeSymlink == os.ModeSymlink)
+
 	certPath, err := os.ReadFile(defaultAuth.ClientCertificate)
 	assert.NoError(t, err)
 

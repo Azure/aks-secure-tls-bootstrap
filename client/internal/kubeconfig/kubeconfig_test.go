@@ -39,6 +39,7 @@ func TestKubeconfigGeneration(t *testing.T) {
 
 	defaultAuth := kubeconfigData.AuthInfos["default-auth"]
 	assert.NotNil(t, defaultAuth)
+	assert.Equal(t, kubeletClientCurrentSymlinkName, filepath.Base(defaultAuth.ClientCertificate))
 	assert.Equal(t, defaultAuth.ClientCertificate, defaultAuth.ClientKey)
 	assert.Equal(t, config.CertDir, filepath.Dir(defaultAuth.ClientCertificate))
 
@@ -48,6 +49,10 @@ func TestKubeconfigGeneration(t *testing.T) {
 	assert.Equal(t, "default-auth", defaultContext.AuthInfo)
 
 	assert.Equal(t, "default-context", kubeconfigData.CurrentContext)
+
+	fi, err := os.Lstat(defaultAuth.ClientCertificate)
+	assert.NoError(t, err)
+	assert.True(t, fi.Mode()&os.ModeSymlink == os.ModeSymlink)
 
 	certData, err := os.ReadFile(defaultAuth.ClientCertificate)
 	assert.NoError(t, err)
