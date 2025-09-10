@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -93,4 +94,66 @@ func TestMustGetTracer(t *testing.T) {
 	assert.Panics(t, func() {
 		mustGetTracer(ctx)
 	})
+}
+
+func TestTraceStore(t *testing.T) {
+	store := NewTraceStore()
+	assert.NotNil(t, store)
+	assert.NotNil(t, store.traces)
+	assert.Empty(t, store.traces)
+
+	trace0 := Trace{"span": 100 * time.Millisecond}
+	trace1 := Trace{"span": 200 * time.Millisecond}
+	trace2 := Trace{"span": 300 * time.Millisecond}
+
+	store.Add(trace0)
+	store.Add(trace1)
+	store.Add(trace2)
+
+	traces := store.GetLastNTraces(3)
+	assert.Len(t, traces, 3)
+	assert.Equal(t, trace0, traces[0])
+	assert.Equal(t, trace1, traces[1])
+	assert.Equal(t, trace2, traces[2])
+
+	summary := store.GetTraceSummary()
+	assert.Len(t, summary, 1)
+	assert.Equal(t, 600*time.Millisecond, summary["span"])
+
+	store = NewTraceStore()
+
+	trace0 = Trace{"span": 100 * time.Millisecond}
+	trace1 = Trace{"span": 200 * time.Millisecond}
+	trace2 = Trace{"span": 300 * time.Millisecond}
+	trace3 := Trace{"span": 400 * time.Millisecond}
+
+	store.Add(trace0)
+	store.Add(trace1)
+	store.Add(trace2)
+	store.Add(trace3)
+
+	traces = store.GetLastNTraces(3)
+	assert.Len(t, traces, 3)
+	assert.Contains(t, traces, 1)
+	assert.Contains(t, traces, 2)
+	assert.Contains(t, traces, 3)
+
+	assert.Equal(t, trace1, traces[1])
+	assert.Equal(t, trace2, traces[2])
+	assert.Equal(t, trace3, traces[3])
+
+	summary = store.GetTraceSummary()
+	assert.Len(t, summary, 1)
+	assert.Equal(t, time.Second, summary["span"])
+
+	store = NewTraceStore()
+	store.Add(trace0)
+
+	traces = store.GetLastNTraces(3)
+	assert.Len(t, traces, 1)
+	assert.Equal(t, trace0, traces[0])
+
+	summary = store.GetTraceSummary()
+	assert.Len(t, summary, 1)
+	assert.Equal(t, 100*time.Millisecond, summary["span"])
 }
