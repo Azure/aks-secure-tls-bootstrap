@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestKubeconfigGeneration(t *testing.T) {
+func TestGenerateForCertAndKey_NoExistingCurrentSymlink(t *testing.T) {
 	certPEM, keyPEM, err := testutil.GenerateCertPEM(testutil.CertTemplate{
 		CommonName:   "system:node:node",
 		Organization: "system:nodes",
@@ -77,4 +77,55 @@ func TestKubeconfigGeneration(t *testing.T) {
 	key, err := x509.ParseECPrivateKey(keyBlock.Bytes)
 	assert.NoError(t, err)
 	assert.NotNil(t, key)
+}
+
+func TestGenerateForCertAndKey_WithExistingCurrentSymlink(t *testing.T) {
+	certPEM, keyPEM, err := testutil.GenerateCertPEM(testutil.CertTemplate{
+		CommonName:   "system:node:node",
+		Organization: "system:nodes",
+		Expiration:   time.Now().Add(time.Hour),
+	})
+	assert.NoError(t, err)
+
+	config := &Config{
+		APIServerFQDN:     "host",
+		ClusterCAFilePath: "path",
+		CertDir:           t.TempDir(),
+	}
+
+	// generate a symlink -> cert file pair initially to simulate an existing symlink
+	kubeconfigData, err := GenerateForCertAndKey(certPEM, keyPEM, config)
+	assert.NoError(t, err)
+
+	defaultAuth := kubeconfigData.AuthInfos["default-auth"]
+	assert.NotNil(t, defaultAuth)
+	assert.Equal(t, kubeletClientCurrentSymlinkName, filepath.Base(defaultAuth.ClientCertificate))
+	assert.Equal(t, defaultAuth.ClientCertificate, defaultAuth.ClientKey)
+	assert.Equal(t, config.CertDir, filepath.Dir(defaultAuth.ClientCertificate))
+
+	originalCertBytes, err := os.ReadFile(defaultAuth.ClientCertificate)
+	assert.NoError(t, err)
+
+	newCertPEM, newKeyPEM, err := testutil.GenerateCertPEM(testutil.CertTemplate{
+		CommonName:   "system:node:node",
+		Organization: "system:nodes",
+		Expiration:   time.Now().Add(time.Hour),
+	})
+	assert.NoError(t, err)
+
+	// generate a new symlink -> cert file pair
+	kubeconfigData, err = GenerateForCertAndKey(newCertPEM, newKeyPEM, config)
+	assert.NoError(t, err)
+
+	defaultAuth = kubeconfigData.AuthInfos["default-auth"]
+	assert.NotNil(t, defaultAuth)
+	assert.Equal(t, kubeletClientCurrentSymlinkName, filepath.Base(defaultAuth.ClientCertificate))
+	assert.Equal(t, defaultAuth.ClientCertificate, defaultAuth.ClientKey)
+	assert.Equal(t, config.CertDir, filepath.Dir(defaultAuth.ClientCertificate))
+
+	newCertBytes, err := os.ReadFile(defaultAuth.ClientCertificate)
+	assert.NoError(t, err)
+
+	// ensure that the symlink was updated to point towards the new cert file
+	assert.NotEqual(t, newCertBytes, originalCertBytes)
 }
