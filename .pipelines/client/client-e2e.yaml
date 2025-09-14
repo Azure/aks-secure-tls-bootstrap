@@ -1,0 +1,114 @@
+name: $(SourceBranchName)_$(Date:yyyyMMdd).$(Rev:r)
+
+pool:
+  name: $(POOL_NAME)
+
+stages:
+- stage: prepare_e2e_vars
+  displayName: Prepare E2E Variables
+  jobs:
+  - job: generate
+    displayName: Generate Required Variables
+    steps:
+      - checkout: none
+
+      - bash: |
+          set -euo pipefail
+
+          build_number_sum=$(echo -n "$(Build.BuildNumber)" | md5sum | tr -d "-" | tr -d " " | tr -d "\t")
+          version="v0.0.0-${build_number_sum}"
+          echo "generated client version for build $(Build.BuildNumber) = ${version}"
+
+          echo "##vso[task.setvariable variable=CLIENT_VERSION;isOutput=true;]${version}"
+        name: client_version
+        displayName: Generate Client Version String
+
+      - bash: |
+          set -euo pipefail
+          
+          az login --identity --resource-id $AGENT_IDENTITY_RESOURCE_ID
+          az account set --subscription $STORAGE_ACCOUNT_SUBSCRIPTION
+
+          web_endpoint=$(az storage account show -g $STORAGE_ACCOUNT_RESOURCE_GROUP -n $STORAGE_ACCOUNT_NAME --subscription $STORAGE_ACCOUNT_SUBSCRIPTION --query primaryEndpoints.web | tr -d \")
+          linux_url="${web_endpoint}client/linux/amd64/${CLIENT_VERSION}.tar.gz"
+          windows_url="${web_endpoint}client/windows/amd64/${CLIENT_VERSION}.zip"
+          echo "Generated linux client URL = ${linux_url}"
+          echo "Generated windows client URL = ${windows_url}"
+
+          toggle_overrides="custom-secure-tls-bootstrap-client-linux-binary-url=${linux_url},custom-secure-tls-bootstrap-client-windows-binary-url=${windows_url}"
+          echo "Generated toggle override string = ${toggle_overrides}"
+
+          echo "##vso[task.setvariable variable=TOGGLE_OVERRIDES;isOutput=true;]${toggle_overrides}"
+        env:
+          CLIENT_VERSION: $(client_version.CLIENT_VERSION)
+          AGENT_IDENTITY_RESOURCE_ID: $(AGENT_IDENTITY_RESOURCE_ID)
+          STORAGE_ACCOUNT_SUBSCRIPTION: $(STORAGE_ACCOUNT_SUBSCRIPTION)
+          STORAGE_ACCOUNT_RESOURCE_GROUP: $(STORAGE_ACCOUNT_RESOURCE_GROUP)
+          STORAGE_ACCOUNT_NAME: $(STORAGE_ACCOUNT_NAME)
+        name: toggle_overrides
+        displayName: Generate Toggle Override String
+
+- stage: build_and_upload
+  displayName: Build and Upload
+  dependsOn: prepare_e2e_vars
+  jobs:
+    - job: build_and_upload_binaries
+      displayName: Build and Upload Client Binaries
+      variables:
+        CLIENT_VERSION_STRING: $[stageDependencies.prepare_e2e_vars.generate.outputs['client_version.CLIENT_VERSION']]
+      steps:
+      - checkout: self
+        path: s
+        fetchTags: false
+        fetchDepth: 1
+
+      - bash: |
+          set -euxo pipefail
+
+          az login --identity --resource-id $AGENT_IDENTITY_RESOURCE_ID
+          az account set --subscription $STORAGE_ACCOUNT_SUBSCRIPTION
+
+          pushd client/
+            ./hack/upload.sh
+          popd
+        env:
+          OS: all # build linux + windows binaries
+          VERSION: $(CLIENT_VERSION_STRING)
+          STORAGE_ACCOUNT_SUBSCRIPTION: $(STORAGE_ACCOUNT_SUBSCRIPTION)
+          STORAGE_ACCOUNT_RESOURCE_GROUP: $(STORAGE_ACCOUNT_RESOURCE_GROUP)
+          STORAGE_ACCOUNT_NAME: $(STORAGE_ACCOUNT_NAME)
+        displayName: Build and Upload x86_64 Linux and Windows Binaries
+
+- stage: E2E
+  dependsOn:
+    - prepare_e2e_vars
+    - build_and_upload
+  jobs:
+  - job: run_e2e
+    displayName: Run E2E Tests
+    variables:
+      TOGGLE_OVERRIDE_STRING: $[stageDependencies.prepare_e2e_vars.generate.outputs['toggle_overrides.TOGGLE_OVERRIDES']]
+    steps:
+    - checkout: self
+      path: s
+      fetchTags: false
+      fetchDepth: 1
+      
+    - bash: |
+        set -euo pipefail
+        az extension add -n azure-devops
+        echo $ADO_PAT | az devops login --organization=https://dev.azure.com/${ORGANIZATION} --verbose
+        az devops configure --defaults organization=https://dev.azure.com/${ORGANIZATION} project=${PROJECT}
+      env:
+        ADO_PAT: $(PAT-aksdevassistant)
+        ORGANIZATION: $(ORGANIZATION)
+        PROJECT: $(PROJECT)
+      displayName: ADO Login
+
+    - bash: /bin/bash .pipelines/client/scripts/run-pipeline.sh
+      env:
+        ADO_PAT: $(PAT-aksdevassistant)
+        AZURE_DEVOPS_EXT_PAT: $(PAT-aksdevassistant)
+        SUITE_ID: $(SECURE_TLS_BOOTSTRAPPING_CHECKIN_SUITE_ID)
+        ADDITIONAL_VARS: "VSTS_TOGGLE_OVERRIDES=$(TOGGLE_OVERRIDE_STRING)"
+      displayName: Run Secure TLS Bootstrapping Check-in Tests
