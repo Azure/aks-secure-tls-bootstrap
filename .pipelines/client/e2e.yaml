@@ -13,8 +13,6 @@ pr:
     - .pipelines/client/e2e.yaml
     - .pipelines/client/scripts/common.sh
     - .pipelines/client/scripts/run-pipeline.sh
-    exclude:
-    - client/**/*_test.go
 
 pool:
   name: $(POOL_NAME)
