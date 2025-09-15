@@ -7,6 +7,8 @@ source .pipelines/client/scripts/common.sh
 TEST_BRANCH="${TEST_BRANCH:-master}"
 ADDITIONAL_VARS="${ADDITIONAL_VARS:-}"
 
+[ -z "$ADO_ORGANIZATION" ] && echo "ADO_ORGANIZATION is empty" && exit 1
+[ -z "$ADO_PROJECT" ] && echo "ADO_PROJECT is empty" && exit 1
 [ -z "$ADO_PAT" ] && echo "ADO_PAT is empty" && exit 1
 [ -z "$AZURE_DEVOPS_EXT_PAT" ] && echo "AZURE_DEVOPS_EXT_PAT is empty" && exit 1
 [ -z "$SUITE_ID" ] && echo "SUITE_ID is empty" && exit 1
@@ -33,7 +35,7 @@ runSuite() {
   fi
 
   BUILD_ID=$(echo "$RESPONSE" | jq -r '.id')
-  BUILD_URL="https://msazure.visualstudio.com/CloudNativeCompute/_build/results?buildId=${BUILD_ID}&view=results"
+  BUILD_URL="https://${ADO_ORGANIZATION}.visualstudio.com/${ADO_PROJECT}/_build/results?buildId=${BUILD_ID}&view=results"
   echo "E2E build URL: $BUILD_URL"
 
   STATUS="$(az pipelines runs show --id $BUILD_ID | jq -r '.status')"

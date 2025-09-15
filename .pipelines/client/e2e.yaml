@@ -110,6 +110,8 @@ stages:
       env:
         ADO_PAT: $(PAT-aksdevassistant)
         AZURE_DEVOPS_EXT_PAT: $(PAT-aksdevassistant)
+        ADO_ORGANIZATION: $(ORGANIZATION)
+        ADO_PROJECT: $(PROJECT)
         SUITE_ID: $(SECURE_TLS_BOOTSTRAPPING_CHECKIN_SUITE_ID)
         ADDITIONAL_VARS: "VSTS_TOGGLE_OVERRIDES=$(ENABLE_SECURE_TLS_BOOTSTRAPPING_TOGGLE_SETTINGS),$(TOGGLE_OVERRIDE_STRING)"
       displayName: Run Secure TLS Bootstrapping Check-in Tests
