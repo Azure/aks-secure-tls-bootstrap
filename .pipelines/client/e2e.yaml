@@ -28,6 +28,7 @@ stages:
 
       - bash: |
           set -euo pipefail
+          set + x
 
           build_number_sum=$(echo -n "$(Build.BuildNumber)" | md5sum | tr -d "-" | tr -d " " | tr -d "\t")
           version="v0.0.0-${build_number_sum}"
