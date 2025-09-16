@@ -42,7 +42,7 @@ func init() {
 	flag.StringVar(&bootstrapConfig.CertDir, "cert-dir", "", "the directory where kubelet's new client certificate/key pair will be stored - this should be the same as the --cert-dir passed to the kubelet")
 	flag.BoolVar(&bootstrapConfig.InsecureSkipTLSVerify, "insecure-skip-tls-verify", false, "skip TLS verification when connecting to the control plane")
 	flag.BoolVar(&bootstrapConfig.EnsureAuthorizedClient, "ensure-authorized", false, "ensure the specified kubeconfig contains an authorized clientset before bootstrapping")
-	flag.DurationVar(&bootstrapConfig.Deadline, "deadline", 3*time.Minute, "deadline within which bootstrapping must succeed")
+	flag.DurationVar(&bootstrapConfig.Deadline, "deadline", 3*time.Minute, "the deadline within which bootstrapping must succeed")
 	flag.Parse()
 }
 
