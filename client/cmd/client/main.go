@@ -34,15 +34,15 @@ func init() {
 
 	flag.StringVar(&bootstrapConfig.CloudProviderConfigPath, "cloud-provider-config", "", "path to the cloud provider config file")
 	flag.StringVar(&bootstrapConfig.APIServerFQDN, "apiserver-fqdn", "", "FQDN of the apiserver")
-	flag.StringVar(&bootstrapConfig.CustomClientID, "custom-client-id", "", "client ID of the user-assigned managed identity to use when requesting a token from IMDS - if not specified the kubelet identity will be used")
+	flag.StringVar(&bootstrapConfig.CustomClientID, "custom-client-id", "", "client ID of the user-assigned managed identity to use when requesting a token from IMDS - if not specified the inferred kubelet identity will be used")
 	flag.StringVar(&bootstrapConfig.AADResource, "aad-resource", "", "resource (audience) used to request JWT tokens from AAD for authentication")
 	flag.StringVar(&bootstrapConfig.NextProto, "next-proto", "", "ALPN next proto value")
-	flag.StringVar(&bootstrapConfig.KubeconfigPath, "kubeconfig", "", "path to the kubeconfig - if this file does not exist, the generated kubeconfig will be placed there")
+	flag.StringVar(&bootstrapConfig.KubeconfigPath, "kubeconfig", "", "path to the kubeconfig - if this file does not exist, the generated kubeconfig will be placed there - this should be the same as the --kubeconfig passed to the kubelet")
 	flag.StringVar(&bootstrapConfig.ClusterCAFilePath, "cluster-ca-file", "", "path to the cluster CA file")
-	flag.StringVar(&bootstrapConfig.CertDir, "cert-dir", "", "the directory where kubelet's new client certificate/key pair will be stored")
+	flag.StringVar(&bootstrapConfig.CertDir, "cert-dir", "", "the directory where kubelet's new client certificate/key pair will be stored - this should be the same as the --cert-dir passed to the kubelet")
 	flag.BoolVar(&bootstrapConfig.InsecureSkipTLSVerify, "insecure-skip-tls-verify", false, "skip TLS verification when connecting to the control plane")
 	flag.BoolVar(&bootstrapConfig.EnsureAuthorizedClient, "ensure-authorized", false, "ensure the specified kubeconfig contains an authorized clientset before bootstrapping")
-	flag.DurationVar(&bootstrapConfig.Deadline, "deadline", 3*time.Minute, "deadline within which bootstrapping must succeed")
+	flag.DurationVar(&bootstrapConfig.Deadline, "deadline", 3*time.Minute, "the deadline within which bootstrapping must succeed")
 	flag.Parse()
 }
 
