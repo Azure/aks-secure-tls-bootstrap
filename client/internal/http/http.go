@@ -46,7 +46,7 @@ func configureRetryPolicy(client *retryablehttp.Client) {
 	// bounded by RetryWaitMin + RetryWaitMax. It will also attempt to parse out and respect any
 	// Retry-After header from the server's response.
 	client.Backoff = retryablehttp.DefaultBackoff
-	client.RetryMax = 5
+	client.RetryMax = 10
 	client.RetryWaitMin = 300 * time.Millisecond
 	client.RetryWaitMax = 3 * time.Second
 }

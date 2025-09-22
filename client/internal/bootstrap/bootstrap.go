@@ -6,50 +6,45 @@ package bootstrap
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/telemetry"
 	"github.com/avast/retry-go/v4"
 	"k8s.io/client-go/tools/clientcmd"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
-// Bootstrap performs the secure TLS bootstrapping process with the provided client, wrapped in a retry loop.
+// Bootstrap performs the secure TLS bootstrapping wrapped in a retry loop.
 // The retry loop will continue indefinitely until the specified context is done, whether that be through a timeout or cancellation.
 // If all retries fail, the last error encountered will be returned in finalErr.
 // In any case, a record of all errors encountered during the bootstrap process will be returned in errs, where error type is mapped to the corresponding occurrence count.
 // Additionally, a map of traces is returned in traces, which records how long each bootstrapping step took, mapping task name to a corresponding time.Duration.
 // Trace data is separately recorded for each retry attempt.
-func Bootstrap(ctx context.Context, client *Client, config *Config) (finalErr error, errLog map[ErrorType]int, traces *telemetry.TraceStore) {
-	errLog = make(map[ErrorType]int)
-	traces = telemetry.NewTraceStore()
+func Bootstrap(ctx context.Context, config *Config) (err error, errLog ErrorLog, traces *telemetry.TraceStore) {
+	client := newClient(ctx)
 
-	finalErr = retry.Do(
+	errLog = make(ErrorLog)
+	traces = telemetry.NewTraceStore()
+	err = retry.Do(
 		func() error {
 			defer func() {
 				traces.Add(telemetry.GetTrace(ctx))
 			}()
-
-			kubeconfigData, err := client.BootstrapKubeletClientCredential(ctx, config)
+			kubeconfigData, err := client.bootstrap(ctx, config)
 			if err != nil {
 				return err
 			}
-			if kubeconfigData == nil {
-				return nil
-			}
-			if err := writeKubeconfig(ctx, kubeconfigData, config.KubeconfigPath); err != nil {
+			if err := clientcmd.WriteToFile(kubeconfigData, config.KubeconfigPath); err != nil {
 				return err
 			}
 			return nil
 		},
 		retry.RetryIf(func(err error) bool {
-			var bootstrapErr *BootstrapError
+			var bootstrapErr *bootstrapError
 			if !errors.As(err, &bootstrapErr) {
 				return false
 			}
-			errLog[bootstrapErr.Type()]++
-			return bootstrapErr.Retryable()
+			errLog[bootstrapErr.errorType]++
+			return bootstrapErr.retryable
 		}),
 		retry.Context(ctx),
 		retry.WrapContextErrorWithLastError(true),
@@ -60,18 +55,5 @@ func Bootstrap(ctx context.Context, client *Client, config *Config) (finalErr er
 		retry.Attempts(0), // retry indefinitely according to the context deadline
 	)
 
-	return finalErr, errLog, traces
-}
-
-func writeKubeconfig(ctx context.Context, config *clientcmdapi.Config, path string) error {
-	endSpan := telemetry.StartSpan(ctx, "WriteKubeconfig")
-	defer endSpan()
-
-	if err := clientcmd.WriteToFile(*config, path); err != nil {
-		return &BootstrapError{
-			errorType: ErrorTypeWriteKubeconfigFailure,
-			inner:     fmt.Errorf("writing generated kubeconfig to disk: %w", err),
-		}
-	}
-	return nil
+	return err, errLog, traces
 }
