@@ -132,17 +132,17 @@ func TestWithResult(t *testing.T) {
 		},
 		Traces: map[int]telemetry.Trace{
 			0: {
-				string(ErrorTypeGetAccessTokenFailure): 100 * time.Millisecond,
+				"GetAccessToken": 100 * time.Millisecond,
 			},
 			1: {
-				string(ErrorTypeGetAccessTokenFailure): 100 * time.Millisecond,
+				"GetAccessToken": 100 * time.Millisecond,
 			},
 			2: {
-				string(ErrorTypeGetAccessTokenFailure): 100 * time.Millisecond,
+				"GetAccessToken": 100 * time.Millisecond,
 			},
 		},
 		TraceSummary: telemetry.Trace{
-			string(ErrorTypeGetAccessTokenFailure): 300 * time.Millisecond,
+			"GetAccessToken": 300 * time.Millisecond,
 		},
 	}
 
