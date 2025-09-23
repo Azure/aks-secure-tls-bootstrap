@@ -16,35 +16,28 @@ const (
 	ErrorTypeGetCSRFailure             ErrorType = "GetCSRFailure"
 	ErrorTypeGetCredentialFailure      ErrorType = "GetCredentialFailure"
 	ErrorTypeGenerateKubeconfigFailure ErrorType = "GenerateKubeconfigFailure"
-	ErrorTypeWriteKubeconfigFailure    ErrorType = "WriteKubeconfigFailure"
 )
 
-type BootstrapError struct {
+type ErrorLog map[ErrorType]int
+
+type bootstrapError struct {
 	errorType ErrorType
+	retryable bool
 	inner     error
 }
 
-func (e *BootstrapError) Retryable() bool {
-	switch e.errorType {
-	case ErrorTypeGetAccessTokenFailure,
-		ErrorTypeGetInstanceDataFailure,
-		ErrorTypeGetAttestedDataFailure,
-		ErrorTypeGetNonceFailure,
-		ErrorTypeGetCredentialFailure:
-		return true
-	default:
-		return false
-	}
-}
-
-func (e *BootstrapError) Error() string {
+func (e *bootstrapError) Error() string {
 	return fmt.Sprintf("%s: %s", e.errorType, e.inner.Error())
 }
 
-func (e *BootstrapError) Type() ErrorType {
-	return e.errorType
+func (e *bootstrapError) Unwrap() error {
+	return e.inner
 }
 
-func (e *BootstrapError) Unwrap() error {
-	return e.inner
+func makeNonRetryableGetAccessTokenFailure(err error) error {
+	return &bootstrapError{
+		errorType: ErrorTypeGetAccessTokenFailure,
+		retryable: false,
+		inner:     err,
+	}
 }

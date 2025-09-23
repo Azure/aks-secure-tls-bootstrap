@@ -14,12 +14,13 @@ import (
 	"time"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/bootstrap"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/kubeconfig"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/log"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/telemetry"
 	"go.uber.org/zap"
 )
 
-var bootstrapConfig = new(bootstrap.Config)
+var config = new(bootstrap.Config)
 
 var (
 	configFile string
@@ -32,28 +33,28 @@ func init() {
 	flag.StringVar(&logFile, "log-file", "", "path to a file where logs will be written, will be created if it does not already exist")
 	flag.BoolVar(&verbose, "verbose", false, "enable verbose log output")
 
-	flag.StringVar(&bootstrapConfig.CloudProviderConfigPath, "cloud-provider-config", "", "path to the cloud provider config file")
-	flag.StringVar(&bootstrapConfig.APIServerFQDN, "apiserver-fqdn", "", "FQDN of the apiserver")
-	flag.StringVar(&bootstrapConfig.CustomClientID, "custom-client-id", "", "client ID of the user-assigned managed identity to use when requesting a token from IMDS - if not specified the inferred kubelet identity will be used")
-	flag.StringVar(&bootstrapConfig.AADResource, "aad-resource", "", "resource (audience) used to request JWT tokens from AAD for authentication")
-	flag.StringVar(&bootstrapConfig.NextProto, "next-proto", "", "ALPN next proto value")
-	flag.StringVar(&bootstrapConfig.KubeconfigPath, "kubeconfig", "", "path to the kubeconfig - if this file does not exist, the generated kubeconfig will be placed there - this should be the same as the --kubeconfig passed to the kubelet")
-	flag.StringVar(&bootstrapConfig.ClusterCAFilePath, "cluster-ca-file", "", "path to the cluster CA file")
-	flag.StringVar(&bootstrapConfig.CertDir, "cert-dir", "", "the directory where kubelet's new client certificate/key pair will be stored - this should be the same as the --cert-dir passed to the kubelet")
-	flag.BoolVar(&bootstrapConfig.InsecureSkipTLSVerify, "insecure-skip-tls-verify", false, "skip TLS verification when connecting to the control plane")
-	flag.BoolVar(&bootstrapConfig.EnsureAuthorizedClient, "ensure-authorized", false, "ensure the specified kubeconfig contains an authorized clientset before bootstrapping")
-	flag.DurationVar(&bootstrapConfig.Deadline, "deadline", 3*time.Minute, "the deadline within which bootstrapping must succeed")
+	flag.StringVar(&config.CloudProviderConfigPath, "cloud-provider-config", "", "path to the cloud provider config file")
+	flag.StringVar(&config.APIServerFQDN, "apiserver-fqdn", "", "FQDN of the apiserver")
+	flag.StringVar(&config.CustomClientID, "custom-client-id", "", "client ID of the user-assigned managed identity to use when requesting a token from IMDS - if not specified the inferred kubelet identity will be used")
+	flag.StringVar(&config.AADResource, "aad-resource", "", "resource (audience) used to request JWT tokens from AAD for authentication")
+	flag.StringVar(&config.NextProto, "next-proto", "", "ALPN next proto value")
+	flag.StringVar(&config.KubeconfigPath, "kubeconfig", "", "path to the kubeconfig - if this file does not exist, the generated kubeconfig will be placed there - this should be the same as the --kubeconfig passed to the kubelet")
+	flag.StringVar(&config.ClusterCAFilePath, "cluster-ca-file", "", "path to the cluster CA file")
+	flag.StringVar(&config.CertDir, "cert-dir", "", "the directory where kubelet's new client certificate/key pair will be stored - this should be the same as the --cert-dir passed to the kubelet")
+	flag.BoolVar(&config.InsecureSkipTLSVerify, "insecure-skip-tls-verify", false, "skip TLS verification when connecting to the control plane")
+	flag.BoolVar(&config.EnsureAuthorizedClient, "ensure-authorized", false, "ensure the specified kubeconfig contains an authorized clientset before bootstrapping")
+	flag.DurationVar(&config.Deadline, "deadline", 3*time.Minute, "the deadline within which bootstrapping must succeed")
 	flag.Parse()
 }
 
 func main() {
 	if configFile != "" {
-		if err := bootstrapConfig.LoadFromFile(configFile); err != nil {
+		if err := config.LoadFromFile(configFile); err != nil {
 			fmt.Printf("unable to load configuration file: %s\n", err)
 			os.Exit(1)
 		}
 	}
-	if err := bootstrapConfig.Validate(); err != nil {
+	if err := config.Validate(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
@@ -65,74 +66,80 @@ func main() {
 }
 
 func run(ctx context.Context) int {
-	logger, flush, finalErr := log.NewProductionLogger(logFile, verbose)
-	if finalErr != nil {
-		fmt.Printf("unable to construct zap logger: %s\n", finalErr)
+	logger, flush, err := log.NewProductionLogger(logFile, verbose)
+	if err != nil {
+		fmt.Printf("unable to construct zap logger: %s\n", err)
 		return 1
 	}
 	defer flush()
 
 	ctx = log.WithLogger(telemetry.WithTracing(ctx), logger)
 
-	bootstrapClient, finalErr := bootstrap.NewClient(ctx)
-	if finalErr != nil {
-		fmt.Printf("unable to construct bootstrap client: %s\n", finalErr)
-		return 1
+	var endTime time.Time
+	result := &bootstrap.Result{
+		Status: bootstrap.StatusSuccess,
 	}
 
-	bootstrapStartTime := time.Now()
-	bootstrapDeadline := bootstrapStartTime.Add(bootstrapConfig.Deadline)
-	logger.Info("set bootstrap deadline", zap.Time("deadline", bootstrapDeadline))
-
-	bootstrapCtx, cancel := context.WithDeadline(ctx, bootstrapDeadline)
+	startTime := time.Now()
+	deadline := startTime.Add(config.Deadline)
+	bootstrapCtx, cancel := context.WithDeadline(ctx, deadline)
 	defer cancel()
+	logger.Info("set bootstrap deadline", zap.Time("deadline", deadline))
 
-	finalErr, errLog, traces := bootstrap.Bootstrap(bootstrapCtx, bootstrapClient, bootstrapConfig)
-	bootstrapEndTime := time.Now()
+	kubeconfigPath := config.KubeconfigPath
+	err = kubeconfig.NewValidator().Validate(bootstrapCtx, kubeconfigPath, config.EnsureAuthorizedClient)
+	if err == nil {
+		logger.Info("existing kubeconfig is valid, will not bootstrap a new kubelet client credential", zap.String("kubeconfig", kubeconfigPath))
+		endTime = time.Now()
+		emitGuestAgentEvent(logger, startTime, endTime, result)
+		return 0
+	}
+	logger.Info("failed to validate existing kubeconfig, will bootstrap a new kubelet client credential", zap.String("kubeconfig", kubeconfigPath), zap.Error(err))
+
+	err, errLog, traces := bootstrap.Bootstrap(bootstrapCtx, config)
+	endTime = time.Now()
+	result.Errors = errLog
+	result.Traces = traces.GetLastNTraces(5) // only keep the last 5 traces to avoid truncating guest agent event data
+	result.TraceSummary = traces.GetTraceSummary()
 
 	var exitCode int
-	bootstrapResult := &bootstrap.Result{
-		Status:              bootstrap.StatusSuccess,
-		ElapsedMilliseconds: bootstrapEndTime.Sub(bootstrapStartTime).Milliseconds(),
-		Errors:              errLog,
-		Traces:              traces.GetLastNTraces(5), // only keep the last 5 traces to avoid truncating guest agent event data
-		TraceSummary:        traces.GetTraceSummary(),
-	}
-
-	if finalErr != nil {
-		bootstrapResult.Status = bootstrap.StatusFailure
-
+	if err != nil {
+		result.Status = bootstrap.StatusFailure
 		switch {
-		case errors.Is(finalErr, context.Canceled):
+		case errors.Is(err, context.Canceled):
 			logger.Error("context was cancelled before bootstrapping could complete")
-		case errors.Is(finalErr, context.DeadlineExceeded):
+		case errors.Is(err, context.DeadlineExceeded):
 			logger.Error(
 				"failed to successfully bootstrap before the specified deadline",
-				zap.Error(errors.Unwrap(finalErr)),
-				zap.Time("deadline", bootstrapDeadline),
-				zap.Duration("deadlineDuration", bootstrapConfig.Deadline),
+				zap.Error(errors.Unwrap(err)),
+				zap.Time("deadline", deadline),
+				zap.Duration("deadlineDuration", config.Deadline),
 			)
 		default:
-			logger.Error("failed to bootstrap", zap.Error(errors.Unwrap(finalErr)))
+			logger.Error("failed to bootstrap", zap.Error(errors.Unwrap(err)))
 		}
-
-		bootstrapResult.FinalError = errors.Unwrap(finalErr).Error()
+		result.FinalError = errors.Unwrap(err).Error()
 		exitCode = 1
 	}
 
+	emitGuestAgentEvent(logger, startTime, endTime, result)
+	return exitCode
+}
+
+func emitGuestAgentEvent(logger *zap.Logger, startTime, endTime time.Time, result *bootstrap.Result) {
+	result.ElapsedMilliseconds = endTime.Sub(startTime).Milliseconds()
+
 	bootstrapEvent := &bootstrap.Event{
-		Start: bootstrapStartTime,
-		End:   bootstrapEndTime,
+		Start: startTime,
+		End:   endTime,
 	}
-	eventFilePath, finalErr := bootstrapEvent.WriteWithResult(bootstrapResult)
-	if finalErr != nil {
-		logger.Error("unable to write bootstrap guest agent event to disk", zap.Error(finalErr))
+	eventFilePath, err := bootstrapEvent.WriteWithResult(result)
+	if err != nil {
+		logger.Error("unable to write bootstrap guest agent event to disk", zap.Error(err))
 	}
 	if eventFilePath == "" {
-		logger.Warn("guest agent event path does not exist, not guest agent event telemetry will be written", zap.String("eventMessage", bootstrapEvent.Message))
+		logger.Warn("guest agent event path does not exist, no guest agent event telemetry will be written", zap.String("eventMessage", bootstrapEvent.Message))
 	} else {
 		logger.Info("bootstrapping guest agent event telemetry written to disk", zap.String("path", eventFilePath))
 	}
-
-	return exitCode
 }

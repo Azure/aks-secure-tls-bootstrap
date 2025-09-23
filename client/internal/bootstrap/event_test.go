@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/telemetry"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -48,7 +49,7 @@ func TestLinuxEvent(t *testing.T) {
 	content, err := os.ReadFile(filepath.Join(guestAgentEventsPathLinux, eventEntry.Name()))
 	assert.NoError(t, err)
 
-	eventData := map[string]interface{}{}
+	eventData := map[string]any{}
 	err = json.Unmarshal(content, &eventData)
 	assert.NoError(t, err)
 
@@ -95,7 +96,7 @@ func TestWindowsEvent(t *testing.T) {
 	content, err := os.ReadFile(filepath.Join(guestAgentEventsPathWindows, eventEntry.Name()))
 	assert.NoError(t, err)
 
-	eventData := map[string]interface{}{}
+	eventData := map[string]any{}
 	err = json.Unmarshal(content, &eventData)
 	assert.NoError(t, err)
 
@@ -107,4 +108,73 @@ func TestWindowsEvent(t *testing.T) {
 	assert.Equal(t, "1.10", eventData["Version"])
 	assert.Equal(t, "0", eventData["EventPid"])
 	assert.Equal(t, "0", eventData["EventTid"])
+}
+
+func TestWithResult(t *testing.T) {
+	guestAgentEventsPathLinux = t.TempDir()
+	isWindows = func() bool {
+		return false
+	}
+
+	now := time.Now()
+	e := &Event{
+		Start:   now,
+		End:     now.Add(time.Minute),
+		Message: "linux",
+		Level:   "Informational",
+	}
+
+	result := &Result{
+		Status:              StatusFailure,
+		ElapsedMilliseconds: time.Minute.Milliseconds(),
+		Errors: ErrorLog{
+			ErrorTypeGetAccessTokenFailure: 3,
+		},
+		Traces: map[int]telemetry.Trace{
+			0: {
+				"GetAccessToken": 100 * time.Millisecond,
+			},
+			1: {
+				"GetAccessToken": 100 * time.Millisecond,
+			},
+			2: {
+				"GetAccessToken": 100 * time.Millisecond,
+			},
+		},
+		TraceSummary: telemetry.Trace{
+			"GetAccessToken": 300 * time.Millisecond,
+		},
+	}
+
+	path, err := e.WriteWithResult(result)
+	assert.NoError(t, err)
+	assert.Equal(t, filepath.Dir(path), guestAgentEventsPathLinux)
+
+	eventBytes, err := os.ReadFile(path)
+	assert.NoError(t, err)
+
+	var eventData map[string]any
+	err = json.Unmarshal(eventBytes, &eventData)
+	assert.NoError(t, err)
+
+	assert.Equal(t, performSecureTLSBootstrappingGuestAgentEventName, eventData["TaskName"])
+	assert.Equal(t, e.Start.Format("2006-01-02 15:04:05.000"), eventData["Timestamp"])
+	assert.Equal(t, e.End.Format("2006-01-02 15:04:05.000"), eventData["OperationId"])
+	assert.Equal(t, "1.23", eventData["Version"])
+	assert.Equal(t, "Error", eventData["EventLevel"])
+	assert.Equal(t, "0", eventData["EventPid"])
+	assert.Equal(t, "0", eventData["EventTid"])
+
+	message := eventData["Message"]
+	assert.NotNil(t, message)
+	assert.NotEmpty(t, message)
+	messageString, ok := message.(string)
+	assert.True(t, ok)
+
+	loadedResult := new(Result)
+	err = json.Unmarshal([]byte(messageString), loadedResult)
+	assert.NoError(t, err)
+
+	assert.Equal(t, StatusFailure, loadedResult.Status)
+	assert.Equal(t, time.Minute.Milliseconds(), loadedResult.ElapsedMilliseconds)
 }

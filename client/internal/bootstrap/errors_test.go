@@ -5,67 +5,74 @@ package bootstrap
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func TestBootstrapErrorRetryable(t *testing.T) {
+func TestBootstrapError(t *testing.T) {
 	cases := []struct {
-		name     string
-		err      *BootstrapError
-		expected bool
+		name      string
+		err       error
+		retryable bool
+		errorType ErrorType
 	}{
 		{
-			name:     "get access token failure should be retryable",
-			err:      &BootstrapError{errorType: ErrorTypeGetAccessTokenFailure, inner: errors.New("get access token error")},
-			expected: true,
+			name:      "get access token failure",
+			err:       errors.New("get access token error"),
+			retryable: true,
+			errorType: ErrorTypeGetAccessTokenFailure,
 		},
 		{
-			name:     "get instance data failure should be retryable",
-			err:      &BootstrapError{errorType: ErrorTypeGetInstanceDataFailure, inner: errors.New("get instance data error")},
-			expected: true,
+			name:      "get instance data failure",
+			err:       errors.New("get instance data error"),
+			retryable: true,
+			errorType: ErrorTypeGetInstanceDataFailure,
 		},
 		{
-			name:     "get attested data failure should be retryable",
-			err:      &BootstrapError{errorType: ErrorTypeGetAttestedDataFailure, inner: errors.New("get attested data error")},
-			expected: true,
+			name:      "get attested data failure",
+			err:       errors.New("get attested data error"),
+			retryable: true,
+			errorType: ErrorTypeGetAttestedDataFailure,
 		},
 		{
-			name:     "get nonce failure should be retryable",
-			err:      &BootstrapError{errorType: ErrorTypeGetNonceFailure, inner: errors.New("get nonce error")},
-			expected: true,
+			name:      "get nonce failure",
+			err:       errors.New("get nonce error"),
+			errorType: ErrorTypeGetNonceFailure,
 		},
 		{
-			name:     "get credential failure should be retryable",
-			err:      &BootstrapError{errorType: ErrorTypeGetCredentialFailure, inner: errors.New("get credential error")},
-			expected: true,
+			name:      "get credential failure",
+			err:       errors.New("get credential error"),
+			errorType: ErrorTypeGetCredentialFailure,
 		},
 		{
-			name:     "get service client error should not be retryable",
-			err:      &BootstrapError{errorType: ErrorTypeGetServiceClientFailure, inner: errors.New("get service client error")},
-			expected: false,
+			name:      "get service client failure",
+			err:       errors.New("get service client error"),
+			errorType: ErrorTypeGetServiceClientFailure,
 		},
 		{
-			name:     "get CSR failure should not be retryable",
-			err:      &BootstrapError{errorType: ErrorTypeGetCSRFailure, inner: errors.New("get CSR error")},
-			expected: false,
+			name:      "get CSR failure",
+			err:       errors.New("get CSR error"),
+			errorType: ErrorTypeGetCSRFailure,
 		},
 		{
-			name:     "generate kubeconfig error should not be retryable",
-			err:      &BootstrapError{errorType: ErrorTypeGenerateKubeconfigFailure, inner: errors.New("generate kubeconfig error")},
-			expected: false,
-		},
-		{
-			name:     "write kubeconfig error should not be retryable",
-			err:      &BootstrapError{errorType: ErrorTypeWriteKubeconfigFailure, inner: errors.New("write kubeconfig error")},
-			expected: false,
+			name:      "generate kubeconfig failure",
+			err:       errors.New("generate kubeconfig error"),
+			errorType: ErrorTypeGenerateKubeconfigFailure,
 		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			assert.Equal(t, c.expected, c.err.Retryable())
+			bootstrapErr := &bootstrapError{
+				errorType: c.errorType,
+				retryable: c.retryable,
+				inner:     c.err,
+			}
+
+			assert.EqualError(t, bootstrapErr, fmt.Sprintf("%s: %s", bootstrapErr.errorType, bootstrapErr.inner.Error()))
+			assert.Equal(t, bootstrapErr.retryable, c.retryable)
 		})
 	}
 }

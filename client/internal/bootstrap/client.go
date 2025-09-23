@@ -17,47 +17,36 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
-type Client struct {
+type client struct {
 	imdsClient             imds.Client
-	kubeconfigValidator    kubeconfig.Validator
 	getServiceClientFunc   getServiceClientFunc
 	extractAccessTokenFunc extractAccessTokenFunc
 }
 
-func NewClient(ctx context.Context) (*Client, error) {
-	return &Client{
+func newClient(ctx context.Context) *client {
+	return &client{
 		imdsClient:             imds.NewClient(ctx),
-		kubeconfigValidator:    kubeconfig.NewValidator(),
 		getServiceClientFunc:   getServiceClient,
 		extractAccessTokenFunc: extractAccessToken,
-	}, nil
+	}
 }
 
-func (c *Client) BootstrapKubeletClientCredential(ctx context.Context, cfg *Config) (*clientcmdapi.Config, error) {
+func (c *client) bootstrap(ctx context.Context, cfg *Config) (clientcmdapi.Config, error) {
 	logger := log.MustGetLogger(ctx)
-
-	err := c.validateKubeconfig(ctx, cfg.KubeconfigPath, cfg.EnsureAuthorizedClient)
-	if err == nil {
-		logger.Info("existing kubeconfig is valid, will skip bootstrapping", zap.String("kubeconfig", cfg.KubeconfigPath))
-		return nil, nil
-	}
-	logger.Info("failed to validate existing kubeconfig, will bootstrap a new client credential", zap.String("kubeconfig", cfg.KubeconfigPath), zap.Error(err))
 
 	token, err := c.getAccessToken(ctx, cfg.CustomClientID, cfg.AADResource, &cfg.ProviderConfig)
 	if err != nil {
 		logger.Error(err.Error())
-		return nil, &BootstrapError{
-			errorType: ErrorTypeGetAccessTokenFailure,
-			inner:     err,
-		}
+		return clientcmdapi.Config{}, err
 	}
-	logger.Info("generated access token for gRPC connection")
+	logger.Info("generated access token for gRPC client connection")
 
 	serviceClient, closer, err := c.getServiceClient(ctx, token, cfg)
 	if err != nil {
 		logger.Error(err.Error())
-		return nil, &BootstrapError{
+		return clientcmdapi.Config{}, &bootstrapError{
 			errorType: ErrorTypeGetServiceClientFailure,
+			retryable: false,
 			inner:     err,
 		}
 	}
@@ -71,8 +60,9 @@ func (c *Client) BootstrapKubeletClientCredential(ctx context.Context, cfg *Conf
 	instanceData, err := c.getInstanceData(ctx)
 	if err != nil {
 		logger.Error(err.Error())
-		return nil, &BootstrapError{
+		return clientcmdapi.Config{}, &bootstrapError{
 			errorType: ErrorTypeGetInstanceDataFailure,
+			retryable: true,
 			inner:     err,
 		}
 	}
@@ -83,8 +73,9 @@ func (c *Client) BootstrapKubeletClientCredential(ctx context.Context, cfg *Conf
 	})
 	if err != nil {
 		logger.Error(err.Error())
-		return nil, &BootstrapError{
+		return clientcmdapi.Config{}, &bootstrapError{
 			errorType: ErrorTypeGetNonceFailure,
+			retryable: true,
 			inner:     err,
 		}
 	}
@@ -93,8 +84,9 @@ func (c *Client) BootstrapKubeletClientCredential(ctx context.Context, cfg *Conf
 	attestedData, err := c.getAttestedData(ctx, nonce)
 	if err != nil {
 		logger.Error(err.Error())
-		return nil, &BootstrapError{
+		return clientcmdapi.Config{}, &bootstrapError{
 			errorType: ErrorTypeGetAttestedDataFailure,
+			retryable: true,
 			inner:     err,
 		}
 	}
@@ -103,8 +95,9 @@ func (c *Client) BootstrapKubeletClientCredential(ctx context.Context, cfg *Conf
 	csrPEM, keyPEM, err := c.getCSR(ctx)
 	if err != nil {
 		logger.Error(err.Error())
-		return nil, &BootstrapError{
+		return clientcmdapi.Config{}, &bootstrapError{
 			errorType: ErrorTypeGetCSRFailure,
+			retryable: false,
 			inner:     err,
 		}
 	}
@@ -118,8 +111,9 @@ func (c *Client) BootstrapKubeletClientCredential(ctx context.Context, cfg *Conf
 	})
 	if err != nil {
 		logger.Error(err.Error())
-		return nil, &BootstrapError{
+		return clientcmdapi.Config{}, &bootstrapError{
 			errorType: ErrorTypeGetCredentialFailure,
+			retryable: true,
 			inner:     err,
 		}
 	}
@@ -132,8 +126,9 @@ func (c *Client) BootstrapKubeletClientCredential(ctx context.Context, cfg *Conf
 	})
 	if err != nil {
 		logger.Error(err.Error())
-		return nil, &BootstrapError{
+		return clientcmdapi.Config{}, &bootstrapError{
 			errorType: ErrorTypeGenerateKubeconfigFailure,
+			retryable: true,
 			inner:     err,
 		}
 	}
@@ -142,17 +137,7 @@ func (c *Client) BootstrapKubeletClientCredential(ctx context.Context, cfg *Conf
 	return kubeconfigData, nil
 }
 
-func (c *Client) validateKubeconfig(ctx context.Context, kubeconfigPath string, ensureAuthorizedClient bool) error {
-	endSpan := telemetry.StartSpan(ctx, "ValidateKubeconfig")
-	defer endSpan()
-
-	if err := c.kubeconfigValidator.Validate(ctx, kubeconfigPath, ensureAuthorizedClient); err != nil {
-		return fmt.Errorf("failed to validate kubeconfig: %w", err)
-	}
-	return nil
-}
-
-func (c *Client) getServiceClient(ctx context.Context, token string, cfg *Config) (v1.SecureTLSBootstrapServiceClient, closeFunc, error) {
+func (c *client) getServiceClient(ctx context.Context, token string, cfg *Config) (v1.SecureTLSBootstrapServiceClient, closeFunc, error) {
 	endSpan := telemetry.StartSpan(ctx, "GetServiceClient")
 	defer endSpan()
 
@@ -164,7 +149,7 @@ func (c *Client) getServiceClient(ctx context.Context, token string, cfg *Config
 	return serviceClient, closer, nil
 }
 
-func (c *Client) getInstanceData(ctx context.Context) (*imds.VMInstanceData, error) {
+func (c *client) getInstanceData(ctx context.Context) (*imds.VMInstanceData, error) {
 	endSpan := telemetry.StartSpan(ctx, "GetInstanceData")
 	defer endSpan()
 
@@ -175,7 +160,7 @@ func (c *Client) getInstanceData(ctx context.Context) (*imds.VMInstanceData, err
 	return instanceData, nil
 }
 
-func (c *Client) getAttestedData(ctx context.Context, nonce string) (*imds.VMAttestedData, error) {
+func (c *client) getAttestedData(ctx context.Context, nonce string) (*imds.VMAttestedData, error) {
 	endSpan := telemetry.StartSpan(ctx, "GetAttestedData")
 	defer endSpan()
 
@@ -186,7 +171,7 @@ func (c *Client) getAttestedData(ctx context.Context, nonce string) (*imds.VMAtt
 	return attestedData, nil
 }
 
-func (c *Client) getNonce(ctx context.Context, serviceClient v1.SecureTLSBootstrapServiceClient, req *v1.GetNonceRequest) (string, error) {
+func (c *client) getNonce(ctx context.Context, serviceClient v1.SecureTLSBootstrapServiceClient, req *v1.GetNonceRequest) (string, error) {
 	endSpan := telemetry.StartSpan(ctx, "GetNonce")
 	defer endSpan()
 
@@ -198,7 +183,7 @@ func (c *Client) getNonce(ctx context.Context, serviceClient v1.SecureTLSBootstr
 	return nonceResponse.GetNonce(), nil
 }
 
-func (c *Client) getCSR(ctx context.Context) ([]byte, []byte, error) {
+func (c *client) getCSR(ctx context.Context) ([]byte, []byte, error) {
 	endSpan := telemetry.StartSpan(ctx, "GetCSR")
 	defer endSpan()
 
@@ -209,7 +194,7 @@ func (c *Client) getCSR(ctx context.Context) ([]byte, []byte, error) {
 	return csrPEM, keyPEM, nil
 }
 
-func (c *Client) getCredential(ctx context.Context, serviceClient v1.SecureTLSBootstrapServiceClient, req *v1.GetCredentialRequest) ([]byte, error) {
+func (c *client) getCredential(ctx context.Context, serviceClient v1.SecureTLSBootstrapServiceClient, req *v1.GetCredentialRequest) ([]byte, error) {
 	endSpan := telemetry.StartSpan(ctx, "GetCredential")
 	defer endSpan()
 
@@ -230,13 +215,13 @@ func (c *Client) getCredential(ctx context.Context, serviceClient v1.SecureTLSBo
 	return certPEM, nil
 }
 
-func (c *Client) generateKubeconfig(ctx context.Context, certPEM, keyPEM []byte, cfg *kubeconfig.Config) (*clientcmdapi.Config, error) {
+func (c *client) generateKubeconfig(ctx context.Context, certPEM, keyPEM []byte, cfg *kubeconfig.Config) (clientcmdapi.Config, error) {
 	endSpan := telemetry.StartSpan(ctx, "GenerateKubeconfig")
 	defer endSpan()
 
 	kubeconfigData, err := kubeconfig.GenerateForCertAndKey(certPEM, keyPEM, cfg)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate kubeconfig for new client cert and key: %w", err)
+		return clientcmdapi.Config{}, fmt.Errorf("failed to generate kubeconfig for new client cert and key: %w", err)
 	}
 	return kubeconfigData, nil
 }
