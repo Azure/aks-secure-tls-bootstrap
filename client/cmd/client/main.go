@@ -84,17 +84,17 @@ func run(ctx context.Context) int {
 	deadline := startTime.Add(config.Deadline)
 	bootstrapCtx, cancel := context.WithDeadline(ctx, deadline)
 	defer cancel()
-	logger.Info("set bootstrap deadline", zap.Time("deadline", deadline))
+	logger.Infof("set bootstrap deadline: %v", deadline)
 
 	kubeconfigPath := config.KubeconfigPath
 	err = kubeconfig.NewValidator().Validate(bootstrapCtx, kubeconfigPath, config.EnsureAuthorizedClient)
 	if err == nil {
-		logger.Info("existing kubeconfig is valid, will not bootstrap a new kubelet client credential", zap.String("kubeconfig", kubeconfigPath))
+		logger.Infof("existing kubeconfig is valid, will not bootstrap a new kubelet client credential (kubeconfig: %s)", kubeconfigPath)
 		endTime = time.Now()
 		emitGuestAgentEvent(logger, startTime, endTime, result)
 		return 0
 	}
-	logger.Info("failed to validate existing kubeconfig, will bootstrap a new kubelet client credential", zap.String("kubeconfig", kubeconfigPath), zap.Error(err))
+	logger.Infof("failed to validate existing kubeconfig, will bootstrap a new kubelet client credential (kubeconfig: %s, error: %v)", kubeconfigPath, err)
 
 	err, errLog, traces := bootstrap.Bootstrap(bootstrapCtx, config)
 	endTime = time.Now()
@@ -109,14 +109,9 @@ func run(ctx context.Context) int {
 		case errors.Is(err, context.Canceled):
 			logger.Error("context was cancelled before bootstrapping could complete")
 		case errors.Is(err, context.DeadlineExceeded):
-			logger.Error(
-				"failed to successfully bootstrap before the specified deadline",
-				zap.Error(errors.Unwrap(err)),
-				zap.Time("deadline", deadline),
-				zap.Duration("deadlineDuration", config.Deadline),
-			)
+			logger.Errorf("failed to successfully bootstrap before the specified deadline (deadline: %v, duration: %v): %v", deadline, config.Deadline, errors.Unwrap(err))
 		default:
-			logger.Error("failed to bootstrap", zap.Error(errors.Unwrap(err)))
+			logger.Errorf("failed to bootstrap: %v", errors.Unwrap(err))
 		}
 		result.FinalError = errors.Unwrap(err).Error()
 		exitCode = 1
@@ -126,7 +121,7 @@ func run(ctx context.Context) int {
 	return exitCode
 }
 
-func emitGuestAgentEvent(logger *zap.Logger, startTime, endTime time.Time, result *bootstrap.Result) {
+func emitGuestAgentEvent(logger *zap.SugaredLogger, startTime, endTime time.Time, result *bootstrap.Result) {
 	result.ElapsedMilliseconds = endTime.Sub(startTime).Milliseconds()
 
 	bootstrapEvent := &bootstrap.Event{
@@ -135,11 +130,11 @@ func emitGuestAgentEvent(logger *zap.Logger, startTime, endTime time.Time, resul
 	}
 	eventFilePath, err := bootstrapEvent.WriteWithResult(result)
 	if err != nil {
-		logger.Error("unable to write bootstrap guest agent event to disk", zap.Error(err))
+		logger.Errorf("unable to write bootstrap guest agent event to disk: %v", err)
 	}
 	if eventFilePath == "" {
-		logger.Warn("guest agent event path does not exist, no guest agent event telemetry will be written", zap.String("eventMessage", bootstrapEvent.Message))
+		logger.Warnf("guest agent event path does not exist, no guest agent event telemetry will be written (message: %s)", bootstrapEvent.Message)
 	} else {
-		logger.Info("bootstrapping guest agent event telemetry written to disk", zap.String("path", eventFilePath))
+		logger.Infof("bootstrapping guest agent event telemetry written to disk (path: %s)", eventFilePath)
 	}
 }

@@ -40,19 +40,20 @@ func TestMustGetLoggerPanics(t *testing.T) {
 }
 
 func TestContextOperations(t *testing.T) {
-	logger, err := zap.NewDevelopment()
+	zapLogger, err := zap.NewDevelopment()
 	assert.NoError(t, err)
+	logger := zapLogger.Sugar()
 
 	ctx := context.Background()
 
 	ctx = WithLogger(ctx, logger)
 	assert.NotNil(t, ctx)
 
-	logger = MustGetLogger(ctx)
-	assert.NotNil(t, logger)
+	retrievedLogger := MustGetLogger(ctx)
+	assert.NotNil(t, retrievedLogger)
 
 	ctx = NewTestContext()
 	assert.NotNil(t, ctx)
-	logger = MustGetLogger(ctx)
-	assert.NotNil(t, logger)
+	testLogger := MustGetLogger(ctx)
+	assert.NotNil(t, testLogger)
 }

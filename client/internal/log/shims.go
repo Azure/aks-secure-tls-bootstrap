@@ -11,31 +11,31 @@ import (
 
 var _ retryablehttp.LeveledLogger = (*LeveledLoggerShim)(nil)
 
-// LeveledLoggerShim provides an implementation of retryablehttp.LeveledLogger, shimming into a zap.Logger.
+// LeveledLoggerShim provides an implementation of retryablehttp.LeveledLogger, shimming into a zap.SugaredLogger.
 type LeveledLoggerShim struct {
-	logger *zap.Logger
+	logger *zap.SugaredLogger
 }
 
-func NewLeveledLoggerShim(logger *zap.Logger) *LeveledLoggerShim {
+func NewLeveledLoggerShim(logger *zap.SugaredLogger) *LeveledLoggerShim {
 	return &LeveledLoggerShim{
 		logger: logger,
 	}
 }
 
 func (l *LeveledLoggerShim) Debug(msg string, keysAndValues ...any) {
-	l.logger.Debug(msg, getZapFields(keysAndValues)...)
+	l.logger.Debugw(msg, keysAndValues...)
 }
 
 func (l *LeveledLoggerShim) Error(msg string, keysAndValues ...any) {
-	l.logger.Error(msg, getZapFields(keysAndValues)...)
+	l.logger.Errorw(msg, keysAndValues...)
 }
 
 func (l *LeveledLoggerShim) Info(msg string, keysAndValues ...any) {
-	l.logger.Info(msg, getZapFields(keysAndValues)...)
+	l.logger.Infow(msg, keysAndValues...)
 }
 
 func (l *LeveledLoggerShim) Warn(msg string, keysAndValues ...any) {
-	l.logger.Warn(msg, getZapFields(keysAndValues)...)
+	l.logger.Warnw(msg, keysAndValues...)
 }
 
 func getZapFields(keysAndValues []any) []zap.Field {

@@ -33,14 +33,14 @@ func TestLeveledLoggerShim(t *testing.T) {
 		notExpectedStdoutSubstrs []string
 	}{
 		{
-			name: "should correctly shim into a zap.Logger",
+			name: "should correctly shim into a zap.SugaredLogger",
 			logFunc: func(shim *LeveledLoggerShim) {
 				shim.Info("info", "field", "value")
 				shim.Warn("warn", "field", "value")
 				shim.Error("error", "field", "value")
 				shim.Debug("debug", "field", "value")
 			},
-			notExpectedStdoutSubstrs: []string{"leveled_logger_fields"},
+			notExpectedStdoutSubstrs: []string{"leveled_logger_fields", "Ignored key without a value"},
 		},
 		{
 			name: "unexpected number of keys and values are specified",
@@ -50,7 +50,7 @@ func TestLeveledLoggerShim(t *testing.T) {
 				shim.Error("error", "field", "value", "otherField")
 				shim.Debug("debug", "field", "value", "otherValue")
 			},
-			expectedStdoutSubstrs: []string{"leveled_logger_fields"},
+			expectedStdoutSubstrs: []string{"Ignored key without a value"},
 		},
 	}
 
@@ -77,7 +77,7 @@ func TestLeveledLoggerShim(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			shim := &LeveledLoggerShim{
-				logger: logger,
+				logger: logger.Sugar(),
 			}
 			tt.logFunc(shim)
 

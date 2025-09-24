@@ -13,7 +13,6 @@ import (
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/log"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/telemetry"
 	v1 "github.com/Azure/aks-secure-tls-bootstrap/service/pkg/gen/akssecuretlsbootstrap/v1"
-	"go.uber.org/zap"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
@@ -36,14 +35,14 @@ func (c *client) bootstrap(ctx context.Context, cfg *Config) (clientcmdapi.Confi
 
 	token, err := c.getAccessToken(ctx, cfg.CustomClientID, cfg.AADResource, &cfg.ProviderConfig)
 	if err != nil {
-		logger.Error(err.Error())
+		logger.Errorf("failed to get access token: %v", err)
 		return clientcmdapi.Config{}, err
 	}
 	logger.Info("generated access token for gRPC client connection")
 
 	serviceClient, closer, err := c.getServiceClient(ctx, token, cfg)
 	if err != nil {
-		logger.Error(err.Error())
+		logger.Errorf("failed to get service client: %v", err)
 		return clientcmdapi.Config{}, &bootstrapError{
 			errorType: ErrorTypeGetServiceClientFailure,
 			retryable: false,
@@ -52,7 +51,7 @@ func (c *client) bootstrap(ctx context.Context, cfg *Config) (clientcmdapi.Confi
 	}
 	defer func() {
 		if err := closer(); err != nil {
-			logger.Error("failed to close gRPC client connection", zap.Error(err))
+			logger.Errorf("failed to close gRPC client connection: %v", err)
 		}
 	}()
 	logger.Info("created bootstrap service gRPC client")
@@ -66,7 +65,7 @@ func (c *client) bootstrap(ctx context.Context, cfg *Config) (clientcmdapi.Confi
 			inner:     err,
 		}
 	}
-	logger.Info("retrieved instance metadata from IMDS", zap.String("resourceId", instanceData.Compute.ResourceID))
+	logger.Infof("retrieved instance metadata from IMDS (resourceId: %s)", instanceData.Compute.ResourceID)
 
 	nonce, err := c.getNonce(ctx, serviceClient, &v1.GetNonceRequest{
 		ResourceId: instanceData.Compute.ResourceID,

@@ -17,7 +17,7 @@ type contextKey struct{}
 
 type flushFunc func()
 
-func NewProductionLogger(logFile string, verbose bool) (*zap.Logger, flushFunc, error) {
+func NewProductionLogger(logFile string, verbose bool) (*zap.SugaredLogger, flushFunc, error) {
 	encoderConfig := zap.NewProductionEncoderConfig()
 	encoderConfig.TimeKey = "timestamp"
 	encoderConfig.EncodeTime = zapcore.RFC3339NanoTimeEncoder
@@ -50,7 +50,7 @@ func NewProductionLogger(logFile string, verbose bool) (*zap.Logger, flushFunc, 
 		))
 	}
 
-	logger := zap.New(zapcore.NewTee(cores...))
+	logger := zap.New(zapcore.NewTee(cores...)).Sugar()
 
 	flush := func() {
 		// per guidance from: https://github.com/uber-go/zap/issues/328
@@ -60,12 +60,12 @@ func NewProductionLogger(logFile string, verbose bool) (*zap.Logger, flushFunc, 
 	return logger, flush, nil
 }
 
-func WithLogger(ctx context.Context, logger *zap.Logger) context.Context {
+func WithLogger(ctx context.Context, logger *zap.SugaredLogger) context.Context {
 	return context.WithValue(ctx, contextKey{}, logger)
 }
 
-func MustGetLogger(ctx context.Context) *zap.Logger {
-	logger, ok := ctx.Value(contextKey{}).(*zap.Logger)
+func MustGetLogger(ctx context.Context) *zap.SugaredLogger {
+	logger, ok := ctx.Value(contextKey{}).(*zap.SugaredLogger)
 	if !ok {
 		panic("logger not found on context")
 	}
@@ -74,5 +74,5 @@ func MustGetLogger(ctx context.Context) *zap.Logger {
 
 func NewTestContext() context.Context {
 	logger, _ := zap.NewDevelopment()
-	return WithLogger(context.Background(), logger)
+	return WithLogger(context.Background(), logger.Sugar())
 }
