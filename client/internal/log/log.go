@@ -21,6 +21,7 @@ func NewProductionLogger(logFile string, verbose bool) (*zap.SugaredLogger, flus
 	encoderConfig := zap.NewProductionEncoderConfig()
 	encoderConfig.TimeKey = "timestamp"
 	encoderConfig.EncodeTime = zapcore.RFC3339NanoTimeEncoder
+	encoderConfig.ConsoleSeparator = " "
 
 	level := zap.InfoLevel
 	if verbose {
