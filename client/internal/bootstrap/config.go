@@ -13,11 +13,10 @@ import (
 )
 
 type Config struct {
-	cloud.ProviderConfig
-
+	CloudProviderConfig     *cloud.ProviderConfig
 	CloudProviderConfigPath string        `json:"cloudProviderConfigPath"`
 	APIServerFQDN           string        `json:"apiServerFqdn"`
-	CustomClientID          string        `json:"customClientId"`
+	UserAssignedIdentityID  string        `json:"userAssignedIdentityId"`
 	NextProto               string        `json:"nextProto"`
 	AADResource             string        `json:"aadResource"`
 	ClusterCAFilePath       string        `json:"clusterCaFilePath"`
@@ -28,13 +27,29 @@ type Config struct {
 	Deadline                time.Duration `json:"deadline"`
 }
 
-func (c *Config) Validate() error {
-	if c.CloudProviderConfigPath == "" {
-		return fmt.Errorf("cloud provider config path must be specified")
+func (c *Config) LoadFromFile(path string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("reading config file: %w", err)
 	}
-	if c.ClusterCAFilePath == "" {
-		return fmt.Errorf("cluster CA file path must be specified")
+	if err := json.Unmarshal(data, c); err != nil {
+		return fmt.Errorf("unmarshalling config file content: %w", err)
 	}
+	return nil
+}
+
+func (c *Config) DefaultAndValidate() error {
+	c.applyDefaults()
+	return c.validate()
+}
+
+func (c *Config) applyDefaults() {
+	if c.Deadline == 0 {
+		c.Deadline = 2 * time.Minute
+	}
+}
+
+func (c *Config) validate() error {
 	if c.APIServerFQDN == "" {
 		return fmt.Errorf("apiserver FQDN must be specified")
 	}
@@ -50,30 +65,28 @@ func (c *Config) Validate() error {
 	if c.CertDir == "" {
 		return fmt.Errorf("cert dir must be specified")
 	}
-	if c.Deadline == 0 {
-		return fmt.Errorf("deadline must be specified")
-	}
-	return c.loadCloudProviderConfig()
-}
 
-func (c *Config) LoadFromFile(path string) error {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return fmt.Errorf("reading config file: %w", err)
+	if c.CloudProviderConfigPath == "" {
+		return fmt.Errorf("cloud provider config path must be specified")
 	}
-	if err := json.Unmarshal(data, c); err != nil {
-		return fmt.Errorf("unmarshalling config file content: %w", err)
-	}
-	return nil
-}
-
-func (c *Config) loadCloudProviderConfig() error {
 	data, err := os.ReadFile(c.CloudProviderConfigPath)
 	if err != nil {
-		return fmt.Errorf("reading cloud provider config data: %w", err)
+		return fmt.Errorf("cannot read cloud provider config data: %w", err)
 	}
-	if err = json.Unmarshal(data, &c.ProviderConfig); err != nil {
-		return fmt.Errorf("unmarshalling cloud provider config data: %w", err)
+	c.CloudProviderConfig = new(cloud.ProviderConfig)
+	if err = json.Unmarshal(data, c.CloudProviderConfig); err != nil {
+		return fmt.Errorf("cannot unmarshal cloud provider config data: %w", err)
 	}
+
+	if c.ClusterCAFilePath == "" {
+		return fmt.Errorf("cluster CA file path must be specified")
+	}
+	if _, err := os.Stat(c.ClusterCAFilePath); err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("specified cluster CA file does not exist: %s", c.ClusterCAFilePath)
+		}
+		return fmt.Errorf("unable to verify existence of cluster CA file: %w", err)
+	}
+
 	return nil
 }

@@ -39,7 +39,7 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 		{
 			name: "an access token cannot be retrieved",
 			setupMocks: func(cfg *Config, imdsClient *imdsmocks.MockClient, serviceClient *v1mocks.MockSecureTLSBootstrapServiceClient) {
-				cfg.ProviderConfig.ClientSecret = "" // force access token failure
+				cfg.CloudProviderConfig.ClientSecret = "" // force access token failure
 			},
 			expectedError: &bootstrapError{
 				errorType: ErrorTypeGetAccessTokenFailure,
@@ -198,13 +198,14 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 				},
 			}
 			config := &Config{
-				NextProto:         "bootstrap",
-				AADResource:       "resource",
-				ClusterCAFilePath: clusterCAFilePath,
-				CertDir:           certDir,
-				APIServerFQDN:     "controlplane.azmk8s.io",
-				KubeconfigPath:    "path/to/kubeconfig",
-				ProviderConfig: cloud.ProviderConfig{
+				NextProto:               "bootstrap",
+				AADResource:             "resource",
+				ClusterCAFilePath:       clusterCAFilePath,
+				CertDir:                 certDir,
+				APIServerFQDN:           "controlplane.azmk8s.io",
+				KubeconfigPath:          "path/to/kubeconfig",
+				CloudProviderConfigPath: filepath.Join(tempDir, "azure.json"),
+				CloudProviderConfig: &cloud.ProviderConfig{
 					CloudName:    azure.PublicCloud.Name,
 					ClientID:     "service-principal-id",
 					ClientSecret: "service-principal-secret",

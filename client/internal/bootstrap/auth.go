@@ -43,17 +43,15 @@ func extractAccessToken(token *adal.ServicePrincipalToken) (string, error) {
 	return token.OAuthToken(), nil
 }
 
-// getAccessToken retrieves an AAD access token (JWT) using the specified custom client ID, resource, and cloud provider config.
-// MSI access tokens are retrieved from IMDS, while service principal tokens are retrieved directly from AAD.
-func (c *client) getAccessToken(ctx context.Context, customClientID, resource string, cloudProviderConfig *cloud.ProviderConfig) (string, error) {
+func (c *client) getAccessToken(ctx context.Context, userAssignedIdentityID, resource string, cloudProviderConfig *cloud.ProviderConfig) (string, error) {
 	endSpan := telemetry.StartSpan(ctx, "GetAccessToken")
 	defer endSpan()
 
 	logger := log.MustGetLogger(ctx)
 
 	userAssignedID := cloudProviderConfig.UserAssignedIdentityID
-	if customClientID != "" {
-		userAssignedID = customClientID
+	if userAssignedIdentityID != "" {
+		userAssignedID = userAssignedIdentityID
 	}
 
 	if userAssignedID != "" {
