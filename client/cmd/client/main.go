@@ -35,7 +35,7 @@ func init() {
 
 	flag.StringVar(&config.CloudProviderConfigPath, "cloud-provider-config", "", "path to the cloud provider config file")
 	flag.StringVar(&config.APIServerFQDN, "apiserver-fqdn", "", "FQDN of the apiserver")
-	flag.StringVar(&config.CustomClientID, "custom-client-id", "", "client ID of the user-assigned managed identity to use when requesting a token from IMDS - if not specified the inferred kubelet identity will be used")
+	flag.StringVar(&config.UserAssignedIdentityID, "user-assigned-identity-id", "", "client ID of the user-assigned identity to use when requesting MSI tokens from IMDS - if not specified, the kubelet identity from the cloud provider config will be used")
 	flag.StringVar(&config.AADResource, "aad-resource", "", "resource (audience) used to request JWT tokens from AAD for authentication")
 	flag.StringVar(&config.NextProto, "next-proto", "", "ALPN next proto value")
 	flag.StringVar(&config.KubeconfigPath, "kubeconfig", "", "path to the kubeconfig - if this file does not exist, the generated kubeconfig will be placed there - this should be the same as the --kubeconfig passed to the kubelet")
@@ -43,7 +43,7 @@ func init() {
 	flag.StringVar(&config.CertDir, "cert-dir", "", "the directory where kubelet's new client certificate/key pair will be stored - this should be the same as the --cert-dir passed to the kubelet")
 	flag.BoolVar(&config.InsecureSkipTLSVerify, "insecure-skip-tls-verify", false, "skip TLS verification when connecting to the control plane")
 	flag.BoolVar(&config.EnsureAuthorizedClient, "ensure-authorized", false, "ensure the specified kubeconfig contains an authorized clientset before bootstrapping")
-	flag.DurationVar(&config.Deadline, "deadline", 3*time.Minute, "the deadline within which bootstrapping must succeed")
+	flag.DurationVar(&config.Deadline, "deadline", 0, "the deadline within which bootstrapping must succeed")
 	flag.Parse()
 }
 
@@ -54,7 +54,7 @@ func main() {
 			os.Exit(1)
 		}
 	}
-	if err := config.Validate(); err != nil {
+	if err := config.DefaultAndValidate(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}

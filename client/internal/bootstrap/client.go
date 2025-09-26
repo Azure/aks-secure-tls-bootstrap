@@ -31,17 +31,17 @@ func newClient(ctx context.Context) *client {
 	}
 }
 
-func (c *client) bootstrap(ctx context.Context, cfg *Config) (clientcmdapi.Config, error) {
+func (c *client) bootstrap(ctx context.Context, config *Config) (clientcmdapi.Config, error) {
 	logger := log.MustGetLogger(ctx)
 
-	token, err := c.getAccessToken(ctx, cfg.CustomClientID, cfg.AADResource, &cfg.ProviderConfig)
+	token, err := c.getAccessToken(ctx, config.UserAssignedIdentityID, config.AADResource, config.CloudProviderConfig)
 	if err != nil {
 		logger.Error(err.Error())
 		return clientcmdapi.Config{}, err
 	}
 	logger.Info("generated access token for gRPC client connection")
 
-	serviceClient, closer, err := c.getServiceClient(ctx, token, cfg)
+	serviceClient, closer, err := c.getServiceClient(ctx, token, config)
 	if err != nil {
 		logger.Error(err.Error())
 		return clientcmdapi.Config{}, &bootstrapError{
@@ -120,9 +120,9 @@ func (c *client) bootstrap(ctx context.Context, cfg *Config) (clientcmdapi.Confi
 	logger.Info("received valid kubelet client credential from bootstrap server")
 
 	kubeconfigData, err := c.generateKubeconfig(ctx, certPEM, keyPEM, &kubeconfig.Config{
-		APIServerFQDN:     cfg.APIServerFQDN,
-		ClusterCAFilePath: cfg.ClusterCAFilePath,
-		CertDir:           cfg.CertDir,
+		APIServerFQDN:     config.APIServerFQDN,
+		ClusterCAFilePath: config.ClusterCAFilePath,
+		CertDir:           config.CertDir,
 	})
 	if err != nil {
 		logger.Error(err.Error())
