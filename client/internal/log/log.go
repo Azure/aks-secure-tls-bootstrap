@@ -22,6 +22,9 @@ func NewProductionLogger(logFile string, verbose bool) (*zap.Logger, flushFunc, 
 	encoderConfig.TimeKey = "timestamp"
 	encoderConfig.EncodeTime = zapcore.RFC3339NanoTimeEncoder
 
+	// default is vertical tab (VT) which gets ASCII encoded in syslog output and causes clutter - we use a single space to workaround this
+	encoderConfig.ConsoleSeparator = " "
+
 	level := zap.InfoLevel
 	if verbose {
 		level = zap.DebugLevel
