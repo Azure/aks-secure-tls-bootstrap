@@ -80,26 +80,40 @@ stages:
     - publish: $(Build.ArtifactStagingDirectory)/aks-secure-tls-bootstrap-client.exe
       artifact: windows-amd64
       
-# - stage: publish
-#   jobs:
-#   - job: publish
-#     displayName: Publish
-#     steps:
-#     - checkout: self
-#       path: s
-#       fetchTags: false
-#       fetchDepth: 1
+- stage: publish
+  dependsOn:
+    - build_linux_amd64
+    - build_linux_arm64
+    - build_windows_amd64
+  jobs:
+  - job: publish
+    displayName: Publish
+    steps:
+    - checkout: self
 
-#     - bash: |
-#         set -euxo pipefail
+    - task: DownloadPipelineArtifact@2
+      displayName: Download linux-amd64
+      inputs:
+        buildType: current
+        artifactName: linux-amd64
+        path: $(Build.ArtifactStagingDirectory)
 
-#         az login --identity --resource-id $AGENT_IDENTITY_RESOURCE_ID
-#         az account set --subscription $STORAGE_ACCOUNT_SUBSCRIPTION
+    - task: DownloadPipelineArtifact@2
+      displayName: Download linux-arm64
+      inputs:
+        buildType: current
+        artifactName: linux-arm64
+        path: $(Build.ArtifactStagingDirectory)
 
-#         pushd client/
-#           ./hack/upload.sh
-#         popd
-#       env:
-#         OS: all # build linux + windows binaries
-#         VERSION: $(CLIENT_VERSION_STRING)
-#       displayName: Build and Upload x86_64 Linux and Windows Binaries
+    - task: DownloadPipelineArtifact@2
+      displayName: Download windows-amd64
+      inputs:
+        buildType: current
+        artifactName: windows-amd64
+        path: $(Build.ArtifactStagingDirectory)
+
+    - bash: /bin/bash .pipelines/client/scripts/github-publish.sh
+      env:
+        ARTIFACT_DIRECTORY: "$(Build.ArtifactStagingDirectory)"
+        VERSION: "v${{ parameters.Version }}"
+      displayName: Publish new GitHub release

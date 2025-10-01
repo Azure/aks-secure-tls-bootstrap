@@ -24,4 +24,4 @@ if [ ! -f "${BIN_PATH}" ]; then
 fi
 
 # move the newly-built binary to the staging directory
-mv "${BIN_PATH}" "${STAGING_DIRECTORY}/aks-secure-tls-bootstrap-client${EXTENSION}"
+mv "${BIN_PATH}" "${STAGING_DIRECTORY}/aks-secure-tls-bootstrap-client-${ARCH}${EXTENSION}"
