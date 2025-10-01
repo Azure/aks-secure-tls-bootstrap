@@ -25,4 +25,4 @@ setup_pmc
 sudo apt-get install msft-golang
 
 # make sure go is accessible from the command line
-go help
+go version
