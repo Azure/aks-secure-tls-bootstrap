@@ -34,6 +34,7 @@ stages:
       artifact: linux-amd64
 
   - job: build_linux_arm64
+    condition: False
     dependsOn: []
     pool:
       name: $(ARM64_POOL_NAME)
@@ -83,7 +84,7 @@ stages:
 - stage: publish
   dependsOn:
     - build_linux_amd64
-    - build_linux_arm64
+    # - build_linux_arm64
     - build_windows_amd64
   jobs:
   - job: publish
@@ -112,8 +113,16 @@ stages:
         artifactName: windows-amd64
         path: $(Build.ArtifactStagingDirectory)
 
+    - bash: /bin/bash .pipelines/client/scripts/generate-github-token.sh
+      env:
+        PRIVATE_KEY: $(aks-node-sig-release-assistant-private-key)
+        CLIENT_ID: $(aks-node-sig-release-assistant-client-id)
+        INSTALLATION_ID: $(aks-node-sig-release-assistant-installation-id)
+      displayName: Generate GitHub token
+
     - bash: /bin/bash .pipelines/client/scripts/github-publish.sh
       env:
         ARTIFACT_DIRECTORY: "$(Build.ArtifactStagingDirectory)"
         VERSION: "v${{ parameters.Version }}"
+        GITHUB_TOKEN: $(GITHUB_TOKEN)
       displayName: Publish new GitHub release
