@@ -1,19 +1,19 @@
 name: $(SourceBranchName)_$(Date:yyyyMMdd).$(Rev:r)
 
-pool:
-  name: $(POOL_NAME)
-
 parameters:
   - name: Version
     type: string
   - name: Revision
     type: string
+    default: "1"
 
 stages:
 - stage: build
   jobs:
   - job: build_linux_amd64
     dependsOn: []
+    pool:
+      name: $(AMD64_POOL_NAME)
     displayName: Build linux-amd64
     steps:
     - checkout: self
@@ -35,6 +35,8 @@ stages:
 
   - job: build_linux_arm64
     dependsOn: []
+    pool:
+      name: $(ARM64_POOL_NAME)
     displayName: Build linux-arm64
     steps:
     - checkout: self
@@ -56,6 +58,8 @@ stages:
 
   - job: build_windows_amd64
     dependsOn: []
+    pool:
+      name: $(AMD64_POOL_NAME)
     displayName: Build windows-amd64
     steps:
     - checkout: self
@@ -73,7 +77,7 @@ stages:
         EXTENSION: ".exe"
       displayName: Build windows-amd64 client binary
 
-    - publish: $(Build.ArtifactStagingDirectory)/aks-secure-tls-bootstrap-client
+    - publish: $(Build.ArtifactStagingDirectory)/aks-secure-tls-bootstrap-client.exe
       artifact: windows-amd64
       
 # - stage: publish
