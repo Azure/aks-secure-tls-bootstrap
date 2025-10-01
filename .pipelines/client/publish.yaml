@@ -81,10 +81,7 @@ stages:
       artifact: windows-amd64
       
 - stage: publish
-  dependsOn:
-    - build_linux_amd64
-    - build_linux_arm64
-    - build_windows_amd64
+  dependsOn: build
   jobs:
   - job: publish
     displayName: Publish
