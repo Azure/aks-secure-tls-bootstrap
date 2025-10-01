@@ -2,7 +2,7 @@
 set -euxo pipefail
 
 purge_go() {
-    sudo apt-get uninstall purge golang*
+    sudo apt-get purge golang*
     sudo apt-get update
     sudo rm -rf /usr/local/go
 }

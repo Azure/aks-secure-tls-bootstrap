@@ -3,6 +3,12 @@ name: $(SourceBranchName)_$(Date:yyyyMMdd).$(Rev:r)
 pool:
   name: $(POOL_NAME)
 
+parameters:
+  - name: Version
+    type: string
+  - name: Revision
+    type: string
+
 stages:
 - stage: build
   jobs:
@@ -18,8 +24,8 @@ stages:
     - bash: /bin/bash .pipelines/client/scripts/build.sh
       env:
         STAGING_DIRECTORY: "$(Build.ArtifactStagingDirectory)"
-        VERSION: "v$(VERSION)"
-        REVISION: $(REVISION)
+        VERSION: "v${{ parameters.Version }}"
+        REVISION: ${{ parameters.Revision }}
         OS: linux
         ARCH: amd64
       displayName: Build linux-amd64 client binary
@@ -39,8 +45,8 @@ stages:
     - bash: /bin/bash .pipelines/client/scripts/build.sh
       env:
         STAGING_DIRECTORY: "$(Build.ArtifactStagingDirectory)"
-        VERSION: "v$(VERSION)"
-        REVISION: $(REVISION)
+        VERSION: "v${{ parameters.Version }}"
+        REVISION: ${{ parameters.Revision }}
         OS: linux
         ARCH: arm64
       displayName: Build linux-arm64 client binary
@@ -60,8 +66,8 @@ stages:
     - bash: /bin/bash .pipelines/client/scripts/build.sh
       env:
         STAGING_DIRECTORY: "$(Build.ArtifactStagingDirectory)"
-        VERSION: "v$(VERSION)"
-        REVISION: $(REVISION)
+        VERSION: "v${{ parameters.Version }}"
+        REVISION: ${{ parameters.Revision }}
         OS: windows
         ARCH: amd64
         EXTENSION: ".exe"
