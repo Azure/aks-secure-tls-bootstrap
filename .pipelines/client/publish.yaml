@@ -1,0 +1,95 @@
+name: $(SourceBranchName)_$(Date:yyyyMMdd).$(Rev:r)
+
+pool:
+  name: $(POOL_NAME)
+
+stages:
+- stage: build
+  jobs:
+  - job: build_linux_amd64
+    dependsOn: []
+    displayName: Build linux-amd64
+    steps:
+    - checkout: self
+
+    - bash: /bin/bash .pipelines/client/scripts/setup-msft-golang.sh
+      displayName: Setup msft-golang
+
+    - bash: /bin/bash .pipelines/client/scripts/build.sh
+      env:
+        STAGING_DIRECTORY: "$(Build.ArtifactStagingDirectory)"
+        VERSION: "v$(VERSION)"
+        REVISION: $(REVISION)
+        OS: linux
+        ARCH: amd64
+      displayName: Build linux-amd64 client binary
+
+    - publish: $(Build.ArtifactStagingDirectory)/aks-secure-tls-bootstrap-client
+      artifact: linux-amd64
+
+  - job: build_linux_arm64
+    dependsOn: []
+    displayName: Build linux-arm64
+    steps:
+    - checkout: self
+
+    - bash: /bin/bash .pipelines/client/scripts/setup-msft-golang.sh
+      displayName: Setup msft-golang
+
+    - bash: /bin/bash .pipelines/client/scripts/build.sh
+      env:
+        STAGING_DIRECTORY: "$(Build.ArtifactStagingDirectory)"
+        VERSION: "v$(VERSION)"
+        REVISION: $(REVISION)
+        OS: linux
+        ARCH: arm64
+      displayName: Build linux-arm64 client binary
+
+    - publish: $(Build.ArtifactStagingDirectory)/aks-secure-tls-bootstrap-client
+      artifact: linux-arm64
+
+  - job: build_windows_amd64
+    dependsOn: []
+    displayName: Build windows-amd64
+    steps:
+    - checkout: self
+
+    - bash: /bin/bash .pipelines/client/scripts/setup-msft-golang.sh
+      displayName: Setup msft-golang
+
+    - bash: /bin/bash .pipelines/client/scripts/build.sh
+      env:
+        STAGING_DIRECTORY: "$(Build.ArtifactStagingDirectory)"
+        VERSION: "v$(VERSION)"
+        REVISION: $(REVISION)
+        OS: windows
+        ARCH: amd64
+        EXTENSION: ".exe"
+      displayName: Build windows-amd64 client binary
+
+    - publish: $(Build.ArtifactStagingDirectory)/aks-secure-tls-bootstrap-client
+      artifact: windows-amd64
+      
+# - stage: publish
+#   jobs:
+#   - job: publish
+#     displayName: Publish
+#     steps:
+#     - checkout: self
+#       path: s
+#       fetchTags: false
+#       fetchDepth: 1
+
+#     - bash: |
+#         set -euxo pipefail
+
+#         az login --identity --resource-id $AGENT_IDENTITY_RESOURCE_ID
+#         az account set --subscription $STORAGE_ACCOUNT_SUBSCRIPTION
+
+#         pushd client/
+#           ./hack/upload.sh
+#         popd
+#       env:
+#         OS: all # build linux + windows binaries
+#         VERSION: $(CLIENT_VERSION_STRING)
+#       displayName: Build and Upload x86_64 Linux and Windows Binaries

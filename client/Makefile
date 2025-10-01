@@ -52,6 +52,10 @@ build-all:
 build:
 	CGO_ENABLED=0 GOOS=$(OS) GOARCH=$(ARCH) go build -ldflags $(LDFLAGS) -o bin/aks-secure-tls-bootstrap-client-$(ARCH)$(EXTENSION) cmd/client/main.go
 
+.PHONY: build-prod
+build-prod:
+	CGO_ENABLED=1 GOEXPERIMENT=systemcrypto GOPROXY=direct GOOS=$(OS) GOARCH=$(ARCH) go build -ldflags "$(LDFLAGS)" -o bin/aks-secure-tls-bootstrap-client-$(ARCH)$(EXTENSION) cmd/client/main.go
+
 ##@ Util
 
 # go-get-tool will 'go get' any package $2 and install it to $1.
