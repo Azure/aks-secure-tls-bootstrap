@@ -22,7 +22,7 @@ purge_go
 setup_pmc
 
 # install msft-golang
-sudo apt-get install msft-golang
+sudo apt-get -y install msft-golang
 
 # make sure go is accessible from the command line
 go version

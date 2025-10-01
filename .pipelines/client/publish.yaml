@@ -34,7 +34,6 @@ stages:
       artifact: linux-amd64
 
   - job: build_linux_arm64
-    condition: False
     dependsOn: []
     pool:
       name: $(ARM64_POOL_NAME)
@@ -84,7 +83,7 @@ stages:
 - stage: publish
   dependsOn:
     - build_linux_amd64
-    # - build_linux_arm64
+    - build_linux_arm64
     - build_windows_amd64
   jobs:
   - job: publish
