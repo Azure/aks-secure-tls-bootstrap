@@ -1,5 +1,3 @@
-name: $(SourceBranchName)_$(Date:yyyyMMdd).$(Rev:r)
-
 parameters:
   - name: Version
     type: string
