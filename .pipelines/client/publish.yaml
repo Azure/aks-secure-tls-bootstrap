@@ -1,0 +1,88 @@
+parameters:
+  - name: VERSION
+    displayName: Version
+    type: string
+
+stages:
+- stage: build
+  jobs:
+  - job: build_linux_amd64
+    displayName: Build linux-amd64
+    pool:
+      name: $(AMD64_POOL_NAME)
+    dependsOn: []
+    steps:
+    - template: templates/build-template.yaml
+      parameters:
+        VERSION: ${{ parameters.VERSION }}
+        OS: linux
+        ARCH: amd64
+
+  - job: build_linux_arm64
+    displayName: Build linux-arm64
+    pool:
+      name: $(ARM64_POOL_NAME)
+    dependsOn: []
+    steps:
+    - template: templates/build-template.yaml
+      parameters:
+        VERSION: ${{ parameters.VERSION }}
+        OS: linux
+        ARCH: arm64
+
+  - job: build_windows_amd64
+    displayName: Build windows-amd64
+    pool:
+      name: $(AMD64_POOL_NAME)
+    dependsOn: []
+    steps:
+    - template: templates/build-template.yaml
+      parameters:
+        VERSION: ${{ parameters.VERSION }}
+        OS: windows
+        ARCH: amd64
+        EXTENSION: .exe
+      
+- stage: publish
+  pool:
+    name: $(AMD64_POOL_NAME)
+  dependsOn: build
+  jobs:
+  - job: publish
+    steps:
+    - checkout: self
+
+    - task: DownloadPipelineArtifact@2
+      displayName: Download linux-amd64
+      inputs:
+        buildType: current
+        artifactName: linux-amd64
+        path: $(Build.ArtifactStagingDirectory)
+
+    - task: DownloadPipelineArtifact@2
+      displayName: Download linux-arm64
+      inputs:
+        buildType: current
+        artifactName: linux-arm64
+        path: $(Build.ArtifactStagingDirectory)
+
+    - task: DownloadPipelineArtifact@2
+      displayName: Download windows-amd64
+      inputs:
+        buildType: current
+        artifactName: windows-amd64
+        path: $(Build.ArtifactStagingDirectory)
+
+    - bash: /bin/bash .pipelines/client/scripts/generate-github-token.sh
+      env:
+        PRIVATE_KEY: $(aks-node-sig-release-assistant-private-key)
+        CLIENT_ID: $(aks-node-sig-release-assistant-client-id)
+        INSTALLATION_ID: $(aks-node-sig-release-assistant-installation-id)
+      displayName: Generate GitHub token
+
+    - bash: /bin/bash .pipelines/client/scripts/github-publish.sh
+      env:
+        ARTIFACT_DIRECTORY: "$(Build.ArtifactStagingDirectory)"
+        VERSION: ${{ parameters.Version }}
+        GITHUB_TOKEN: $(GITHUB_TOKEN)
+      displayName: Publish new GitHub release

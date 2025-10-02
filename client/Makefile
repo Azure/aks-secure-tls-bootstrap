@@ -26,7 +26,7 @@ EXTENSION=
 
 .PHONY: test
 test:
-	go test $(shell go list ./... | grep -v vendor | grep -v mock | grep -v testutil)
+	go test ./...
 
 .PHONY: test-coverage
 test-coverage:
@@ -51,6 +51,10 @@ build-all:
 .PHONY: build
 build:
 	CGO_ENABLED=0 GOOS=$(OS) GOARCH=$(ARCH) go build -ldflags $(LDFLAGS) -o bin/aks-secure-tls-bootstrap-client-$(ARCH)$(EXTENSION) cmd/client/main.go
+
+.PHONY: build-prod
+build-prod:
+	CGO_ENABLED=1 GOEXPERIMENT=systemcrypto GOPROXY=direct GOOS=$(OS) GOARCH=$(ARCH) go build -ldflags "$(LDFLAGS)" -o bin/aks-secure-tls-bootstrap-client-$(ARCH)$(EXTENSION) cmd/client/main.go
 
 ##@ Util
 
