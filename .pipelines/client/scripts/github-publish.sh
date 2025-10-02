@@ -56,7 +56,7 @@ create_windows_zip_archive() {
 }
 
 create_github_release() {
-    TAG_NAME="client/v${VERSION}"
+    TAG_NAME="client/${VERSION}"
     echo "Creating GitHub release for tag: ${TAG_NAME}"
     
     RELEASE_RESPONSE=$(curl -s -X POST \
@@ -122,4 +122,4 @@ upload_asset() {
 verify_artifacts
 create_linux_tarballs
 create_windows_zip_archive
-# create_github_release
+create_github_release
