@@ -67,7 +67,7 @@ create_github_release() {
         -H "Accept: application/vnd.github+json" \
         -H "X-GitHub-Api-Version: 2022-11-28" \
         https://api.github.com/repos/${REPO_PATH}/releases/latest)
-    LATEST_RELEASE_TAG=$(echo "${LATEST_RELEASE_RESPONSE}" | jq -r '.properties.tag_name')
+    LATEST_RELEASE_TAG=$(echo "${LATEST_RELEASE_RESPONSE}" | jq -r '.tag_name')
     if [ -z "${LATEST_RELEASE_TAG}" ] || [ "${LATEST_RELEASE_TAG}" = "null" ]; then
         echo "Failed to get latest release tag to generate release notes. Response:"
         echo "${LATEST_RELEASE_RESPONSE}"
@@ -84,7 +84,7 @@ create_github_release() {
             \"tag_name\": \"${TAG_NAME}\",
             \"previous_tag_name\": \"${LATEST_RELEASE_TAG}\"
         }")
-    RELEASE_NOTES=$(echo "${GENERATE_RELEASE_NOTES_RESPONSE}" | jq -r '.properties.body')
+    RELEASE_NOTES=$(echo "${GENERATE_RELEASE_NOTES_RESPONSE}" | jq -r '.body')
     if [ -z "${RELEASE_NOTES}" ] || [ "${RELEASE_NOTES}" = "null" ]; then
         echo "Failed to generate release notes for new release: ${TAG_NAME}. Response:"
         echo "${GENERATE_RELEASE_NOTES_RESPONSE}"

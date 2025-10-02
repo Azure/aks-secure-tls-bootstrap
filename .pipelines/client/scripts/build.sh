@@ -36,7 +36,6 @@ if [ "${OS,,}" = "linux" ]; then
         echo "failed to run help command on newly-built binary, exit code: ${EXIT_CODE}"
         exit 1
     fi
-
     if [[ "${HELP_OUTPUT}" != *"${VERSION}"* ]]; then
         echo "help command output did not contain expected version string: \"${VERSION}\""
         exit 1

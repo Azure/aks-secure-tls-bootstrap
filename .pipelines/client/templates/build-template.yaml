@@ -1,0 +1,29 @@
+parameters:
+  - name: Version
+    type: string
+  - name: OS
+    type: string
+  - name: ARCH
+    type: string
+  - name: EXTENSION
+    type: string
+    default: ""
+
+steps:
+- checkout: self
+
+- bash: /bin/bash .pipelines/client/scripts/setup-dependencies.sh
+  displayName: Setup build dependencies
+
+- bash: /bin/bash .pipelines/client/scripts/build.sh
+  env:
+    STAGING_DIRECTORY: "$(Build.ArtifactStagingDirectory)"
+    VERSION: ${{ parameters.Version }}
+    OS: ${{ parameters.OS }}
+    ARCH: ${{ parameters.ARCH }}
+    EXTENSION: ${{ parameters.EXTENSION }}
+  displayName: Build ${{ parameters.OS }}-${{ parameters.ARCH }} client binary
+
+- publish: $(Build.ArtifactStagingDirectory)/aks-secure-tls-bootstrap-client-${{ parameters.ARCH }}${{ parameters.EXTENSION }}
+  artifact: ${{ parameters.OS }}-${{ parameters.ARCH }}
+  displayName: Publish ${{ parameters.OS }}-${{ parameters.ARCH }} to pipeline artifacts
