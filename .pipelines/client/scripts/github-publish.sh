@@ -8,6 +8,8 @@ LINUX_AMD64_PATH="${ARTIFACT_DIRECTORY}/aks-secure-tls-bootstrap-client-amd64"
 LINUX_ARM64_PATH="${ARTIFACT_DIRECTORY}/aks-secure-tls-bootstrap-client-arm64"
 WINDOWS_AMD64_PATH="${ARTIFACT_DIRECTORY}/aks-secure-tls-bootstrap-client-amd64.exe"
 
+REPO_PATH="Azure/aks-secure-tls-bootstrap"
+
 verify_artifacts() {
     if [ ! -f "${LINUX_AMD64_PATH}" ]; then
         echo "could not find linux-amd64 client binary artifact at: ${LINUX_AMD64_PATH}"
@@ -63,19 +65,18 @@ create_github_release() {
         -H "Authorization: Bearer ${GITHUB_TOKEN}" \
         -H "Accept: application/vnd.github.v3+json" \
         -H "Content-Type: application/json" \
-        "https://api.github.com/repos/Azure/aks-secure-tls-bootstrap/releases" \
+        "https://api.github.com/repos/${REPO_PATH}/releases" \
         -d "{
             \"tag_name\": \"${TAG_NAME}\",
             \"name\": \"${TAG_NAME}\",
-            \"body\": \"official client release - v${VERSION}\",
             \"draft\": false,
             \"prerelease\": false
         }")
     
-    # Extract release ID and upload URL
+    # extract release ID and upload URL
     RELEASE_ID=$(echo "${RELEASE_RESPONSE}" | jq -r '.id')
     UPLOAD_URL=$(echo "${RELEASE_RESPONSE}" | jq -r '.upload_url')
-    UPLOAD_URL="${UPLOAD_URL%\{*}"  # Remove the {?name,label} template part
+    UPLOAD_URL="${UPLOAD_URL%\{*}"
     
     if [ -z "${RELEASE_ID}" ] || [ -z "${UPLOAD_URL}" ]; then
         echo "Failed to create GitHub release. Response:"
@@ -85,13 +86,24 @@ create_github_release() {
     
     echo "Created GitHub release with ID: ${RELEASE_ID}"
     
-    # Upload artifacts
+    # upload artifacts
     upload_asset "${UPLOAD_URL}" "${LINUX_AMD64_TAR}" "application/gzip"
     upload_asset "${UPLOAD_URL}" "${LINUX_ARM64_TAR}" "application/gzip"
     upload_asset "${UPLOAD_URL}" "${WINDOWS_AMD64_ZIP}" "application/zip"
-    
-    echo "Successfully created GitHub release: ${RELEASE_TAG}"
-    echo "Release URL: https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/tag/${RELEASE_TAG}"
+    echo "Successfully created GitHub release for tag: ${TAG_NAME}"
+
+    # automatically generate new release notes
+    curl -L -X POST \
+        -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+        -H "Accept: application/vnd.github+json" \
+        -H "X-GitHub-Api-Version: 2022-11-28" \
+        "https://api.github.com/repos/${REPO_PATH}/releases/generate-notes" \
+        -d "{
+            \"tag_name\": \"${TAG_NAME}\"
+        }"
+    echo "Successfully generated release notes for new release for tag: ${TAG_NAME}"
+
+    echo "Release URL: https://github.com/${REPO_PATH}/releases/tag/${TAG_NAME}"
 }
 
 upload_asset() {
