@@ -26,7 +26,7 @@ EXTENSION=
 
 .PHONY: test
 test:
-	go test $(shell go list ./... | grep -v vendor | grep -v mock | grep -v testutil)
+	go test ./...
 
 .PHONY: test-coverage
 test-coverage:
