@@ -79,6 +79,8 @@ stages:
       artifact: windows-amd64
       
 - stage: publish
+  pool:
+    name: $(AMD64_POOL_NAME)
   dependsOn: build
   jobs:
   - job: publish
