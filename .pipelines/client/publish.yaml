@@ -1,9 +1,6 @@
 parameters:
   - name: Version
     type: string
-  - name: Revision
-    type: string
-    default: "1"
 
 stages:
 - stage: build
@@ -23,7 +20,6 @@ stages:
       env:
         STAGING_DIRECTORY: "$(Build.ArtifactStagingDirectory)"
         VERSION: "v${{ parameters.Version }}"
-        REVISION: ${{ parameters.Revision }}
         OS: linux
         ARCH: amd64
       displayName: Build linux-amd64 client binary
@@ -46,7 +42,6 @@ stages:
       env:
         STAGING_DIRECTORY: "$(Build.ArtifactStagingDirectory)"
         VERSION: "v${{ parameters.Version }}"
-        REVISION: ${{ parameters.Revision }}
         OS: linux
         ARCH: arm64
       displayName: Build linux-arm64 client binary
@@ -69,7 +64,6 @@ stages:
       env:
         STAGING_DIRECTORY: "$(Build.ArtifactStagingDirectory)"
         VERSION: "v${{ parameters.Version }}"
-        REVISION: ${{ parameters.Revision }}
         OS: windows
         ARCH: amd64
         EXTENSION: ".exe"
