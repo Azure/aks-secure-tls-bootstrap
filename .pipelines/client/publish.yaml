@@ -1,5 +1,6 @@
 parameters:
-  - name: Version
+  - name: TAG_NAME
+    displayName: Tag Name
     type: string
 
 stages:
@@ -11,8 +12,9 @@ stages:
       name: $(AMD64_POOL_NAME)
     dependsOn: []
     steps:
-    - template: ./templates/build-template.yaml
+    - template: templates/build-template.yaml
       parameters:
+        VERSION: ${{ parameters.TAG_NAME }}
         OS: linux
         ARCH: amd64
 
@@ -22,8 +24,9 @@ stages:
       name: $(ARM64_POOL_NAME)
     dependsOn: []
     steps:
-    - template: ./templates/build-template.yaml
+    - template: templates/build-template.yaml
       parameters:
+        VERSION: ${{ parameters.TAG_NAME }}
         OS: linux
         ARCH: arm64
 
@@ -33,8 +36,9 @@ stages:
       name: $(AMD64_POOL_NAME)
     dependsOn: []
     steps:
-    - template: ./templates/build-template.yaml
+    - template: templates/build-template.yaml
       parameters:
+        VERSION: ${{ parameters.TAG_NAME }}
         OS: windows
         ARCH: amd64
         EXTENSION: .exe
