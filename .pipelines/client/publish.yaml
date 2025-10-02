@@ -28,7 +28,7 @@ stages:
         ARCH: amd64
       displayName: Build linux-amd64 client binary
 
-    - publish: $(Build.ArtifactStagingDirectory)/aks-secure-tls-bootstrap-client
+    - publish: $(Build.ArtifactStagingDirectory)/aks-secure-tls-bootstrap-client-amd64
       artifact: linux-amd64
 
   - job: build_linux_arm64
@@ -51,7 +51,7 @@ stages:
         ARCH: arm64
       displayName: Build linux-arm64 client binary
 
-    - publish: $(Build.ArtifactStagingDirectory)/aks-secure-tls-bootstrap-client
+    - publish: $(Build.ArtifactStagingDirectory)/aks-secure-tls-bootstrap-client-arm64
       artifact: linux-arm64
 
   - job: build_windows_amd64
@@ -75,7 +75,7 @@ stages:
         EXTENSION: ".exe"
       displayName: Build windows-amd64 client binary
 
-    - publish: $(Build.ArtifactStagingDirectory)/aks-secure-tls-bootstrap-client.exe
+    - publish: $(Build.ArtifactStagingDirectory)/aks-secure-tls-bootstrap-client-amd64.exe
       artifact: windows-amd64
       
 - stage: publish

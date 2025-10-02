@@ -21,6 +21,9 @@ purge_go
 # setup access to packages.microsoft.com for the particular Ubuntu release
 setup_pmc
 
+# install make
+sudo apt-get -y install make
+
 # install msft-golang
 sudo apt-get -y install msft-golang
 
