@@ -16,8 +16,8 @@ stages:
     steps:
     - checkout: self
 
-    - bash: /bin/bash .pipelines/client/scripts/setup-msft-golang.sh
-      displayName: Setup msft-golang
+    - bash: /bin/bash .pipelines/client/scripts/setup-dependencies.sh
+      displayName: Setup build dependencies
 
     - bash: /bin/bash .pipelines/client/scripts/build.sh
       env:
@@ -39,8 +39,8 @@ stages:
     steps:
     - checkout: self
 
-    - bash: /bin/bash .pipelines/client/scripts/setup-msft-golang.sh
-      displayName: Setup msft-golang
+    - bash: /bin/bash .pipelines/client/scripts/setup-dependencies.sh
+      displayName: Setup build dependencies
 
     - bash: /bin/bash .pipelines/client/scripts/build.sh
       env:
@@ -62,8 +62,8 @@ stages:
     steps:
     - checkout: self
 
-    - bash: /bin/bash .pipelines/client/scripts/setup-msft-golang.sh
-      displayName: Setup msft-golang
+    - bash: /bin/bash .pipelines/client/scripts/setup-dependencies.sh
+      displayName: Setup build dependencies
 
     - bash: /bin/bash .pipelines/client/scripts/build.sh
       env:
