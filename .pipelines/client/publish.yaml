@@ -11,7 +11,7 @@ stages:
       name: $(AMD64_POOL_NAME)
     dependsOn: []
     steps:
-    - template: .pipelines/client/templates/build-template.yaml
+    - template: ./templates/build-template.yaml
       parameters:
         OS: linux
         ARCH: amd64
@@ -22,7 +22,7 @@ stages:
       name: $(ARM64_POOL_NAME)
     dependsOn: []
     steps:
-    - template: .pipelines/client/templates/build-template.yaml
+    - template: ./templates/build-template.yaml
       parameters:
         OS: linux
         ARCH: arm64
@@ -33,7 +33,7 @@ stages:
       name: $(AMD64_POOL_NAME)
     dependsOn: []
     steps:
-    - template: .pipelines/client/templates/build-template.yaml
+    - template: ./templates/build-template.yaml
       parameters:
         OS: windows
         ARCH: amd64
