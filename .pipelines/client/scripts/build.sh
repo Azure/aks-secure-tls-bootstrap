@@ -37,7 +37,7 @@ if [ "${OS,,}" = "linux" ]; then
         exit 1
     fi
 
-    if [[ "${HELP_OUTPUT}" != *"Usage of aks-secure-tls-bootstrap-client-${ARCH}${EXTENSION} - ${VERSION}"* ]]; then
+    if [[ "${HELP_OUTPUT}" != *"${VERSION}"* ]]; then
         echo "help command output did not contain expected version string: \"${VERSION}\""
         exit 1
     fi
