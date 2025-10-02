@@ -61,36 +61,36 @@ create_github_release() {
     TAG_NAME="client/${VERSION}"
     echo "Creating GitHub release for tag: ${TAG_NAME}"
 
-    # get the latest release
-    LATEST_RELEASE_RESPONSE=$(curl -L -X GET \
-        -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-        -H "Accept: application/vnd.github+json" \
-        -H "X-GitHub-Api-Version: 2022-11-28" \
-        https://api.github.com/repos/${REPO_PATH}/releases/latest)
-    LATEST_RELEASE_TAG=$(echo "${LATEST_RELEASE_RESPONSE}" | jq -r '.tag_name')
-    if [ -z "${LATEST_RELEASE_TAG}" ] || [ "${LATEST_RELEASE_TAG}" = "null" ]; then
-        echo "Failed to get latest release tag to generate release notes. Response:"
-        echo "${LATEST_RELEASE_RESPONSE}"
-        exit 1
-    fi
+    # # get the latest release
+    # LATEST_RELEASE_RESPONSE=$(curl -L -X GET \
+    #     -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+    #     -H "Accept: application/vnd.github+json" \
+    #     -H "X-GitHub-Api-Version: 2022-11-28" \
+    #     https://api.github.com/repos/${REPO_PATH}/releases/latest)
+    # LATEST_RELEASE_TAG=$(echo "${LATEST_RELEASE_RESPONSE}" | jq -r '.tag_name')
+    # if [ -z "${LATEST_RELEASE_TAG}" ] || [ "${LATEST_RELEASE_TAG}" = "null" ]; then
+    #     echo "Failed to get latest release tag to generate release notes. Response:"
+    #     echo "${LATEST_RELEASE_RESPONSE}"
+    #     exit 1
+    # fi
 
-    # generate release notes
-    GENERATE_RELEASE_NOTES_RESPONSE=$(curl -L -X POST \
-        -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-        -H "Accept: application/vnd.github+json" \
-        -H "X-GitHub-Api-Version: 2022-11-28" \
-        "https://api.github.com/repos/${REPO_PATH}/releases/generate-notes" \
-        -d "{
-            \"tag_name\": \"${TAG_NAME}\",
-            \"previous_tag_name\": \"${LATEST_RELEASE_TAG}\"
-        }")
-    RELEASE_NOTES=$(echo "${GENERATE_RELEASE_NOTES_RESPONSE}" | jq -r '.body')
-    if [ -z "${RELEASE_NOTES}" ] || [ "${RELEASE_NOTES}" = "null" ]; then
-        echo "Failed to generate release notes for new release: ${TAG_NAME}. Response:"
-        echo "${GENERATE_RELEASE_NOTES_RESPONSE}"
-        exit 1
-    fi
-    echo "Successfully generated release notes for new release for tag: ${TAG_NAME}"
+    # # generate release notes
+    # GENERATE_RELEASE_NOTES_RESPONSE=$(curl -L -X POST \
+    #     -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+    #     -H "Accept: application/vnd.github+json" \
+    #     -H "X-GitHub-Api-Version: 2022-11-28" \
+    #     "https://api.github.com/repos/${REPO_PATH}/releases/generate-notes" \
+    #     -d "{
+    #         \"tag_name\": \"${TAG_NAME}\",
+    #         \"previous_tag_name\": \"${LATEST_RELEASE_TAG}\"
+    #     }")
+    # RELEASE_NOTES=$(echo "${GENERATE_RELEASE_NOTES_RESPONSE}" | jq -r '.body')
+    # if [ -z "${RELEASE_NOTES}" ] || [ "${RELEASE_NOTES}" = "null" ]; then
+    #     echo "Failed to generate release notes for new release: ${TAG_NAME}. Response:"
+    #     echo "${GENERATE_RELEASE_NOTES_RESPONSE}"
+    #     exit 1
+    # fi
+    # echo "Successfully generated release notes for new release for tag: ${TAG_NAME}"
             
     # create the release
     CREATE_RELEASE_RESPONSE=$(curl -s -X POST \
@@ -101,7 +101,6 @@ create_github_release() {
         -d "{
             \"tag_name\": \"${TAG_NAME}\",
             \"name\": \"${TAG_NAME}\",
-            \"body\": \"${RELEASE_NOTES}\",
             \"draft\": false,
             \"prerelease\": false
         }")
