@@ -11,7 +11,6 @@ pr:
     - client/go.sum
     - client/**/*.go
     - .pipelines/client/e2e.yaml
-    - .pipelines/client/scripts/common.sh
     - .pipelines/client/scripts/run-pipeline.sh
 
 pool:

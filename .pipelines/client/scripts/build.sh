@@ -12,8 +12,10 @@ EXTENSION="${EXTENSION:-}"
 # checkout the particular tag we'd like to build
 git checkout client/${VERSION}
 
+# run unit tests
+cd client && make test
+
 # build the binary for the target OS/arch
-cd client
 LDFLAGS="-X github.com/Azure/aks-secure-tls-bootstrap/client/internal/build.version=${VERSION}-${REVISION}"
 make build-prod OS="${OS}" ARCH="${ARCH}" EXTENSION="${EXTENSION}" LDFLAGS="${LDFLAGS}"
 
@@ -22,6 +24,23 @@ if [ ! -f "${BIN_PATH}" ]; then
     echo "binary ${BIN_PATH} is missing after building with make"
     exit 1
 fi
+
+set +e
+sudo chmod +x "${BIN_PATH}"
+HELP_OUTPUT=$(sudo ./${BIN_PATH} -h 2>&1)
+EXIT_CODE=$?
+set -e
+
+if [ $EXIT_CODE -ne 0 ]; then
+    echo "failed to run help command on newly-built binary, exit code: ${EXIT_CODE}"
+    exit 1
+fi
+
+if [[ "${HELP_OUTPUT}" != *"Usage of aks-secure-tls-bootstrap-client - ${VERSION}"* ]]; then
+    echo "help command output did not contain expected version string: \"${VERSION}\""
+    exit 1
+fi
+
 
 # move the newly-built binary to the staging directory
 mv "${BIN_PATH}" "${STAGING_DIRECTORY}/aks-secure-tls-bootstrap-client-${ARCH}${EXTENSION}"

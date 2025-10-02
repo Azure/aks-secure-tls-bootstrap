@@ -2,8 +2,6 @@
 set -euo pipefail
 set +x
 
-source .pipelines/client/scripts/common.sh
-
 TEST_BRANCH="${TEST_BRANCH:-master}"
 ADDITIONAL_VARS="${ADDITIONAL_VARS:-}"
 
