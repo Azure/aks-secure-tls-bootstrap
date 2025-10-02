@@ -73,8 +73,8 @@ create_github_release() {
         }")
     
     # Extract release ID and upload URL
-    RELEASE_ID=$(echo "${RELEASE_RESPONSE}" | grep -o '"id":[[:space:]]*[0-9]\+' | head -1 | grep -o '[0-9]\+')
-    UPLOAD_URL=$(echo "${RELEASE_RESPONSE}" | grep -o '"upload_url":[[:space:]]*"[^"]\+"' | grep -o 'https://[^"]\+')
+    RELEASE_ID=$(echo "${RELEASE_RESPONSE}" | jq -r '.id')
+    UPLOAD_URL=$(echo "${RELEASE_RESPONSE}" | jq -r '.upload_url')
     UPLOAD_URL="${UPLOAD_URL%\{*}"  # Remove the {?name,label} template part
     
     if [ -z "${RELEASE_ID}" ] || [ -z "${UPLOAD_URL}" ]; then
@@ -110,7 +110,7 @@ upload_asset() {
         --data-binary "@${file_path}")
     
     # Check if upload was successful
-    if echo "${UPLOAD_RESPONSE}" | grep -q '"state":[[:space:]]*"uploaded"'; then
+    if [ "$(echo "${UPLOAD_RESPONSE}" | jq -r '.state')" = "uploaded" ]; then
         echo "Successfully uploaded: ${file_name}"
     else
         echo "Failed to upload asset: ${file_name}. Response:"
