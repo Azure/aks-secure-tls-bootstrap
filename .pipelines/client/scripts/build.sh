@@ -2,7 +2,6 @@
 set -euxo pipefail
 
 [ -z "${VERSION:-}" ] && echo "VERSION must be specified" && exit 1
-[ -z "${REVISION:-}" ] && echo "REVISION must be specified" && exit 1
 [ -z "${OS:-}" ] && echo "OS must be specified" && exit 1
 [ -z "${ARCH:-}" ] && echo "ARCH must be specified" && exit 1
 [ -z "${STAGING_DIRECTORY:-}" ] && echo "STAGING_DIRECTORY must be specified" && exit 1
@@ -16,7 +15,7 @@ git checkout client/${VERSION}
 cd client && make test
 
 # build the binary for the target OS/arch
-LDFLAGS="-X github.com/Azure/aks-secure-tls-bootstrap/client/internal/build.version=${VERSION}-${REVISION}"
+LDFLAGS="-X github.com/Azure/aks-secure-tls-bootstrap/client/internal/build.version=${VERSION}"
 make build-prod OS="${OS}" ARCH="${ARCH}" EXTENSION="${EXTENSION}" LDFLAGS="${LDFLAGS}"
 
 BIN_PATH="bin/aks-secure-tls-bootstrap-client-${ARCH}${EXTENSION}"
