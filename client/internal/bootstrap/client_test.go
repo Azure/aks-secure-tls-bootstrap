@@ -43,7 +43,7 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 			},
 			expectedError: &bootstrapError{
 				errorType: ErrorTypeGetAccessTokenFailure,
-				inner:     fmt.Errorf("generating SPN access token with username and password"),
+				inner:     fmt.Errorf("generating service principal access token with username and password"),
 			},
 		},
 		{

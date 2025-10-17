@@ -3,7 +3,12 @@
 
 package bootstrap
 
-import "fmt"
+import (
+	"fmt"
+
+	internalhttp "github.com/Azure/aks-secure-tls-bootstrap/client/internal/http"
+	"github.com/Azure/go-autorest/autorest/adal"
+)
 
 type ErrorType string
 
@@ -39,5 +44,25 @@ func makeNonRetryableGetAccessTokenFailure(err error) error {
 		errorType: ErrorTypeGetAccessTokenFailure,
 		retryable: false,
 		inner:     err,
+	}
+}
+
+func tokenRefreshErrorToGetAccessTokenFailure(err error) *bootstrapError {
+	// optimistically start by considering the error is retryable
+	retryable := true
+
+	refreshErr, ok := err.(adal.TokenRefreshError)
+	if ok {
+		response := refreshErr.Response()
+		if response != nil {
+			// only considering marking as non-retryable if we have a status code
+			retryable = internalhttp.IsRetryableHTTPStatusCode(response.StatusCode)
+		}
+	}
+
+	return &bootstrapError{
+		errorType: ErrorTypeGetAccessTokenFailure,
+		retryable: retryable,
+		inner:     fmt.Errorf("obtaining fresh access token: %w", err),
 	}
 }

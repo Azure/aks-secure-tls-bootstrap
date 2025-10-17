@@ -8,6 +8,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"math"
 	"os"
 	"time"
 
@@ -58,7 +59,7 @@ func getServiceClient(token string, cfg *Config) (akssecuretlsbootstrapv1.Secure
 			retry.WithOnRetryCallback(getGRPCOnRetryCallbackFunc()),
 			retry.WithBackoff(retry.BackoffExponentialWithJitterBounded(100*time.Millisecond, 0.75, 2*time.Second)),
 			retry.WithCodes(codes.Aborted, codes.Unavailable),
-			retry.WithMax(30),
+			retry.WithMax(math.MaxUint), // effectively retry indefinitely with respect to the context deadline
 		)),
 		// forcefully disable usage of HTTP proxy, this is needed since on AKS nodes where the client
 		// will be running, the no_proxy environment variable will only contain the FQDN of the apiserver
@@ -85,9 +86,12 @@ func getGRPCOnRetryCallbackFunc() retry.OnRetryCallback {
 	}
 }
 
-// withLastGRPCRetryErrorIfDeadlineExceeded wraps the error with lastGRPCRetryError if the error
-// was caused by a context.DeadlineExceeded.
+// withLastGRPCRetryErrorIfDeadlineExceeded wraps the error with lastGRPCRetryError if the error is a context.DeadlineExceeded.
 func withLastGRPCRetryErrorIfDeadlineExceeded(err error) error {
+	defer func() {
+		// clear the last gRPC retry error after bubbling it up for the first time
+		lastGRPCRetryError = nil
+	}()
 	if lastGRPCRetryError == nil || status.Code(err) != codes.DeadlineExceeded {
 		return err
 	}

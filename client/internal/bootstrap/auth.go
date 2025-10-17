@@ -34,11 +34,7 @@ type extractAccessTokenFunc func(token *adal.ServicePrincipalToken) (string, err
 
 func extractAccessToken(token *adal.ServicePrincipalToken) (string, error) {
 	if err := token.Refresh(); err != nil {
-		return "", &bootstrapError{
-			errorType: ErrorTypeGetAccessTokenFailure,
-			retryable: true,
-			inner:     fmt.Errorf("obtaining fresh access token: %w", err),
-		}
+		return "", tokenRefreshErrorToGetAccessTokenFailure(err)
 	}
 	return token.OAuthToken(), nil
 }
@@ -56,7 +52,7 @@ func (c *client) getAccessToken(ctx context.Context, userAssignedIdentityID, res
 
 	if userAssignedID != "" {
 		logger.Info("generating MSI access token", zap.String("clientId", userAssignedID))
-		token, err := adal.NewServicePrincipalTokenFromManagedIdentity(resource, &adal.ManagedIdentityOptions{
+		msiToken, err := adal.NewServicePrincipalTokenFromManagedIdentity(resource, &adal.ManagedIdentityOptions{
 			ClientID: userAssignedID,
 		})
 		if err != nil {
@@ -64,48 +60,68 @@ func (c *client) getAccessToken(ctx context.Context, userAssignedIdentityID, res
 		}
 		// to avoid falling too deep into exponential backoff implemented by adal, which follows the public retry guidance:
 		// https://learn.microsoft.com/en-us/entra/identity/managed-identities-azure-resources/how-to-use-vm-token#retry-guidance
-		token.MaxMSIRefreshAttempts = maxMSIRefreshAttempts
-		return c.extractAccessTokenFunc(token)
+		msiToken.MaxMSIRefreshAttempts = maxMSIRefreshAttempts
+		return c.extractAccessTokenFunc(msiToken)
 	}
 
 	if cloudProviderConfig.ClientID == clientIDForMSI {
 		return "", makeNonRetryableGetAccessTokenFailure(fmt.Errorf("client ID within cloud provider config indicates usage of a managed identity, though no user-assigned identity ID was provided"))
 	}
 
+	servicePrincipalToken, err := getServicePrincipalToken(ctx, resource, cloudProviderConfig)
+	if err != nil {
+		return "", err
+	}
+
+	return c.extractAccessTokenFunc(servicePrincipalToken)
+}
+
+func getServicePrincipalToken(ctx context.Context, resource string, cloudProviderConfig *cloud.ProviderConfig) (*adal.ServicePrincipalToken, error) {
+	logger := log.MustGetLogger(ctx)
+
+	secret := maybeB64Decode(cloudProviderConfig.ClientSecret)
+
 	env, err := azure.EnvironmentFromName(cloudProviderConfig.CloudName)
 	if err != nil {
-		return "", makeNonRetryableGetAccessTokenFailure(fmt.Errorf("getting azure environment config for cloud %q: %w", cloudProviderConfig.CloudName, err))
+		return nil, makeNonRetryableGetAccessTokenFailure(fmt.Errorf("getting azure environment config for cloud %q: %w", cloudProviderConfig.CloudName, err))
 	}
 	oauthConfig, err := adal.NewOAuthConfig(env.ActiveDirectoryEndpoint, cloudProviderConfig.TenantID)
 	if err != nil {
-		return "", makeNonRetryableGetAccessTokenFailure(fmt.Errorf("creating oauth config with azure environment: %w", err))
+		return nil, makeNonRetryableGetAccessTokenFailure(fmt.Errorf("creating oauth config with azure environment: %w", err))
 	}
 
-	if !strings.HasPrefix(cloudProviderConfig.ClientSecret, certificateSecretPrefix) {
-		logger.Info("generating SPN access token with username and password", zap.String("clientId", cloudProviderConfig.ClientID))
-		token, err := adal.NewServicePrincipalToken(*oauthConfig, cloudProviderConfig.ClientID, cloudProviderConfig.ClientSecret, resource)
+	if !strings.HasPrefix(secret, certificateSecretPrefix) {
+		logger.Info("generating service principal access token with username and password", zap.String("clientId", cloudProviderConfig.ClientID))
+		token, err := adal.NewServicePrincipalToken(*oauthConfig, cloudProviderConfig.ClientID, secret, resource)
 		if err != nil {
-			return "", makeNonRetryableGetAccessTokenFailure(fmt.Errorf("generating SPN access token with username and password: %w", err))
+			return nil, makeNonRetryableGetAccessTokenFailure(fmt.Errorf("generating service principal access token with username and password: %w", err))
 		}
-		return c.extractAccessTokenFunc(token)
+		return token, nil
 	}
 
-	logger.Info("client secret contains certificate data, using certificate to generate SPN access token", zap.String("clientId", cloudProviderConfig.ClientID))
+	logger.Info("client secret contains certificate data, using certificate to generate service principal access token", zap.String("clientId", cloudProviderConfig.ClientID))
 
-	certData, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(cloudProviderConfig.ClientSecret, certificateSecretPrefix))
+	certData, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(secret, certificateSecretPrefix))
 	if err != nil {
-		return "", makeNonRetryableGetAccessTokenFailure(fmt.Errorf("b64-decoding certificate data in client secret: %w", err))
+		return nil, makeNonRetryableGetAccessTokenFailure(fmt.Errorf("b64-decoding certificate data in client secret: %w", err))
 	}
 	certificate, privateKey, err := adal.DecodePfxCertificateData(certData, "")
 	if err != nil {
-		return "", makeNonRetryableGetAccessTokenFailure(fmt.Errorf("decoding pfx certificate data in client secret: %w", err))
+		return nil, makeNonRetryableGetAccessTokenFailure(fmt.Errorf("decoding pfx certificate data in client secret: %w", err))
 	}
 
-	logger.Info("generating SPN access token with certificate", zap.String("clientId", cloudProviderConfig.ClientID))
+	logger.Info("generating service principal access token with certificate", zap.String("clientId", cloudProviderConfig.ClientID))
 	token, err := adal.NewServicePrincipalTokenFromCertificate(*oauthConfig, cloudProviderConfig.ClientID, certificate, privateKey, resource)
 	if err != nil {
-		return "", makeNonRetryableGetAccessTokenFailure(fmt.Errorf("generating SPN access token with certificate: %w", err))
+		return nil, makeNonRetryableGetAccessTokenFailure(fmt.Errorf("generating service principal access token with certificate: %w", err))
 	}
 
-	return c.extractAccessTokenFunc(token)
+	return token, nil
+}
+
+func maybeB64Decode(str string) string {
+	if decoded, err := base64.StdEncoding.DecodeString(str); err == nil {
+		return string(decoded)
+	}
+	return str
 }

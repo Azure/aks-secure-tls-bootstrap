@@ -4,6 +4,7 @@
 package bootstrap
 
 import (
+	"encoding/base64"
 	"errors"
 	"testing"
 	"time"
@@ -55,7 +56,7 @@ func TestGetAccessToken(t *testing.T) {
 				}
 			},
 			expectedToken: "",
-			expectedErr:   errors.New("generating SPN access token with username and password"),
+			expectedErr:   errors.New("generating service principal access token with username and password"),
 		},
 		{
 			name: "there is an error b64-decoding the client secret certificate data",
@@ -103,11 +104,11 @@ func TestGetAccessToken(t *testing.T) {
 			},
 			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
 				return func(token *adal.ServicePrincipalToken) (string, error) {
-					return "", errors.New("generating SPN access token with certificate")
+					return "", errors.New("generating service principal access token with certificate")
 				}
 			},
 			expectedToken: "",
-			expectedErr:   errors.New("generating SPN access token with certificate"),
+			expectedErr:   errors.New("generating service principal access token with certificate"),
 		},
 		{
 			name: "UserAssignedIdentityID is specified in cloud provider config",
@@ -182,6 +183,28 @@ func TestGetAccessToken(t *testing.T) {
 				config.CloudName = azure.PublicCloud.Name
 				config.ClientID = "service-principal-id"
 				config.ClientSecret = "certificate:" + certData
+			},
+			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
+				return func(token *adal.ServicePrincipalToken) (string, error) {
+					return "token", nil
+				}
+			},
+			expectedToken: "token",
+			expectedErr:   nil,
+		},
+		{
+			name: "service principal client secret is b64-decoded and contains certificate data",
+			setupCloudProviderConfig: func(t *testing.T, config *cloud.ProviderConfig) {
+				certData, err := testutil.GenerateCertAndKeyAsEncodedPFXData(testutil.CertTemplate{
+					CommonName:   "aad",
+					Organization: "azure",
+					Expiration:   time.Now().Add(time.Hour),
+				})
+				assert.NoError(t, err)
+
+				config.CloudName = azure.PublicCloud.Name
+				config.ClientID = "service-principal-id"
+				config.ClientSecret = base64.StdEncoding.EncodeToString([]byte("certificate:" + certData))
 			},
 			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
 				return func(token *adal.ServicePrincipalToken) (string, error) {

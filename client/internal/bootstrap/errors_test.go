@@ -6,10 +6,27 @@ package bootstrap
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"testing"
 
+	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/stretchr/testify/assert"
 )
+
+type fakeRefreshError struct {
+	response *http.Response
+	err      error
+}
+
+var _ adal.TokenRefreshError = (*fakeRefreshError)(nil)
+
+func (e *fakeRefreshError) Response() *http.Response {
+	return e.response
+}
+
+func (e *fakeRefreshError) Error() string {
+	return e.err.Error()
+}
 
 func TestBootstrapError(t *testing.T) {
 	cases := []struct {
@@ -73,6 +90,103 @@ func TestBootstrapError(t *testing.T) {
 
 			assert.EqualError(t, bootstrapErr, fmt.Sprintf("%s: %s", bootstrapErr.errorType, bootstrapErr.inner.Error()))
 			assert.Equal(t, bootstrapErr.retryable, c.retryable)
+		})
+	}
+}
+
+func TestTokenRefreshErrorToGetAccessTokenFailure(t *testing.T) {
+	cases := []struct {
+		name        string
+		err         error
+		expectedErr *bootstrapError
+	}{
+		{
+			name: "error is not an adal.TokenRefreshError",
+			err:  errors.New("unexpected error"),
+			expectedErr: &bootstrapError{
+				errorType: ErrorTypeGetAccessTokenFailure,
+				retryable: true,
+				inner:     errors.New("obtaining fresh access token: unexpected error"),
+			},
+		},
+		{
+			name: "error is an adal.TokenRefreshError with nil response",
+			err: &fakeRefreshError{
+				response: nil,
+				err:      errors.New("refresh error"),
+			},
+			expectedErr: &bootstrapError{
+				errorType: ErrorTypeGetAccessTokenFailure,
+				retryable: true,
+				inner:     errors.New("obtaining fresh access token: refresh error"),
+			},
+		},
+		{
+			name: "error is an adal.TokenRefreshError with 5XX response",
+			err: &fakeRefreshError{
+				response: &http.Response{
+					StatusCode: http.StatusInternalServerError,
+				},
+				err: errors.New("refresh error"),
+			},
+			expectedErr: &bootstrapError{
+				errorType: ErrorTypeGetAccessTokenFailure,
+				retryable: true,
+				inner:     errors.New("obtaining fresh access token: refresh error"),
+			},
+		},
+		{
+			name: "error is an adal.TokenRefreshError with 429 response",
+			err: &fakeRefreshError{
+				response: &http.Response{
+					StatusCode: http.StatusTooManyRequests,
+				},
+				err: errors.New("refresh error"),
+			},
+			expectedErr: &bootstrapError{
+				errorType: ErrorTypeGetAccessTokenFailure,
+				retryable: true,
+				inner:     errors.New("obtaining fresh access token: refresh error"),
+			},
+		},
+		{
+			name: "error is an adal.TokenRefreshError with 409 response",
+			err: &fakeRefreshError{
+				response: &http.Response{
+					StatusCode: http.StatusConflict,
+				},
+				err: errors.New("refresh error"),
+			},
+			expectedErr: &bootstrapError{
+				errorType: ErrorTypeGetAccessTokenFailure,
+				retryable: true,
+				inner:     errors.New("obtaining fresh access token: refresh error"),
+			},
+		},
+		{
+			name: "error is an adal.TokenRefreshError with non-retryable response",
+			err: &fakeRefreshError{
+				response: &http.Response{
+					StatusCode: http.StatusUnauthorized,
+				},
+				err: errors.New("unauthorized"),
+			},
+			expectedErr: &bootstrapError{
+				errorType: ErrorTypeGetAccessTokenFailure,
+				retryable: false,
+				inner:     errors.New("obtaining fresh access token: unauthorized"),
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			err := tokenRefreshErrorToGetAccessTokenFailure(c.err)
+			var bootstrapErr *bootstrapError
+			assert.True(t, errors.As(err, &bootstrapErr))
+			assert.Equal(t, c.expectedErr.errorType, bootstrapErr.errorType)
+			assert.Equal(t, c.expectedErr.retryable, bootstrapErr.retryable)
+			assert.EqualError(t, c.expectedErr.inner, bootstrapErr.inner.Error())
 		})
 	}
 }
