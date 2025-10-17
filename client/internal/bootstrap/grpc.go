@@ -26,7 +26,7 @@ import (
 )
 
 // used to store any errors encountered by the gRPC client when making RPCs to the remote
-// within the retry loop configured by retry.UnaryClientInterceptor
+// within the retry loop configured by retry.UnaryClientInterceptor.
 var lastGRPCRetryError error
 
 // closeFunc closes a gRPC client connection, fake implementations given in unit tests.
