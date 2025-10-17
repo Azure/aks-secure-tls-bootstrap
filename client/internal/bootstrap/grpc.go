@@ -14,7 +14,7 @@ import (
 
 	internalhttp "github.com/Azure/aks-secure-tls-bootstrap/client/internal/http"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/log"
-	akssecuretlsbootstrapv1 "github.com/Azure/aks-secure-tls-bootstrap/service/pkg/gen/akssecuretlsbootstrap/v1"
+	v1 "github.com/Azure/aks-secure-tls-bootstrap/service/pkg/gen/akssecuretlsbootstrap/v1"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/retry"
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
@@ -33,9 +33,9 @@ var lastGRPCRetryError error
 type closeFunc func() error
 
 // getServiceClientFunc returns a new SecureTLSBootstrapServiceClient over a gRPC connection, fake implementations given in unit tests.
-type getServiceClientFunc func(token string, cfg *Config) (akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient, closeFunc, error)
+type getServiceClientFunc func(token string, cfg *Config) (v1.SecureTLSBootstrapServiceClient, closeFunc, error)
 
-func getServiceClient(token string, cfg *Config) (akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient, closeFunc, error) {
+func getServiceClient(token string, cfg *Config) (v1.SecureTLSBootstrapServiceClient, closeFunc, error) {
 	clusterCAData, err := os.ReadFile(cfg.ClusterCAFilePath)
 	if err != nil {
 		return nil, nil, fmt.Errorf("reading cluster CA data from %s: %w", cfg.ClusterCAFilePath, err)
@@ -72,7 +72,7 @@ func getServiceClient(token string, cfg *Config) (akssecuretlsbootstrapv1.Secure
 		return nil, nil, fmt.Errorf("failed to dial client connection with context: %w", err)
 	}
 
-	return akssecuretlsbootstrapv1.NewSecureTLSBootstrapServiceClient(conn), conn.Close, nil
+	return v1.NewSecureTLSBootstrapServiceClient(conn), conn.Close, nil
 }
 
 func getGRPCOnRetryCallbackFunc() retry.OnRetryCallback {
