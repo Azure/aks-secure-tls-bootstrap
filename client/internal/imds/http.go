@@ -25,6 +25,7 @@ func getCheckRetry() retryablehttp.CheckRetry {
 	return func(ctx context.Context, resp *http.Response, err error) (bool, error) {
 		defaultShouldRetry, err := retryablehttp.DefaultRetryPolicy(ctx, resp, err)
 		if err != nil {
+			// retryablehttp.DefaultRetryPolicy will only bubble up context errors, which we should always halt on
 			return false, err
 		}
 		if resp == nil {
