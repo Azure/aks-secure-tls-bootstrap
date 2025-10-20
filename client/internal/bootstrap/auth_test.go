@@ -6,6 +6,7 @@ package bootstrap
 import (
 	"encoding/base64"
 	"errors"
+	"net/http"
 	"testing"
 	"time"
 
@@ -36,7 +37,7 @@ func TestGetAccessToken(t *testing.T) {
 				config.ClientSecret = "secret"
 			},
 			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
-				return func(token *adal.ServicePrincipalToken) (string, error) {
+				return func(token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
 					return "token", nil
 				}
 			},
@@ -44,19 +45,19 @@ func TestGetAccessToken(t *testing.T) {
 			expectedErr:   errors.New(`getting azure environment config for cloud "invalid"`),
 		},
 		{
-			name: "there is an error generating a service principal access token with username and password due to missing client secret",
+			name: "there is an error generating a service principal access token with client secret due to missing client secret",
 			setupCloudProviderConfig: func(t *testing.T, config *cloud.ProviderConfig) {
 				config.CloudName = azure.PublicCloud.Name
 				config.ClientID = "service-principal-id"
 				config.ClientSecret = ""
 			},
 			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
-				return func(token *adal.ServicePrincipalToken) (string, error) {
+				return func(token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
 					return "token", nil
 				}
 			},
 			expectedToken: "",
-			expectedErr:   errors.New("generating service principal access token with username and password"),
+			expectedErr:   errors.New("generating service principal access token with client secret"),
 		},
 		{
 			name: "there is an error b64-decoding the client secret certificate data",
@@ -66,7 +67,7 @@ func TestGetAccessToken(t *testing.T) {
 				config.ClientSecret = "certificate:YW55IGNhcm5hbCBwbGVhc3U======" // invalid b64-encoding
 			},
 			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
-				return func(token *adal.ServicePrincipalToken) (string, error) {
+				return func(token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
 					return "token", nil
 				}
 			},
@@ -81,7 +82,7 @@ func TestGetAccessToken(t *testing.T) {
 				config.ClientSecret = "certificate:dGVzdAo=" // b64-encoding of "test"
 			},
 			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
-				return func(token *adal.ServicePrincipalToken) (string, error) {
+				return func(token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
 					return "token", nil
 				}
 			},
@@ -103,7 +104,7 @@ func TestGetAccessToken(t *testing.T) {
 				config.ClientSecret = "certificate:" + certData
 			},
 			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
-				return func(token *adal.ServicePrincipalToken) (string, error) {
+				return func(token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
 					return "", errors.New("generating service principal access token with certificate")
 				}
 			},
@@ -117,7 +118,7 @@ func TestGetAccessToken(t *testing.T) {
 				config.ClientID = clientIDForMSI
 			},
 			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
-				return func(token *adal.ServicePrincipalToken) (string, error) {
+				return func(token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
 					assert.Equal(t, maxMSIRefreshAttempts, token.MaxMSIRefreshAttempts)
 					return "token", nil
 				}
@@ -132,7 +133,7 @@ func TestGetAccessToken(t *testing.T) {
 				config.ClientID = clientIDForMSI
 			},
 			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
-				return func(token *adal.ServicePrincipalToken) (string, error) {
+				return func(token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
 					return "token", nil
 				}
 			},
@@ -147,7 +148,7 @@ func TestGetAccessToken(t *testing.T) {
 				config.ClientID = clientIDForMSI
 			},
 			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
-				return func(token *adal.ServicePrincipalToken) (string, error) {
+				return func(token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
 					assert.Equal(t, maxMSIRefreshAttempts, token.MaxMSIRefreshAttempts)
 					return "token", nil
 				}
@@ -163,7 +164,7 @@ func TestGetAccessToken(t *testing.T) {
 				config.ClientSecret = "secret"
 			},
 			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
-				return func(token *adal.ServicePrincipalToken) (string, error) {
+				return func(token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
 					return "token", nil
 				}
 			},
@@ -185,7 +186,7 @@ func TestGetAccessToken(t *testing.T) {
 				config.ClientSecret = "certificate:" + certData
 			},
 			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
-				return func(token *adal.ServicePrincipalToken) (string, error) {
+				return func(token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
 					return "token", nil
 				}
 			},
@@ -207,7 +208,7 @@ func TestGetAccessToken(t *testing.T) {
 				config.ClientSecret = base64.StdEncoding.EncodeToString([]byte("certificate:" + certData))
 			},
 			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
-				return func(token *adal.ServicePrincipalToken) (string, error) {
+				return func(token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
 					return "token", nil
 				}
 			},
@@ -239,6 +240,164 @@ func TestGetAccessToken(t *testing.T) {
 				assert.NoError(t, err)
 				assert.Equal(t, c.expectedToken, token)
 			}
+		})
+	}
+}
+
+func TestTokenRefreshErrorToGetAccessTokenFailure(t *testing.T) {
+	cases := []struct {
+		name        string
+		err         error
+		isMSI       bool
+		expectedErr *bootstrapError
+	}{
+		{
+			name: "error is not an adal.TokenRefreshError",
+			err:  errors.New("unexpected error"),
+			expectedErr: &bootstrapError{
+				errorType: ErrorTypeGetAccessTokenFailure,
+				retryable: true,
+				inner:     errors.New("obtaining fresh access token: unexpected error"),
+			},
+		},
+		{
+			name: "error is an adal.TokenRefreshError with nil response",
+			err: &fakeRefreshError{
+				response: nil,
+				err:      errors.New("refresh error"),
+			},
+			expectedErr: &bootstrapError{
+				errorType: ErrorTypeGetAccessTokenFailure,
+				retryable: true,
+				inner:     errors.New("obtaining fresh access token: refresh error"),
+			},
+		},
+		{
+			name:  "error is an adal.TokenRefreshError with 5XX response for MSI",
+			isMSI: true,
+			err: &fakeRefreshError{
+				response: &http.Response{
+					StatusCode: http.StatusInternalServerError,
+				},
+				err: errors.New("refresh error"),
+			},
+			expectedErr: &bootstrapError{
+				errorType: ErrorTypeGetAccessTokenFailure,
+				retryable: true,
+				inner:     errors.New("obtaining fresh access token: refresh error"),
+			},
+		},
+		{
+			name: "error is an adal.TokenRefreshError with 5XX response for service principal",
+			err: &fakeRefreshError{
+				response: &http.Response{
+					StatusCode: http.StatusInternalServerError,
+				},
+				err: errors.New("refresh error"),
+			},
+			expectedErr: &bootstrapError{
+				errorType: ErrorTypeGetAccessTokenFailure,
+				retryable: true,
+				inner:     errors.New("obtaining fresh access token: refresh error"),
+			},
+		},
+		{
+			name:  "error is an adal.TokenRefreshError with 429 response for MSI",
+			isMSI: true,
+			err: &fakeRefreshError{
+				response: &http.Response{
+					StatusCode: http.StatusTooManyRequests,
+				},
+				err: errors.New("refresh error"),
+			},
+			expectedErr: &bootstrapError{
+				errorType: ErrorTypeGetAccessTokenFailure,
+				retryable: true,
+				inner:     errors.New("obtaining fresh access token: refresh error"),
+			},
+		},
+		{
+			name: "error is an adal.TokenRefreshError with 429 response for service principal",
+			err: &fakeRefreshError{
+				response: &http.Response{
+					StatusCode: http.StatusTooManyRequests,
+				},
+				err: errors.New("refresh error"),
+			},
+			expectedErr: &bootstrapError{
+				errorType: ErrorTypeGetAccessTokenFailure,
+				retryable: false,
+				inner:     errors.New("obtaining fresh access token: refresh error"),
+			},
+		},
+		{
+			name:  "error is an adal.TokenRefreshError with 404 response for MSI",
+			isMSI: true,
+			err: &fakeRefreshError{
+				response: &http.Response{
+					StatusCode: http.StatusNotFound,
+				},
+				err: errors.New("refresh error"),
+			},
+			expectedErr: &bootstrapError{
+				errorType: ErrorTypeGetAccessTokenFailure,
+				retryable: true,
+				inner:     errors.New("obtaining fresh access token: refresh error"),
+			},
+		},
+		{
+			name: "error is an adal.TokenRefreshError with 404 response for service principal",
+			err: &fakeRefreshError{
+				response: &http.Response{
+					StatusCode: http.StatusNotFound,
+				},
+				err: errors.New("refresh error"),
+			},
+			expectedErr: &bootstrapError{
+				errorType: ErrorTypeGetAccessTokenFailure,
+				retryable: false,
+				inner:     errors.New("obtaining fresh access token: refresh error"),
+			},
+		},
+		{
+			name:  "error is an adal.TokenRefreshError with non-retryable response for MSI",
+			isMSI: true,
+			err: &fakeRefreshError{
+				response: &http.Response{
+					StatusCode: http.StatusUnauthorized,
+				},
+				err: errors.New("unauthorized"),
+			},
+			expectedErr: &bootstrapError{
+				errorType: ErrorTypeGetAccessTokenFailure,
+				retryable: false,
+				inner:     errors.New("obtaining fresh access token: unauthorized"),
+			},
+		},
+		{
+			name: "error is an adal.TokenRefreshError with non-retryable response for service principal",
+			err: &fakeRefreshError{
+				response: &http.Response{
+					StatusCode: http.StatusUnauthorized,
+				},
+				err: errors.New("unauthorized"),
+			},
+			expectedErr: &bootstrapError{
+				errorType: ErrorTypeGetAccessTokenFailure,
+				retryable: false,
+				inner:     errors.New("obtaining fresh access token: unauthorized"),
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			err := tokenRefreshErrorToGetAccessTokenFailure(c.err, c.isMSI)
+			var bootstrapErr *bootstrapError
+			assert.True(t, errors.As(err, &bootstrapErr))
+			assert.Equal(t, c.expectedErr.errorType, bootstrapErr.errorType)
+			assert.Equal(t, c.expectedErr.retryable, bootstrapErr.retryable)
+			assert.EqualError(t, c.expectedErr.inner, bootstrapErr.inner.Error())
 		})
 	}
 }

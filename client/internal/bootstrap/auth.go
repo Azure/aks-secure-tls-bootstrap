@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/cloud"
@@ -31,11 +32,11 @@ const (
 )
 
 // extractAccessTokenFunc extracts an oauth access token from the specified service principal token after a refresh, fake implementations given in unit tests.
-type extractAccessTokenFunc func(token *adal.ServicePrincipalToken) (string, error)
+type extractAccessTokenFunc func(token *adal.ServicePrincipalToken, isMSI bool) (string, error)
 
-func extractAccessToken(token *adal.ServicePrincipalToken) (string, error) {
+func extractAccessToken(token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
 	if err := token.Refresh(); err != nil {
-		return "", tokenRefreshErrorToGetAccessTokenFailure(err)
+		return "", tokenRefreshErrorToGetAccessTokenFailure(err, isMSI)
 	}
 	return token.OAuthToken(), nil
 }
@@ -62,7 +63,7 @@ func (c *client) getAccessToken(ctx context.Context, userAssignedIdentityID, res
 		// to avoid falling too deep into exponential backoff implemented by adal, which follows the public retry guidance:
 		// https://learn.microsoft.com/en-us/entra/identity/managed-identities-azure-resources/how-to-use-vm-token#retry-guidance
 		msiToken.MaxMSIRefreshAttempts = maxMSIRefreshAttempts
-		return c.extractAccessTokenFunc(msiToken)
+		return c.extractAccessTokenFunc(msiToken, true)
 	}
 
 	if cloudProviderConfig.ClientID == clientIDForMSI {
@@ -74,7 +75,7 @@ func (c *client) getAccessToken(ctx context.Context, userAssignedIdentityID, res
 		return "", err
 	}
 
-	return c.extractAccessTokenFunc(servicePrincipalToken)
+	return c.extractAccessTokenFunc(servicePrincipalToken, false)
 }
 
 func getServicePrincipalToken(ctx context.Context, resource string, cloudProviderConfig *cloud.ProviderConfig) (*adal.ServicePrincipalToken, error) {
@@ -92,10 +93,10 @@ func getServicePrincipalToken(ctx context.Context, resource string, cloudProvide
 	}
 
 	if !strings.HasPrefix(secret, certificateSecretPrefix) {
-		logger.Info("generating service principal access token with username and password", zap.String("clientId", cloudProviderConfig.ClientID))
+		logger.Info("generating service principal access token with client secret", zap.String("clientId", cloudProviderConfig.ClientID))
 		token, err := adal.NewServicePrincipalToken(*oauthConfig, cloudProviderConfig.ClientID, secret, resource)
 		if err != nil {
-			return nil, makeNonRetryableGetAccessTokenFailure(fmt.Errorf("generating service principal access token with username and password: %w", err))
+			return nil, makeNonRetryableGetAccessTokenFailure(fmt.Errorf("generating service principal access token with client secret: %w", err))
 		}
 		return token, nil
 	}
@@ -135,21 +136,28 @@ func makeNonRetryableGetAccessTokenFailure(err error) error {
 	}
 }
 
-func tokenRefreshErrorToGetAccessTokenFailure(err error) *bootstrapError {
-	// optimistically consider the error retryable from the start
-	retryable := true
-
-	rerr, ok := err.(adal.TokenRefreshError)
-	if ok {
-		if resp := rerr.Response(); resp != nil {
-			// only consider making non-retryable if we have a readable HTTP response and corresponding status code
-			retryable = imds.IsRetryableHTTPStatusCode(resp.StatusCode)
-		}
-	}
-
-	return &bootstrapError{
+func tokenRefreshErrorToGetAccessTokenFailure(err error, isMSI bool) *bootstrapError {
+	bootstrapErr := &bootstrapError{
 		errorType: ErrorTypeGetAccessTokenFailure,
-		retryable: retryable,
+		retryable: true, // optimistically consider the error retryable from the start
 		inner:     fmt.Errorf("obtaining fresh access token: %w", err),
 	}
+
+	rerr, ok := err.(adal.TokenRefreshError)
+	if !ok {
+		return bootstrapErr
+	}
+
+	resp := rerr.Response()
+	if resp == nil {
+		return bootstrapErr
+	}
+
+	if isMSI {
+		bootstrapErr.retryable = imds.IsRetryableHTTPStatusCode(resp.StatusCode)
+	} else {
+		bootstrapErr.retryable = resp.StatusCode >= http.StatusInternalServerError
+	}
+
+	return bootstrapErr
 }
