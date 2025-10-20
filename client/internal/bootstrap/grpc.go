@@ -57,7 +57,7 @@ func getServiceClient(token string, cfg *Config) (v1.SecureTLSBootstrapServiceCl
 		}),
 		grpc.WithUnaryInterceptor(retry.UnaryClientInterceptor(
 			retry.WithOnRetryCallback(getGRPCOnRetryCallbackFunc()),
-			retry.WithBackoff(retry.BackoffExponentialWithJitterBounded(100*time.Millisecond, 0.75, 2*time.Second)),
+			retry.WithBackoff(retry.BackoffLinearWithJitter(2*time.Second, 0.25)),
 			retry.WithCodes(codes.Aborted, codes.Unavailable),
 			retry.WithMax(math.MaxUint), // effectively retry indefinitely with respect to the context deadline
 		)),

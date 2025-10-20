@@ -30,9 +30,11 @@ type client struct {
 var _ Client = (*client)(nil)
 
 func NewClient(ctx context.Context) Client {
+	retryableClient := internalhttp.NewRetryableClient(ctx)
+	retryableClient.CheckRetry = getCheckRetry()
 	return &client{
 		baseURL:    imdsURL,
-		httpClient: internalhttp.NewClient(ctx),
+		httpClient: retryableClient.StandardClient(),
 	}
 }
 

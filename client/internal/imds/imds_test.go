@@ -63,7 +63,7 @@ func TestCallIMDS(t *testing.T) {
 
 	for _, tt := range tests {
 		imdsClient := &client{
-			httpClient: internalhttp.NewClient(ctx),
+			httpClient: internalhttp.NewRetryableClient(ctx).StandardClient(),
 		}
 		imds := tt.setupTestServer(tt.params)
 		defer imds.Close()
@@ -112,7 +112,7 @@ func TestGetInstanceData(t *testing.T) {
 			defer imds.Close()
 
 			imdsClient := &client{
-				httpClient: internalhttp.NewClient(ctx),
+				httpClient: internalhttp.NewRetryableClient(ctx).StandardClient(),
 				baseURL:    imds.URL,
 			}
 
@@ -170,7 +170,7 @@ func TestGetAttestedData(t *testing.T) {
 			defer imds.Close()
 
 			imdsClient := &client{
-				httpClient: internalhttp.NewClient(ctx),
+				httpClient: internalhttp.NewRetryableClient(ctx).StandardClient(),
 				baseURL:    imds.URL,
 			}
 

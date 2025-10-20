@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/cloud"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/imds"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/log"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/telemetry"
 	"github.com/Azure/go-autorest/autorest/adal"
@@ -124,4 +125,31 @@ func maybeB64Decode(str string) string {
 		return string(decoded)
 	}
 	return str
+}
+
+func makeNonRetryableGetAccessTokenFailure(err error) error {
+	return &bootstrapError{
+		errorType: ErrorTypeGetAccessTokenFailure,
+		retryable: false,
+		inner:     err,
+	}
+}
+
+func tokenRefreshErrorToGetAccessTokenFailure(err error) *bootstrapError {
+	// optimistically consider the error retryable from the start
+	retryable := true
+
+	rerr, ok := err.(adal.TokenRefreshError)
+	if ok {
+		if resp := rerr.Response(); resp != nil {
+			// only consider making non-retryable if we have a readable HTTP response and corresponding status code
+			retryable = imds.IsRetryableHTTPStatusCode(resp.StatusCode)
+		}
+	}
+
+	return &bootstrapError{
+		errorType: ErrorTypeGetAccessTokenFailure,
+		retryable: retryable,
+		inner:     fmt.Errorf("obtaining fresh access token: %w", err),
+	}
 }

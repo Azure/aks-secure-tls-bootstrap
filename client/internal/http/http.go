@@ -23,16 +23,11 @@ func UserAgent() string {
 	return fmt.Sprintf("aks-secure-tls-bootstrap-client/%s", build.GetVersion())
 }
 
-// NewClient returns an http.Client shimmed into a *retryablehttp.Client with a custom transport.
-func NewClient(ctx context.Context) *http.Client {
-	return NewRetryableClient(ctx).StandardClient()
-}
-
 // NewRetryableClient returns a *retryablehttp.Client with a custom transport.
 func NewRetryableClient(ctx context.Context) *retryablehttp.Client {
 	client := retryablehttp.NewClient()
 	configureLogger(ctx, client)
-	configureRetryPolicy(client)
+	configureBackoff(client)
 	configureTransport(client)
 	return client
 }
@@ -41,14 +36,13 @@ func configureLogger(ctx context.Context, client *retryablehttp.Client) {
 	client.Logger = log.NewLeveledLoggerShim(log.MustGetLogger(ctx))
 }
 
-func configureRetryPolicy(client *retryablehttp.Client) {
-	// retryablehttp.DefaultBackoff implements an exponential backoff strategy
-	// bounded by RetryWaitMin + RetryWaitMax. It will also attempt to parse out and respect any
-	// Retry-After header from the server's response.
-	client.Backoff = retryablehttp.DefaultBackoff
+func configureBackoff(client *retryablehttp.Client) {
+	// LinearJitterBackoff provides a linear retry policy (1s, 2s, 3s, etc.)
+	// with some random jitter applied, bounded by RetryWaitMin and RetryWaitMax.
+	client.Backoff = retryablehttp.LinearJitterBackoff
+	client.RetryWaitMin = 800 * time.Millisecond
+	client.RetryWaitMax = 1200 * time.Millisecond
 	client.RetryMax = 10
-	client.RetryWaitMin = 300 * time.Millisecond
-	client.RetryWaitMax = 3 * time.Second
 }
 
 func configureTransport(client *retryablehttp.Client) {

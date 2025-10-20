@@ -150,10 +150,10 @@ func TestTokenRefreshErrorToGetAccessTokenFailure(t *testing.T) {
 			},
 		},
 		{
-			name: "error is an adal.TokenRefreshError with 409 response",
+			name: "error is an adal.TokenRefreshError with 404 response",
 			err: &fakeRefreshError{
 				response: &http.Response{
-					StatusCode: http.StatusConflict,
+					StatusCode: http.StatusNotFound,
 				},
 				err: errors.New("refresh error"),
 			},
