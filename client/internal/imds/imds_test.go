@@ -4,7 +4,9 @@
 package imds
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -15,8 +17,62 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestParseErrorDescription(t *testing.T) {
+	cases := []struct {
+		name                string
+		resp                *http.Response
+		expectedDescription string
+		expectedErr         error
+	}{
+		{
+			name:                "response is nil",
+			resp:                nil,
+			expectedDescription: "",
+			expectedErr:         nil,
+		},
+		{
+			name: "response body is malformed",
+			resp: &http.Response{
+				Body: io.NopCloser(strings.NewReader("malformed")),
+			},
+			expectedDescription: "",
+			expectedErr:         errors.New("unmarshalling IMDS error resposne"),
+		},
+		{
+			name: "response body does not contain error_description",
+			resp: &http.Response{
+				StatusCode: http.StatusBadRequest,
+				Body:       io.NopCloser(strings.NewReader(`{"error":"invalid_request"}`)),
+			},
+			expectedDescription: "",
+			expectedErr:         nil,
+		},
+		{
+			name: "response body contains an error_description",
+			resp: &http.Response{
+				StatusCode: http.StatusBadRequest,
+				Body:       io.NopCloser(strings.NewReader(`{"error":"invalid_request","error_description":"Identity not found"}`)),
+			},
+			expectedDescription: "Identity not found",
+			expectedErr:         nil,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			description, err := ParseErrorDescription(c.resp)
+			if c.expectedErr != nil {
+				assert.ErrorContains(t, err, c.expectedErr.Error())
+			} else {
+				assert.Nil(t, err)
+			}
+			assert.Equal(t, c.expectedDescription, description)
+		})
+	}
+}
+
 func TestCallIMDS(t *testing.T) {
-	tests := []struct {
+	cases := []struct {
 		name            string
 		setupTestServer func(map[string]string) *httptest.Server
 		params          map[string]string
@@ -61,14 +117,14 @@ func TestCallIMDS(t *testing.T) {
 
 	ctx := log.NewTestContext()
 
-	for _, tt := range tests {
+	for _, c := range cases {
 		imdsClient := &client{
 			httpClient: internalhttp.NewRetryableClient(ctx).StandardClient(),
 		}
-		imds := tt.setupTestServer(tt.params)
+		imds := c.setupTestServer(c.params)
 		defer imds.Close()
 
-		err := imdsClient.callIMDS(ctx, imds.URL, tt.params, &VMInstanceData{})
+		err := imdsClient.callIMDS(ctx, imds.URL, c.params, &VMInstanceData{})
 		assert.NoError(t, err)
 	}
 }
@@ -79,7 +135,7 @@ func TestGetInstanceData(t *testing.T) {
 		malformedJSON          = `{{}`
 	)
 
-	tests := []struct {
+	cases := []struct {
 		name               string
 		json               string
 		expectedErr        string
@@ -101,9 +157,9 @@ func TestGetInstanceData(t *testing.T) {
 
 	ctx := log.NewTestContext()
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			imds := mockIMDSWithAssertions(t, tt.json, func(r *http.Request) {
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			imds := mockIMDSWithAssertions(t, c.json, func(r *http.Request) {
 				assert.Equal(t, "/metadata/instance", r.URL.Path)
 				queryParameters := r.URL.Query()
 				assert.Equal(t, apiVersion, queryParameters.Get("api-version"))
@@ -117,14 +173,14 @@ func TestGetInstanceData(t *testing.T) {
 			}
 
 			instanceData, err := imdsClient.GetInstanceData(ctx)
-			if tt.expectedErr != "" {
+			if c.expectedErr != "" {
 				assert.Error(t, err)
-				assert.Contains(t, err.Error(), tt.expectedErr)
+				assert.Contains(t, err.Error(), c.expectedErr)
 				assert.Nil(t, instanceData)
 			} else {
 				assert.NoError(t, err)
 				assert.NotNil(t, instanceData)
-				assert.Equal(t, tt.expectedResourceID, instanceData.Compute.ResourceID)
+				assert.Equal(t, c.expectedResourceID, instanceData.Compute.ResourceID)
 			}
 		})
 	}
@@ -136,7 +192,7 @@ func TestGetAttestedData(t *testing.T) {
 		malformedJSON          = `{{}`
 	)
 
-	tests := []struct {
+	cases := []struct {
 		name              string
 		json              string
 		expectedErr       string // Empty string indicates no error expected
@@ -158,9 +214,9 @@ func TestGetAttestedData(t *testing.T) {
 
 	ctx := log.NewTestContext()
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			imds := mockIMDSWithAssertions(t, tt.json, func(r *http.Request) {
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			imds := mockIMDSWithAssertions(t, c.json, func(r *http.Request) {
 				assert.Equal(t, "/metadata/attested/document", r.URL.Path)
 				queryParameters := r.URL.Query()
 				assert.Equal(t, apiVersion, queryParameters.Get("api-version"))
@@ -175,14 +231,14 @@ func TestGetAttestedData(t *testing.T) {
 			}
 
 			attestedData, err := imdsClient.GetAttestedData(ctx, "nonce")
-			if tt.expectedErr != "" {
+			if c.expectedErr != "" {
 				assert.Error(t, err)
-				assert.Contains(t, err.Error(), tt.expectedErr)
+				assert.Contains(t, err.Error(), c.expectedErr)
 				assert.Nil(t, attestedData)
 			} else {
 				assert.NoError(t, err)
 				assert.NotNil(t, attestedData)
-				assert.Equal(t, tt.expectedSignature, attestedData.Signature)
+				assert.Equal(t, c.expectedSignature, attestedData.Signature)
 			}
 		})
 	}

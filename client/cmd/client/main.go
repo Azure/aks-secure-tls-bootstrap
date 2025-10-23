@@ -116,16 +116,17 @@ func run(ctx context.Context) int {
 		case errors.Is(err, context.Canceled):
 			logger.Error("context was cancelled before bootstrapping could complete")
 		case errors.Is(err, context.DeadlineExceeded):
+			err = errors.Unwrap(err)
 			logger.Error(
 				"failed to successfully bootstrap before the specified deadline",
-				zap.Error(errors.Unwrap(err)),
+				zap.Error(err),
 				zap.Time("deadline", deadline),
 				zap.Duration("deadlineDuration", config.Deadline),
 			)
 		default:
-			logger.Error("failed to bootstrap", zap.Error(errors.Unwrap(err)))
+			logger.Error("failed to bootstrap", zap.Error(err))
 		}
-		result.FinalError = errors.Unwrap(err).Error()
+		result.FinalError = err.Error()
 		exitCode = 1
 	}
 

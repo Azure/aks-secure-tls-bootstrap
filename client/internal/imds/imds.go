@@ -15,6 +15,23 @@ import (
 	"go.uber.org/zap"
 )
 
+func ParseErrorDescription(resp *http.Response) (string, error) {
+	if resp == nil {
+		return "", nil
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("parsing IMDS error response: %w", err)
+	}
+	var errorBody struct {
+		Description string `json:"error_description"`
+	}
+	if err := json.Unmarshal(body, &errorBody); err != nil {
+		return "", fmt.Errorf("unmarshalling IMDS error resposne: %w", err)
+	}
+	return errorBody.Description, nil
+}
+
 //go:generate ../../bin/mockgen -copyright_file=../../../hack/copyright_header.txt -destination=./mocks/mock_imds.go -package=mocks github.com/Azure/aks-secure-tls-bootstrap/client/internal/imds Client
 
 type Client interface {

@@ -32,11 +32,11 @@ const (
 )
 
 // extractAccessTokenFunc extracts an oauth access token from the specified service principal token after a refresh, fake implementations given in unit tests.
-type extractAccessTokenFunc func(token *adal.ServicePrincipalToken, isMSI bool) (string, error)
+type extractAccessTokenFunc func(ctx context.Context, oken *adal.ServicePrincipalToken, isMSI bool) (string, error)
 
-func extractAccessToken(token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
+func extractAccessToken(ctx context.Context, token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
 	if err := token.Refresh(); err != nil {
-		return "", tokenRefreshErrorToGetAccessTokenFailure(err, isMSI)
+		return "", tokenRefreshErrorToGetAccessTokenFailure(ctx, err, isMSI)
 	}
 	return token.OAuthToken(), nil
 }
@@ -63,7 +63,7 @@ func (c *client) getAccessToken(ctx context.Context, userAssignedIdentityID, res
 		// to avoid falling too deep into exponential backoff implemented by adal, which follows the public retry guidance:
 		// https://learn.microsoft.com/en-us/entra/identity/managed-identities-azure-resources/how-to-use-vm-token#retry-guidance
 		msiToken.MaxMSIRefreshAttempts = maxMSIRefreshAttempts
-		return c.extractAccessTokenFunc(msiToken, true)
+		return c.extractAccessTokenFunc(ctx, msiToken, true)
 	}
 
 	if cloudProviderConfig.ClientID == clientIDForMSI {
@@ -75,7 +75,7 @@ func (c *client) getAccessToken(ctx context.Context, userAssignedIdentityID, res
 		return "", err
 	}
 
-	return c.extractAccessTokenFunc(servicePrincipalToken, false)
+	return c.extractAccessTokenFunc(ctx, servicePrincipalToken, false)
 }
 
 func getServicePrincipalToken(ctx context.Context, resource string, cloudProviderConfig *cloud.ProviderConfig) (*adal.ServicePrincipalToken, error) {
@@ -136,7 +136,7 @@ func makeNonRetryableGetAccessTokenFailure(err error) error {
 	}
 }
 
-func tokenRefreshErrorToGetAccessTokenFailure(err error, isMSI bool) *bootstrapError {
+func tokenRefreshErrorToGetAccessTokenFailure(ctx context.Context, err error, isMSI bool) error {
 	bootstrapErr := &bootstrapError{
 		errorType: ErrorTypeGetAccessTokenFailure,
 		retryable: true, // optimistically consider the error retryable from the start
@@ -153,11 +153,26 @@ func tokenRefreshErrorToGetAccessTokenFailure(err error, isMSI bool) *bootstrapE
 		return bootstrapErr
 	}
 
-	if isMSI {
-		bootstrapErr.retryable = imds.IsRetryableHTTPStatusCode(resp.StatusCode)
-	} else {
+	if !isMSI {
 		bootstrapErr.retryable = resp.StatusCode >= http.StatusInternalServerError
+		return bootstrapErr
 	}
 
+	if resp.StatusCode == http.StatusBadRequest {
+		// 400 error is normally not retryable
+		bootstrapErr.retryable = false
+		description, err := imds.ParseErrorDescription(resp)
+		if err != nil {
+			log.MustGetLogger(ctx).Error("unable to parse IMDS error response", zap.Error(err))
+		} else {
+			if strings.Contains(strings.ToLower(description), "identity not found") {
+				// identity assignment can sometimes take a bit of time to propagate to IMDS, treat this as retryable
+				bootstrapErr.retryable = true
+			}
+		}
+		return bootstrapErr
+	}
+
+	bootstrapErr.retryable = imds.IsRetryableHTTPStatusCode(resp.StatusCode)
 	return bootstrapErr
 }
