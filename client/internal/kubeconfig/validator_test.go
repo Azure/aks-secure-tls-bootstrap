@@ -48,7 +48,7 @@ func TestValidateKubeconfig(t *testing.T) {
 	otherValidKeyPEM, err := testutil.GeneratePrivateKeyPEM()
 	assert.NoError(t, err)
 
-	tests := []struct {
+	cases := []struct {
 		name         string
 		setupFunc    func(v *validator)
 		expectedErrs []string
@@ -128,16 +128,16 @@ func TestValidateKubeconfig(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
 			ctx := log.NewTestContext()
 			v := new(validator)
-			tt.setupFunc(v)
+			c.setupFunc(v)
 
 			err := v.Validate(ctx, "path", false)
-			if len(tt.expectedErrs) > 0 {
+			if len(c.expectedErrs) > 0 {
 				assert.Error(t, err)
-				for _, expectedErr := range tt.expectedErrs {
+				for _, expectedErr := range c.expectedErrs {
 					assert.ErrorContains(t, err, expectedErr)
 				}
 			} else {
@@ -148,7 +148,7 @@ func TestValidateKubeconfig(t *testing.T) {
 }
 
 func TestEnsureAuthorizedClient(t *testing.T) {
-	tests := []struct {
+	cases := []struct {
 		name         string
 		setupFunc    func(v *validator, clientset *fake.Clientset)
 		expectedErrs []string
@@ -205,8 +205,8 @@ func TestEnsureAuthorizedClient(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
 			ctx := log.NewTestContext()
 			v := new(validator)
 
@@ -225,12 +225,12 @@ func TestEnsureAuthorizedClient(t *testing.T) {
 				return clientset, nil
 			}
 
-			tt.setupFunc(v, clientset)
+			c.setupFunc(v, clientset)
 			err := v.Validate(ctx, "path", true)
 
-			if len(tt.expectedErrs) > 0 {
+			if len(c.expectedErrs) > 0 {
 				assert.Error(t, err)
-				for _, expectedErr := range tt.expectedErrs {
+				for _, expectedErr := range c.expectedErrs {
 					assert.ErrorContains(t, err, expectedErr)
 				}
 			} else {

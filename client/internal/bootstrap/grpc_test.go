@@ -30,7 +30,7 @@ func TestGetServiceClient(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	tests := []struct {
+	cases := []struct {
 		name        string
 		setupFunc   func(*testing.T) *Config
 		errorSubstr []string
@@ -85,14 +85,14 @@ func TestGetServiceClient(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cfg := tt.setupFunc(t)
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			cfg := c.setupFunc(t)
 			client, closeFn, err := getServiceClient("token", cfg)
 
-			if len(tt.errorSubstr) > 0 {
+			if len(c.errorSubstr) > 0 {
 				assert.Error(t, err)
-				for _, substr := range tt.errorSubstr {
+				for _, substr := range c.errorSubstr {
 					assert.Contains(t, err.Error(), substr)
 				}
 				assert.Nil(t, client)
@@ -120,7 +120,7 @@ func TestGetTLSConfig(t *testing.T) {
 	ok := rootPool.AppendCertsFromPEM(clusterCACertPEM)
 	assert.True(t, ok)
 
-	tests := []struct {
+	cases := []struct {
 		name               string
 		nextProto          string
 		insecureSkipVerify bool
@@ -151,13 +151,13 @@ func TestGetTLSConfig(t *testing.T) {
 			expectedNextProtos: []string{"nextProto", "h2"},
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			config, err := getTLSConfig(clusterCACertPEM, tt.nextProto, tt.insecureSkipVerify)
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			config, err := getTLSConfig(clusterCACertPEM, c.nextProto, c.insecureSkipVerify)
 			assert.NoError(t, err)
 			assert.NotNil(t, config)
-			assert.Equal(t, tt.expectedNextProtos, config.NextProtos)
-			assert.Equal(t, tt.insecureSkipVerify, config.InsecureSkipVerify)
+			assert.Equal(t, c.expectedNextProtos, config.NextProtos)
+			assert.Equal(t, c.insecureSkipVerify, config.InsecureSkipVerify)
 			assert.True(t, config.RootCAs.Equal(rootPool))
 		})
 	}
