@@ -158,21 +158,23 @@ func tokenRefreshErrorToGetAccessTokenFailure(ctx context.Context, err error, is
 		return bootstrapErr
 	}
 
-	if resp.StatusCode == http.StatusBadRequest {
-		// 400 error is normally not retryable
-		bootstrapErr.retryable = false
-		description, err := imds.ParseErrorDescription(resp)
-		if err != nil {
-			log.MustGetLogger(ctx).Error("unable to parse IMDS error response", zap.Error(err))
-		} else {
-			if strings.Contains(strings.ToLower(description), "identity not found") {
-				// identity assignment can sometimes take a bit of time to propagate to IMDS, treat this as retryable
-				bootstrapErr.retryable = true
-			}
-		}
+	if resp.StatusCode != http.StatusBadRequest {
+		bootstrapErr.retryable = imds.IsRetryableHTTPStatusCode(resp.StatusCode)
 		return bootstrapErr
 	}
 
-	bootstrapErr.retryable = imds.IsRetryableHTTPStatusCode(resp.StatusCode)
+	// 400 error is normally not retryable
+	bootstrapErr.retryable = false
+
+	description, err := imds.ParseErrorDescription(resp)
+	if err != nil {
+		log.MustGetLogger(ctx).Error("unable to parse IMDS error response", zap.Error(err))
+	} else {
+		if strings.Contains(strings.ToLower(description), "identity not found") {
+			// identity assignment can sometimes take a bit of time to propagate to IMDS, treat this as retryable
+			bootstrapErr.retryable = true
+		}
+	}
 	return bootstrapErr
+
 }
