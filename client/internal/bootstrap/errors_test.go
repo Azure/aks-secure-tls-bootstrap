@@ -14,14 +14,14 @@ import (
 )
 
 type fakeRefreshError struct {
-	response *http.Response
-	err      error
+	resp *http.Response
+	err  error
 }
 
 var _ adal.TokenRefreshError = (*fakeRefreshError)(nil)
 
 func (e *fakeRefreshError) Response() *http.Response {
-	return e.response
+	return e.resp
 }
 
 func (e *fakeRefreshError) Error() string {

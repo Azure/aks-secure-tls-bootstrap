@@ -266,8 +266,8 @@ func TestTokenRefreshErrorToGetAccessTokenFailure(t *testing.T) {
 		{
 			name: "error is an adal.TokenRefreshError with nil response",
 			err: &fakeRefreshError{
-				response: nil,
-				err:      errors.New("refresh error"),
+				resp: nil,
+				err:  errors.New("refresh error"),
 			},
 			expectedErr: &bootstrapError{
 				errorType: ErrorTypeGetAccessTokenFailure,
@@ -279,7 +279,7 @@ func TestTokenRefreshErrorToGetAccessTokenFailure(t *testing.T) {
 			name:  "error is an adal.TokenRefreshError with 5XX response for MSI",
 			isMSI: true,
 			err: &fakeRefreshError{
-				response: &http.Response{
+				resp: &http.Response{
 					StatusCode: http.StatusInternalServerError,
 				},
 				err: errors.New("refresh error"),
@@ -293,7 +293,7 @@ func TestTokenRefreshErrorToGetAccessTokenFailure(t *testing.T) {
 		{
 			name: "error is an adal.TokenRefreshError with 5XX response for service principal",
 			err: &fakeRefreshError{
-				response: &http.Response{
+				resp: &http.Response{
 					StatusCode: http.StatusInternalServerError,
 				},
 				err: errors.New("refresh error"),
@@ -308,7 +308,7 @@ func TestTokenRefreshErrorToGetAccessTokenFailure(t *testing.T) {
 			name:  "error is an adal.TokenRefreshError with 429 response for MSI",
 			isMSI: true,
 			err: &fakeRefreshError{
-				response: &http.Response{
+				resp: &http.Response{
 					StatusCode: http.StatusTooManyRequests,
 				},
 				err: errors.New("refresh error"),
@@ -322,7 +322,7 @@ func TestTokenRefreshErrorToGetAccessTokenFailure(t *testing.T) {
 		{
 			name: "error is an adal.TokenRefreshError with 429 response for service principal",
 			err: &fakeRefreshError{
-				response: &http.Response{
+				resp: &http.Response{
 					StatusCode: http.StatusTooManyRequests,
 				},
 				err: errors.New("refresh error"),
@@ -337,7 +337,7 @@ func TestTokenRefreshErrorToGetAccessTokenFailure(t *testing.T) {
 			name:  "error is an adal.TokenRefreshError with 404 response for MSI",
 			isMSI: true,
 			err: &fakeRefreshError{
-				response: &http.Response{
+				resp: &http.Response{
 					StatusCode: http.StatusNotFound,
 				},
 				err: errors.New("refresh error"),
@@ -351,7 +351,7 @@ func TestTokenRefreshErrorToGetAccessTokenFailure(t *testing.T) {
 		{
 			name: "error is an adal.TokenRefreshError with 404 response for service principal",
 			err: &fakeRefreshError{
-				response: &http.Response{
+				resp: &http.Response{
 					StatusCode: http.StatusNotFound,
 				},
 				err: errors.New("refresh error"),
@@ -366,7 +366,7 @@ func TestTokenRefreshErrorToGetAccessTokenFailure(t *testing.T) {
 			name:  "error is an adal.TokenRefreshError with an unknown 400 response for MSI",
 			isMSI: true,
 			err: &fakeRefreshError{
-				response: &http.Response{
+				resp: &http.Response{
 					StatusCode: http.StatusBadRequest,
 					Body:       io.NopCloser(strings.NewReader("malformed")),
 				},
@@ -382,7 +382,7 @@ func TestTokenRefreshErrorToGetAccessTokenFailure(t *testing.T) {
 			name:  "error is an adal.TokenRefreshError with a non-retryable 400 response",
 			isMSI: true,
 			err: &fakeRefreshError{
-				response: &http.Response{
+				resp: &http.Response{
 					StatusCode: http.StatusBadRequest,
 					Body:       io.NopCloser(strings.NewReader(`{"error":"invalid_request","error_description":"bad request"}`)),
 				},
@@ -398,7 +398,7 @@ func TestTokenRefreshErrorToGetAccessTokenFailure(t *testing.T) {
 			name:  "error is an adal.TokenRefreshError with a retryable 400 response",
 			isMSI: true,
 			err: &fakeRefreshError{
-				response: &http.Response{
+				resp: &http.Response{
 					StatusCode: http.StatusBadRequest,
 					Body:       io.NopCloser(strings.NewReader(`{"error":"invalid_request","error_description":"Identity not found"}`)),
 				},
@@ -414,7 +414,7 @@ func TestTokenRefreshErrorToGetAccessTokenFailure(t *testing.T) {
 			name:  "error is an adal.TokenRefreshError with non-retryable response for MSI",
 			isMSI: true,
 			err: &fakeRefreshError{
-				response: &http.Response{
+				resp: &http.Response{
 					StatusCode: http.StatusUnauthorized,
 				},
 				err: errors.New("unauthorized"),
@@ -428,7 +428,7 @@ func TestTokenRefreshErrorToGetAccessTokenFailure(t *testing.T) {
 		{
 			name: "error is an adal.TokenRefreshError with non-retryable response for service principal",
 			err: &fakeRefreshError{
-				response: &http.Response{
+				resp: &http.Response{
 					StatusCode: http.StatusUnauthorized,
 				},
 				err: errors.New("unauthorized"),

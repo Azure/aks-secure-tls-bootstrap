@@ -130,11 +130,6 @@ func TestCallIMDS(t *testing.T) {
 }
 
 func TestGetInstanceData(t *testing.T) {
-	const (
-		mockVMInstanceDataJSON = `{"compute":{"resourceId": "resourceId"}}`
-		malformedJSON          = `{{}`
-	)
-
 	cases := []struct {
 		name               string
 		json               string
@@ -143,13 +138,13 @@ func TestGetInstanceData(t *testing.T) {
 	}{
 		{
 			name:               "should call the correct IMDS endpoint with the correct query parameters",
-			json:               mockVMInstanceDataJSON,
+			json:               `{"compute":{"resourceId": "resourceId"}}`,
 			expectedErr:        "",
 			expectedResourceID: "resourceId",
 		},
 		{
 			name:               "unable parse instance data response from IMDS",
-			json:               malformedJSON,
+			json:               "malformed",
 			expectedErr:        "failed to unmarshal IMDS data",
 			expectedResourceID: "",
 		},
@@ -187,26 +182,21 @@ func TestGetInstanceData(t *testing.T) {
 }
 
 func TestGetAttestedData(t *testing.T) {
-	const (
-		mockVMAttestedDataJSON = `{"signature":"signature"}`
-		malformedJSON          = `{{}`
-	)
-
 	cases := []struct {
 		name              string
-		json              string
-		expectedErr       string // Empty string indicates no error expected
-		expectedSignature string // For validating the signature in the attested data
+		responseBody      string
+		expectedErr       string
+		expectedSignature string
 	}{
 		{
 			name:              "should call the correct IMDS endpoint with the correct query parameters",
-			json:              mockVMAttestedDataJSON,
+			responseBody:      `{"signature":"signature"}`,
 			expectedErr:       "",
 			expectedSignature: "signature",
 		},
 		{
 			name:              "unable to parse attested data response from IMDS",
-			json:              malformedJSON,
+			responseBody:      "malformed",
 			expectedErr:       "failed to unmarshal IMDS data",
 			expectedSignature: "",
 		},
@@ -216,7 +206,7 @@ func TestGetAttestedData(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			imds := mockIMDSWithAssertions(t, c.json, func(r *http.Request) {
+			imds := mockIMDSWithAssertions(t, c.responseBody, func(r *http.Request) {
 				assert.Equal(t, "/metadata/attested/document", r.URL.Path)
 				queryParameters := r.URL.Query()
 				assert.Equal(t, apiVersion, queryParameters.Get("api-version"))
