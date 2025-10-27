@@ -4,9 +4,7 @@
 package imds
 
 import (
-	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -16,60 +14,6 @@ import (
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/log"
 	"github.com/stretchr/testify/assert"
 )
-
-func TestParseErrorDescription(t *testing.T) {
-	cases := []struct {
-		name                string
-		resp                *http.Response
-		expectedDescription string
-		expectedErr         error
-	}{
-		{
-			name:                "response is nil",
-			resp:                nil,
-			expectedDescription: "",
-			expectedErr:         nil,
-		},
-		{
-			name: "response body is malformed",
-			resp: &http.Response{
-				Body: io.NopCloser(strings.NewReader("malformed")),
-			},
-			expectedDescription: "",
-			expectedErr:         errors.New("unmarshalling IMDS error resposne"),
-		},
-		{
-			name: "response body does not contain error_description",
-			resp: &http.Response{
-				StatusCode: http.StatusBadRequest,
-				Body:       io.NopCloser(strings.NewReader(`{"error":"invalid_request"}`)),
-			},
-			expectedDescription: "",
-			expectedErr:         nil,
-		},
-		{
-			name: "response body contains an error_description",
-			resp: &http.Response{
-				StatusCode: http.StatusBadRequest,
-				Body:       io.NopCloser(strings.NewReader(`{"error":"invalid_request","error_description":"Identity not found"}`)),
-			},
-			expectedDescription: "Identity not found",
-			expectedErr:         nil,
-		},
-	}
-
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			description, err := ParseErrorDescription(c.resp)
-			if c.expectedErr != nil {
-				assert.ErrorContains(t, err, c.expectedErr.Error())
-			} else {
-				assert.Nil(t, err)
-			}
-			assert.Equal(t, c.expectedDescription, description)
-		})
-	}
-}
 
 func TestCallIMDS(t *testing.T) {
 	cases := []struct {

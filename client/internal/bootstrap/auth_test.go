@@ -7,9 +7,7 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
-	"io"
 	"net/http"
-	"strings"
 	"testing"
 	"time"
 
@@ -368,14 +366,13 @@ func TestTokenRefreshErrorToGetAccessTokenFailure(t *testing.T) {
 			err: &fakeRefreshError{
 				resp: &http.Response{
 					StatusCode: http.StatusBadRequest,
-					Body:       io.NopCloser(strings.NewReader("malformed")),
 				},
-				err: errors.New("malformed"),
+				err: errors.New(`Refresh request failed. Status Code = '400'. Response body: {\"error\":\"invalid_request\"} Endpoint http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&client_id=id&resource=res`),
 			},
 			expectedErr: &bootstrapError{
 				errorType: ErrorTypeGetAccessTokenFailure,
 				retryable: false,
-				inner:     errors.New("obtaining fresh access token: malformed"),
+				inner:     errors.New(`obtaining fresh access token: Refresh request failed. Status Code = '400'. Response body: {\"error\":\"invalid_request\"} Endpoint http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&client_id=id&resource=res`),
 			},
 		},
 		{
@@ -384,14 +381,13 @@ func TestTokenRefreshErrorToGetAccessTokenFailure(t *testing.T) {
 			err: &fakeRefreshError{
 				resp: &http.Response{
 					StatusCode: http.StatusBadRequest,
-					Body:       io.NopCloser(strings.NewReader(`{"error":"invalid_request","error_description":"bad request"}`)),
 				},
-				err: errors.New("bad request"),
+				err: errors.New(`Refresh request failed. Status Code = '400'. Response body: {\"error\":\"invalid_request\",\"error_description\":\"Bad request\"} Endpoint http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&client_id=id&resource=res`),
 			},
 			expectedErr: &bootstrapError{
 				errorType: ErrorTypeGetAccessTokenFailure,
 				retryable: false,
-				inner:     errors.New("obtaining fresh access token: bad request"),
+				inner:     errors.New(`obtaining fresh access token: Refresh request failed. Status Code = '400'. Response body: {\"error\":\"invalid_request\",\"error_description\":\"Bad request\"} Endpoint http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&client_id=id&resource=res`),
 			},
 		},
 		{
@@ -400,14 +396,13 @@ func TestTokenRefreshErrorToGetAccessTokenFailure(t *testing.T) {
 			err: &fakeRefreshError{
 				resp: &http.Response{
 					StatusCode: http.StatusBadRequest,
-					Body:       io.NopCloser(strings.NewReader(`{"error":"invalid_request","error_description":"Identity not found"}`)),
 				},
-				err: errors.New("Identity not found"),
+				err: errors.New(`Refresh request failed. Status Code = '400'. Response body: {\"error\":\"invalid_request\",\"error_description\":\"Identity not found\"} Endpoint http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&client_id=id&resource=res`),
 			},
 			expectedErr: &bootstrapError{
 				errorType: ErrorTypeGetAccessTokenFailure,
 				retryable: true,
-				inner:     errors.New("obtaining fresh access token: Identity not found"),
+				inner:     errors.New(`obtaining fresh access token: Refresh request failed. Status Code = '400'. Response body: {\"error\":\"invalid_request\",\"error_description\":\"Identity not found\"} Endpoint http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&client_id=id&resource=res`),
 			},
 		},
 		{

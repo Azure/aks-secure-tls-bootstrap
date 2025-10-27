@@ -163,18 +163,8 @@ func tokenRefreshErrorToGetAccessTokenFailure(ctx context.Context, err error, is
 		return bootstrapErr
 	}
 
-	// 400 error is normally not retryable
-	bootstrapErr.retryable = false
-
-	description, err := imds.ParseErrorDescription(resp)
-	if err != nil {
-		log.MustGetLogger(ctx).Error("unable to parse IMDS error response", zap.Error(err))
-	} else {
-		if strings.Contains(strings.ToLower(description), "identity not found") {
-			// identity assignment can sometimes take a bit of time to propagate to IMDS, treat this as retryable
-			bootstrapErr.retryable = true
-		}
-	}
+	// 400s aren't normally retryable, though identity assignment can sometimes take a bit of time to propagate to IMDS,
+	// so we treat "Identity not found" errors as retryable
+	bootstrapErr.retryable = strings.Contains(strings.ToLower(err.Error()), "identity not found")
 	return bootstrapErr
-
 }
