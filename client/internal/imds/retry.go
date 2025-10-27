@@ -22,6 +22,7 @@ func IsRetryableHTTPStatusCode(code int) bool {
 func wrapWithRetryableIMDSStatusCodes(defaultShouldRetry bool, resp *http.Response, err error) (bool, error) {
 	switch {
 	case err != nil:
+		// by default we don't retry if there was an error doing the request
 		return false, err
 	case resp == nil:
 		// fall back to default logic if we can't check the status code
