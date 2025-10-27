@@ -32,11 +32,11 @@ const (
 )
 
 // extractAccessTokenFunc extracts an oauth access token from the specified service principal token after a refresh, fake implementations given in unit tests.
-type extractAccessTokenFunc func(ctx context.Context, oken *adal.ServicePrincipalToken, isMSI bool) (string, error)
+type extractAccessTokenFunc func(token *adal.ServicePrincipalToken, isMSI bool) (string, error)
 
-func extractAccessToken(ctx context.Context, token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
+func extractAccessToken(token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
 	if err := token.Refresh(); err != nil {
-		return "", tokenRefreshErrorToGetAccessTokenFailure(ctx, err, isMSI)
+		return "", tokenRefreshErrorToGetAccessTokenFailure(err, isMSI)
 	}
 	return token.OAuthToken(), nil
 }
@@ -63,7 +63,7 @@ func (c *client) getAccessToken(ctx context.Context, userAssignedIdentityID, res
 		// to avoid falling too deep into exponential backoff implemented by adal, which follows the public retry guidance:
 		// https://learn.microsoft.com/en-us/entra/identity/managed-identities-azure-resources/how-to-use-vm-token#retry-guidance
 		msiToken.MaxMSIRefreshAttempts = maxMSIRefreshAttempts
-		return c.extractAccessTokenFunc(ctx, msiToken, true)
+		return c.extractAccessTokenFunc(msiToken, true)
 	}
 
 	if cloudProviderConfig.ClientID == clientIDForMSI {
@@ -75,7 +75,7 @@ func (c *client) getAccessToken(ctx context.Context, userAssignedIdentityID, res
 		return "", err
 	}
 
-	return c.extractAccessTokenFunc(ctx, servicePrincipalToken, false)
+	return c.extractAccessTokenFunc(servicePrincipalToken, false)
 }
 
 func getServicePrincipalToken(ctx context.Context, resource string, cloudProviderConfig *cloud.ProviderConfig) (*adal.ServicePrincipalToken, error) {
@@ -136,7 +136,7 @@ func makeNonRetryableGetAccessTokenFailure(err error) error {
 	}
 }
 
-func tokenRefreshErrorToGetAccessTokenFailure(ctx context.Context, err error, isMSI bool) error {
+func tokenRefreshErrorToGetAccessTokenFailure(err error, isMSI bool) error {
 	bootstrapErr := &bootstrapError{
 		errorType: ErrorTypeGetAccessTokenFailure,
 		retryable: true, // optimistically consider the error retryable from the start

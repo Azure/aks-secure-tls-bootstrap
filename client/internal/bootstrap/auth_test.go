@@ -4,7 +4,6 @@
 package bootstrap
 
 import (
-	"context"
 	"encoding/base64"
 	"errors"
 	"net/http"
@@ -38,7 +37,7 @@ func TestGetAccessToken(t *testing.T) {
 				config.ClientSecret = "secret"
 			},
 			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
-				return func(ctx context.Context, token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
+				return func(token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
 					return "token", nil
 				}
 			},
@@ -53,7 +52,7 @@ func TestGetAccessToken(t *testing.T) {
 				config.ClientSecret = ""
 			},
 			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
-				return func(ctx context.Context, token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
+				return func(token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
 					return "token", nil
 				}
 			},
@@ -68,7 +67,7 @@ func TestGetAccessToken(t *testing.T) {
 				config.ClientSecret = "certificate:YW55IGNhcm5hbCBwbGVhc3U======" // invalid b64-encoding
 			},
 			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
-				return func(ctx context.Context, token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
+				return func(token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
 					return "token", nil
 				}
 			},
@@ -83,7 +82,7 @@ func TestGetAccessToken(t *testing.T) {
 				config.ClientSecret = "certificate:dGVzdAo=" // b64-encoding of "test"
 			},
 			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
-				return func(ctx context.Context, token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
+				return func(token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
 					return "token", nil
 				}
 			},
@@ -105,7 +104,7 @@ func TestGetAccessToken(t *testing.T) {
 				config.ClientSecret = "certificate:" + certData
 			},
 			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
-				return func(ctx context.Context, token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
+				return func(token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
 					return "", errors.New("generating service principal access token with certificate")
 				}
 			},
@@ -119,7 +118,7 @@ func TestGetAccessToken(t *testing.T) {
 				config.ClientID = clientIDForMSI
 			},
 			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
-				return func(ctx context.Context, token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
+				return func(token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
 					assert.Equal(t, maxMSIRefreshAttempts, token.MaxMSIRefreshAttempts)
 					return "token", nil
 				}
@@ -134,7 +133,7 @@ func TestGetAccessToken(t *testing.T) {
 				config.ClientID = clientIDForMSI
 			},
 			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
-				return func(ctx context.Context, token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
+				return func(token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
 					return "token", nil
 				}
 			},
@@ -149,7 +148,7 @@ func TestGetAccessToken(t *testing.T) {
 				config.ClientID = clientIDForMSI
 			},
 			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
-				return func(ctx context.Context, token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
+				return func(token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
 					assert.Equal(t, maxMSIRefreshAttempts, token.MaxMSIRefreshAttempts)
 					return "token", nil
 				}
@@ -165,7 +164,7 @@ func TestGetAccessToken(t *testing.T) {
 				config.ClientSecret = "secret"
 			},
 			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
-				return func(ctx context.Context, token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
+				return func(token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
 					return "token", nil
 				}
 			},
@@ -187,7 +186,7 @@ func TestGetAccessToken(t *testing.T) {
 				config.ClientSecret = "certificate:" + certData
 			},
 			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
-				return func(ctx context.Context, token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
+				return func(token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
 					return "token", nil
 				}
 			},
@@ -209,7 +208,7 @@ func TestGetAccessToken(t *testing.T) {
 				config.ClientSecret = base64.StdEncoding.EncodeToString([]byte("certificate:" + certData))
 			},
 			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
-				return func(ctx context.Context, token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
+				return func(token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
 					return "token", nil
 				}
 			},
@@ -436,11 +435,9 @@ func TestTokenRefreshErrorToGetAccessTokenFailure(t *testing.T) {
 		},
 	}
 
-	ctx := log.NewTestContext()
-
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			err := tokenRefreshErrorToGetAccessTokenFailure(ctx, c.err, c.isMSI)
+			err := tokenRefreshErrorToGetAccessTokenFailure(c.err, c.isMSI)
 			var bootstrapErr *bootstrapError
 			assert.True(t, errors.As(err, &bootstrapErr))
 			assert.Equal(t, c.expectedErr.errorType, bootstrapErr.errorType)

@@ -4,7 +4,6 @@
 package bootstrap
 
 import (
-	"context"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
@@ -193,7 +192,7 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 				getServiceClientFunc: func(_ string, _ *Config) (v1.SecureTLSBootstrapServiceClient, closeFunc, error) {
 					return serviceClient, func() error { return nil }, nil
 				},
-				extractAccessTokenFunc: func(ctx context.Context, token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
+				extractAccessTokenFunc: func(token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
 					assert.NotNil(t, token)
 					assert.False(t, isMSI)
 					return "token", nil
