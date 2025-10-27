@@ -19,19 +19,23 @@ func IsRetryableHTTPStatusCode(code int) bool {
 	return code >= http.StatusInternalServerError
 }
 
+func wrapWithRetryableIMDSStatusCodes(defaultShouldRetry bool, resp *http.Response, err error) (bool, error) {
+	switch {
+	case err != nil:
+		return false, err
+	case resp == nil:
+		// fall back to default logic if we can't check the status code
+		return defaultShouldRetry, nil
+	default:
+		return defaultShouldRetry || IsRetryableHTTPStatusCode(resp.StatusCode), nil
+	}
+}
+
 // getCheckRetry can be applied to a retryablehttp.Client to correctly handle HTTP status codes
 // according to guidance from IMDS + adal's token refresh implementation
 func getCheckRetry() retryablehttp.CheckRetry {
 	return func(ctx context.Context, resp *http.Response, err error) (bool, error) {
-		defaultShouldRetry, err := retryablehttp.DefaultRetryPolicy(ctx, resp, err)
-		if err != nil {
-			// retryablehttp.DefaultRetryPolicy will only bubble up context errors, which we should always halt on
-			return false, err
-		}
-		if resp == nil {
-			// fall back to default logic if we can't check the status code
-			return defaultShouldRetry, nil
-		}
-		return defaultShouldRetry || IsRetryableHTTPStatusCode(resp.StatusCode), nil
+		defaultShouldRetry, retryErr := retryablehttp.DefaultRetryPolicy(ctx, resp, err)
+		return wrapWithRetryableIMDSStatusCodes(defaultShouldRetry, resp, retryErr)
 	}
 }
