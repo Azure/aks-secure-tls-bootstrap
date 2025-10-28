@@ -6,10 +6,27 @@ package bootstrap
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"testing"
 
+	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/stretchr/testify/assert"
 )
+
+type fakeRefreshError struct {
+	resp *http.Response
+	err  error
+}
+
+var _ adal.TokenRefreshError = (*fakeRefreshError)(nil)
+
+func (e *fakeRefreshError) Response() *http.Response {
+	return e.resp
+}
+
+func (e *fakeRefreshError) Error() string {
+	return e.err.Error()
+}
 
 func TestBootstrapError(t *testing.T) {
 	cases := []struct {

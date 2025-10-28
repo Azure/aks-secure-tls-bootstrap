@@ -8,12 +8,13 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"math"
 	"os"
 	"time"
 
 	internalhttp "github.com/Azure/aks-secure-tls-bootstrap/client/internal/http"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/log"
-	akssecuretlsbootstrapv1 "github.com/Azure/aks-secure-tls-bootstrap/service/pkg/gen/akssecuretlsbootstrap/v1"
+	v1 "github.com/Azure/aks-secure-tls-bootstrap/service/pkg/gen/akssecuretlsbootstrap/v1"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/retry"
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
@@ -25,16 +26,16 @@ import (
 )
 
 // used to store any errors encountered by the gRPC client when making RPCs to the remote
-// within the retry loop configured by retry.UnaryClientInterceptor
+// within the retry loop configured by retry.UnaryClientInterceptor.
 var lastGRPCRetryError error
 
 // closeFunc closes a gRPC client connection, fake implementations given in unit tests.
 type closeFunc func() error
 
 // getServiceClientFunc returns a new SecureTLSBootstrapServiceClient over a gRPC connection, fake implementations given in unit tests.
-type getServiceClientFunc func(token string, cfg *Config) (akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient, closeFunc, error)
+type getServiceClientFunc func(token string, cfg *Config) (v1.SecureTLSBootstrapServiceClient, closeFunc, error)
 
-func getServiceClient(token string, cfg *Config) (akssecuretlsbootstrapv1.SecureTLSBootstrapServiceClient, closeFunc, error) {
+func getServiceClient(token string, cfg *Config) (v1.SecureTLSBootstrapServiceClient, closeFunc, error) {
 	clusterCAData, err := os.ReadFile(cfg.ClusterCAFilePath)
 	if err != nil {
 		return nil, nil, fmt.Errorf("reading cluster CA data from %s: %w", cfg.ClusterCAFilePath, err)
@@ -56,9 +57,9 @@ func getServiceClient(token string, cfg *Config) (akssecuretlsbootstrapv1.Secure
 		}),
 		grpc.WithUnaryInterceptor(retry.UnaryClientInterceptor(
 			retry.WithOnRetryCallback(getGRPCOnRetryCallbackFunc()),
-			retry.WithBackoff(retry.BackoffExponentialWithJitterBounded(100*time.Millisecond, 0.75, 2*time.Second)),
+			retry.WithBackoff(retry.BackoffLinearWithJitter(2*time.Second, 0.25)),
 			retry.WithCodes(codes.Aborted, codes.Unavailable),
-			retry.WithMax(30),
+			retry.WithMax(math.MaxUint), // effectively retry indefinitely with respect to the context deadline
 		)),
 		// forcefully disable usage of HTTP proxy, this is needed since on AKS nodes where the client
 		// will be running, the no_proxy environment variable will only contain the FQDN of the apiserver
@@ -71,7 +72,7 @@ func getServiceClient(token string, cfg *Config) (akssecuretlsbootstrapv1.Secure
 		return nil, nil, fmt.Errorf("failed to dial client connection with context: %w", err)
 	}
 
-	return akssecuretlsbootstrapv1.NewSecureTLSBootstrapServiceClient(conn), conn.Close, nil
+	return v1.NewSecureTLSBootstrapServiceClient(conn), conn.Close, nil
 }
 
 func getGRPCOnRetryCallbackFunc() retry.OnRetryCallback {
@@ -85,9 +86,12 @@ func getGRPCOnRetryCallbackFunc() retry.OnRetryCallback {
 	}
 }
 
-// withLastGRPCRetryErrorIfDeadlineExceeded wraps the error with lastGRPCRetryError if the error
-// was caused by a context.DeadlineExceeded.
+// withLastGRPCRetryErrorIfDeadlineExceeded wraps the error with lastGRPCRetryError if the error is a context.DeadlineExceeded.
 func withLastGRPCRetryErrorIfDeadlineExceeded(err error) error {
+	defer func() {
+		// clear the last gRPC retry error after bubbling it up for the first time
+		lastGRPCRetryError = nil
+	}()
 	if lastGRPCRetryError == nil || status.Code(err) != codes.DeadlineExceeded {
 		return err
 	}

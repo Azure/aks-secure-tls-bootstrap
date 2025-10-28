@@ -3,7 +3,9 @@
 
 package bootstrap
 
-import "fmt"
+import (
+	"fmt"
+)
 
 type ErrorType string
 
@@ -32,12 +34,4 @@ func (e *bootstrapError) Error() string {
 
 func (e *bootstrapError) Unwrap() error {
 	return e.inner
-}
-
-func makeNonRetryableGetAccessTokenFailure(err error) error {
-	return &bootstrapError{
-		errorType: ErrorTypeGetAccessTokenFailure,
-		retryable: false,
-		inner:     err,
-	}
 }

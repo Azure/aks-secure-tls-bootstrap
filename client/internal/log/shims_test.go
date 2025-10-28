@@ -26,7 +26,7 @@ func (cw customWriter) Sync() error {
 }
 
 func TestLeveledLoggerShim(t *testing.T) {
-	tests := []struct {
+	cases := []struct {
 		name                     string
 		logFunc                  func(*LeveledLoggerShim)
 		expectedStdoutSubstrs    []string
@@ -74,12 +74,12 @@ func TestLeveledLoggerShim(t *testing.T) {
 	logger, err := config.Build()
 	assert.NoError(t, err)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
 			shim := &LeveledLoggerShim{
 				logger: logger,
 			}
-			tt.logFunc(shim)
+			c.logFunc(shim)
 
 			err := bufWriter.Flush()
 			assert.NoError(t, err)
@@ -87,11 +87,10 @@ func TestLeveledLoggerShim(t *testing.T) {
 			out := buf.String()
 			assert.NotEmpty(t, out)
 
-			for _, substr := range tt.expectedStdoutSubstrs {
+			for _, substr := range c.expectedStdoutSubstrs {
 				assert.Contains(t, out, substr)
 			}
-
-			for _, substr := range tt.notExpectedStdoutSubstrs {
+			for _, substr := range c.notExpectedStdoutSubstrs {
 				assert.NotContains(t, out, substr)
 			}
 		})

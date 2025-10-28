@@ -43,7 +43,7 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 			},
 			expectedError: &bootstrapError{
 				errorType: ErrorTypeGetAccessTokenFailure,
-				inner:     fmt.Errorf("generating SPN access token with username and password"),
+				inner:     fmt.Errorf("generating service principal access token with client secret"),
 			},
 		},
 		{
@@ -192,8 +192,9 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 				getServiceClientFunc: func(_ string, _ *Config) (v1.SecureTLSBootstrapServiceClient, closeFunc, error) {
 					return serviceClient, func() error { return nil }, nil
 				},
-				extractAccessTokenFunc: func(token *adal.ServicePrincipalToken) (string, error) {
+				extractAccessTokenFunc: func(token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
 					assert.NotNil(t, token)
+					assert.False(t, isMSI)
 					return "token", nil
 				},
 			}
