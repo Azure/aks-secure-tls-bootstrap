@@ -57,7 +57,6 @@ stages:
         displayName: Generate Client Version String and Toggle Overrides
 
       - task: AzureCLI@2
-        condition: succeeded()
         inputs:
           azureSubscription: $(ARM_SERVICE_CONNECTION)
           scriptType: bash
@@ -71,6 +70,7 @@ stages:
           STORAGE_ACCOUNT_SUBSCRIPTION: $(STORAGE_ACCOUNT_SUBSCRIPTION)
           STORAGE_ACCOUNT_RESOURCE_GROUP: $(STORAGE_ACCOUNT_RESOURCE_GROUP)
           STORAGE_ACCOUNT_NAME: $(STORAGE_ACCOUNT_NAME)
+        condition: succeeded()
         displayName: Build and Upload x86_64 Linux and Windows Binaries
 
       - bash: |
