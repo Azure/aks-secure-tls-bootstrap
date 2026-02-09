@@ -37,8 +37,8 @@ stages:
             echo "##vso[task.setvariable variable=CLIENT_VERSION;isOutput=true;]${version}"
               
             web_endpoint=$(az storage account show -g $STORAGE_ACCOUNT_RESOURCE_GROUP -n $STORAGE_ACCOUNT_NAME --subscription $STORAGE_ACCOUNT_SUBSCRIPTION --query primaryEndpoints.web | tr -d \")
-            linux_url="${web_endpoint}client/linux/amd64/${CLIENT_VERSION}.tar.gz"
-            windows_url="${web_endpoint}client/windows/amd64/${CLIENT_VERSION}.zip"
+            linux_url="${web_endpoint}client/linux/amd64/${version}.tar.gz"
+            windows_url="${web_endpoint}client/windows/amd64/${version}.zip"
             echo "Generated linux client URL = ${linux_url}"
             echo "Generated windows client URL = ${windows_url}"
 
