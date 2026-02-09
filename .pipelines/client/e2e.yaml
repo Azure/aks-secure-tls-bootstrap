@@ -36,25 +36,26 @@ stages:
         name: client_version
         displayName: Generate Client Version String
 
-      - bash: |
-          set -euo pipefail
-          
-          az login --identity --resource-id $AGENT_IDENTITY_RESOURCE_ID
-          az account set --subscription $STORAGE_ACCOUNT_SUBSCRIPTION
+      - task: AzureCLI@2
+        inputs:
+          azureSubscription: $(ARM_SERVICE_CONNECTION)
+          scriptType: bash
+          scriptLocation: inlineScript
+          inlineScript: |
+            set -exuo pipefail
+            
+            web_endpoint=$(az storage account show -g $STORAGE_ACCOUNT_RESOURCE_GROUP -n $STORAGE_ACCOUNT_NAME --subscription $STORAGE_ACCOUNT_SUBSCRIPTION --query primaryEndpoints.web | tr -d \")
+            linux_url="${web_endpoint}client/linux/amd64/${CLIENT_VERSION}.tar.gz"
+            windows_url="${web_endpoint}client/windows/amd64/${CLIENT_VERSION}.zip"
+            echo "Generated linux client URL = ${linux_url}"
+            echo "Generated windows client URL = ${windows_url}"
 
-          web_endpoint=$(az storage account show -g $STORAGE_ACCOUNT_RESOURCE_GROUP -n $STORAGE_ACCOUNT_NAME --subscription $STORAGE_ACCOUNT_SUBSCRIPTION --query primaryEndpoints.web | tr -d \")
-          linux_url="${web_endpoint}client/linux/amd64/${CLIENT_VERSION}.tar.gz"
-          windows_url="${web_endpoint}client/windows/amd64/${CLIENT_VERSION}.zip"
-          echo "Generated linux client URL = ${linux_url}"
-          echo "Generated windows client URL = ${windows_url}"
+            toggle_overrides="custom-secure-tls-bootstrap-client-linux-binary-url=${linux_url},custom-secure-tls-bootstrap-client-windows-binary-url=${windows_url}"
+            echo "Generated toggle override string = ${toggle_overrides}"
 
-          toggle_overrides="custom-secure-tls-bootstrap-client-linux-binary-url=${linux_url},custom-secure-tls-bootstrap-client-windows-binary-url=${windows_url}"
-          echo "Generated toggle override string = ${toggle_overrides}"
-
-          echo "##vso[task.setvariable variable=TOGGLE_OVERRIDES;isOutput=true;]${toggle_overrides}"
+            echo "##vso[task.setvariable variable=TOGGLE_OVERRIDES;isOutput=true;]${toggle_overrides}"
         env:
           CLIENT_VERSION: $(client_version.CLIENT_VERSION)
-          AGENT_IDENTITY_RESOURCE_ID: $(AGENT_IDENTITY_RESOURCE_ID)
           STORAGE_ACCOUNT_SUBSCRIPTION: $(STORAGE_ACCOUNT_SUBSCRIPTION)
           STORAGE_ACCOUNT_RESOURCE_GROUP: $(STORAGE_ACCOUNT_RESOURCE_GROUP)
           STORAGE_ACCOUNT_NAME: $(STORAGE_ACCOUNT_NAME)
@@ -75,15 +76,17 @@ stages:
         fetchTags: false
         fetchDepth: 1
 
-      - bash: |
-          set -euxo pipefail
+      - task: AzureCLI@2
+        inputs:
+          azureSubscription: $(ARM_SERVICE_CONNECTION)
+          scriptType: bash
+          scriptLocation: inlineScript
+          inlineScript: |
+            set -euxo pipefail
 
-          az login --identity --resource-id $AGENT_IDENTITY_RESOURCE_ID
-          az account set --subscription $STORAGE_ACCOUNT_SUBSCRIPTION
-
-          pushd client/
-            ./hack/upload.sh
-          popd
+            pushd client/
+              ./hack/upload.sh
+            popd
         env:
           OS: all # build linux + windows binaries
           VERSION: $(CLIENT_VERSION_STRING)
