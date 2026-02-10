@@ -4,6 +4,7 @@
 package bootstrap
 
 import (
+	"crypto/tls"
 	"crypto/x509"
 	"errors"
 	"fmt"
@@ -158,6 +159,7 @@ func TestGetTLSConfig(t *testing.T) {
 			assert.NotNil(t, config)
 			assert.Equal(t, c.expectedNextProtos, config.NextProtos)
 			assert.Equal(t, c.insecureSkipVerify, config.InsecureSkipVerify)
+			assert.Equal(t, uint16(tls.VersionTLS13), config.MinVersion)
 			assert.True(t, config.RootCAs.Equal(rootPool))
 		})
 	}

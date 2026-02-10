@@ -104,8 +104,8 @@ func getTLSConfig(caPEM []byte, nextProto string, insecureSkipVerify bool) (*tls
 		return nil, fmt.Errorf("unable to construct new cert pool using cluster CA data")
 	}
 
-	//nolint: gosec // let server dictate min TLS version
 	tlsConfig := &tls.Config{
+		MinVersion:         tls.VersionTLS13,
 		RootCAs:            roots,
 		InsecureSkipVerify: insecureSkipVerify,
 	}
