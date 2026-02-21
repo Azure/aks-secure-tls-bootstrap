@@ -7,7 +7,6 @@ package testutil
 import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
-	"crypto/rand"
 	cryptorand "crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -81,7 +80,7 @@ func GenerateCertPEM(template CertTemplate) (certPEM []byte, keyPEM []byte, err 
 		return nil, nil, err
 	}
 
-	certBytes, err := x509.CreateCertificate(rand.Reader, &x509Template, &x509Template, &privateKey.PublicKey, privateKey)
+	certBytes, err := x509.CreateCertificate(cryptorand.Reader, &x509Template, &x509Template, &privateKey.PublicKey, privateKey)
 	if err != nil {
 		return nil, nil, err
 	}
