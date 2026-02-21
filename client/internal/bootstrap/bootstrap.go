@@ -19,7 +19,7 @@ import (
 // In any case, a record of all errors encountered during the bootstrap process will be returned in errs, where error type is mapped to the corresponding occurrence count.
 // Additionally, a map of traces is returned in traces, which records how long each bootstrapping step took, mapping task name to a corresponding time.Duration.
 // Trace data is separately recorded for each retry attempt.
-func Bootstrap(ctx context.Context, config *Config) (err error, errLog ErrorLog, traces *telemetry.TraceStore) {
+func Bootstrap(ctx context.Context, config *Config) (errLog ErrorLog, traces *telemetry.TraceStore, err error) {
 	client := newClient(ctx)
 
 	errLog = make(ErrorLog)
@@ -54,5 +54,5 @@ func Bootstrap(ctx context.Context, config *Config) (err error, errLog ErrorLog,
 		retry.Attempts(0), // retry indefinitely according to the context deadline
 	)
 
-	return err, errLog, traces
+	return errLog, traces, err
 }

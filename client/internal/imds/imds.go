@@ -85,7 +85,11 @@ func (c *client) callIMDS(ctx context.Context, url string, queryParameters map[s
 		return fmt.Errorf("failed to do HTTP request to IMDS: %w", err)
 	}
 	if resp != nil && resp.Body != nil {
-		defer resp.Body.Close()
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				log.MustGetLogger(ctx).Error("error closing IMDS response body", zap.Error(err))
+			}
+		}()
 	}
 
 	body, err := io.ReadAll(resp.Body)
