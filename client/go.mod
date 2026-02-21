@@ -1,6 +1,6 @@
 module github.com/Azure/aks-secure-tls-bootstrap/client
 
-go 1.24.0
+go 1.24.12
 
 require (
 	github.com/Azure/aks-secure-tls-bootstrap/service v1.0.2
