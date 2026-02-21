@@ -42,6 +42,7 @@ func init() {
 	flag.StringVar(&config.KubeconfigPath, "kubeconfig", "", "path to the kubeconfig - if this file does not exist, the generated kubeconfig will be placed there - this should be the same as the --kubeconfig passed to the kubelet")
 	flag.StringVar(&config.ClusterCAFilePath, "cluster-ca-file", "", "path to the cluster CA file")
 	flag.StringVar(&config.CertDir, "cert-dir", "", "the directory where kubelet's new client certificate/key pair will be stored - this should be the same as the --cert-dir passed to the kubelet")
+	flag.StringVar(&config.TLSMinVersion, "tls-min-version", "", "the minimum TLS version used to communicate with control plane")
 	flag.BoolVar(&config.InsecureSkipTLSVerify, "insecure-skip-tls-verify", false, "skip TLS verification when connecting to the control plane")
 	flag.BoolVar(&config.EnsureAuthorizedClient, "ensure-authorized", false, "ensure the specified kubeconfig contains an authorized clientset before bootstrapping")
 	flag.DurationVar(&config.Deadline, "deadline", 0, "the deadline within which bootstrapping must succeed")
