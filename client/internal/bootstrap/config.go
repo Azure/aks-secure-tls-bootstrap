@@ -22,6 +22,7 @@ type Config struct {
 	ClusterCAFilePath       string        `json:"clusterCaFilePath"`
 	KubeconfigPath          string        `json:"kubeconfigPath"`
 	CertDir                 string        `json:"credFilePath"`
+	TLSMinVersion           string        `json:"tlsMinVersion"`
 	InsecureSkipTLSVerify   bool          `json:"insecureSkipTlsVerify"`
 	EnsureAuthorizedClient  bool          `json:"ensureAuthorizedClient"`
 	Deadline                time.Duration `json:"deadline"`
@@ -64,6 +65,9 @@ func (c *Config) validate() error {
 	}
 	if c.CertDir == "" {
 		return fmt.Errorf("cert dir must be specified")
+	}
+	if c.TLSMinVersion != "" && c.TLSMinVersion != "1.2" && c.TLSMinVersion != "1.3" {
+		return fmt.Errorf(`when specified, TLS min version can either be "1.2" or "1.3"`)
 	}
 
 	if c.CloudProviderConfigPath == "" {
