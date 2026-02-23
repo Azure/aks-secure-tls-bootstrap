@@ -4,6 +4,7 @@
 package bootstrap
 
 import (
+	"crypto/tls"
 	"crypto/x509"
 	"errors"
 	"fmt"
@@ -155,12 +156,43 @@ func TestGetTLSConfig(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			config, err := getTLSConfig(clusterCACertPEM, c.nextProto, c.insecureSkipVerify)
+			config, err := getTLSConfig(clusterCACertPEM, c.nextProto, c.insecureSkipVerify, tls.VersionTLS13)
 			assert.NoError(t, err)
 			assert.NotNil(t, config)
 			assert.Equal(t, c.expectedNextProtos, config.NextProtos)
 			assert.Equal(t, c.insecureSkipVerify, config.InsecureSkipVerify)
+			assert.Equal(t, uint16(tls.VersionTLS13), config.MinVersion)
 			assert.True(t, config.RootCAs.Equal(rootPool))
+		})
+	}
+}
+
+func TestGetTLSMinVersion(t *testing.T) {
+	cases := []struct {
+		name     string
+		cfg      *Config
+		expected uint16
+	}{
+		{
+			name:     "TLSv1.3 is specified",
+			cfg:      &Config{TLSMinVersion: "1.3"},
+			expected: tls.VersionTLS13,
+		},
+		{
+			name:     "TLSv1.2 is specified",
+			cfg:      &Config{TLSMinVersion: "1.2"},
+			expected: tls.VersionTLS12,
+		},
+		{
+			name:     "no minimum TLS version is specified",
+			cfg:      &Config{},
+			expected: tls.VersionTLS13,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			assert.Equal(t, c.expected, getTLSMinVersion(c.cfg))
 		})
 	}
 }

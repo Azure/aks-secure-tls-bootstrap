@@ -125,6 +125,13 @@ func TestConfigDefaultAndValidate(t *testing.T) {
 			expectedErr: errors.New("specified cluster CA file does not exist"),
 		},
 		{
+			name: "TLS min version is invalid",
+			setupConfig: func(t *testing.T, c *Config) {
+				c.TLSMinVersion = "1.1"
+			},
+			expectedErr: errors.New(`when specified, TLS min version can either be "1.2" or "1.3"`),
+		},
+		{
 			name: "ok",
 			setupConfig: func(t *testing.T, c *Config) {
 				tempDir := t.TempDir()
@@ -169,6 +176,7 @@ func TestConfigDefaultAndValidate(t *testing.T) {
 				ClusterCAFilePath:       "path",
 				KubeconfigPath:          "path",
 				CertDir:                 "path",
+				TLSMinVersion:           "1.3",
 			}
 			c.setupConfig(t, config)
 
