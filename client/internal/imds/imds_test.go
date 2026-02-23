@@ -183,6 +183,7 @@ func mockIMDSWithAssertions(t *testing.T, response string, assertions func(r *ht
 		assert.True(t, strings.HasPrefix(r.Header.Get("User-Agent"), "aks-secure-tls-bootstrap-client/"))
 		assertions(r)
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintln(w, response)
+		_, err := fmt.Fprintln(w, response)
+		assert.NoError(t, err)
 	}))
 }
