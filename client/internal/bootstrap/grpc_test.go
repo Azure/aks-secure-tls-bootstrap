@@ -70,7 +70,9 @@ func TestGetServiceClient(t *testing.T) {
 			name: "client connection can be created with provided auth token",
 			setupFunc: func(t *testing.T) *Config {
 				lis := bufconn.Listen(1024)
-				defer lis.Close()
+				defer func() {
+					assert.NoError(t, lis.Close())
+				}()
 				tempDir := t.TempDir()
 				caFilePath := filepath.Join(tempDir, "ca.crt")
 				err := os.WriteFile(caFilePath, clusterCACertPEM, os.ModePerm)

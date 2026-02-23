@@ -48,7 +48,7 @@ func init() {
 	flag.DurationVar(&config.Deadline, "deadline", 0, "the deadline within which bootstrapping must succeed")
 
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage of %s - %s:\n", os.Args[0], build.GetVersion())
+		_, _ = fmt.Fprintf(os.Stderr, "Usage of %s - %s:\n", os.Args[0], build.GetVersion())
 		flag.PrintDefaults()
 	}
 
@@ -104,7 +104,7 @@ func run(ctx context.Context) int {
 	}
 	logger.Info("failed to validate existing kubeconfig, will bootstrap a new kubelet client credential", zap.String("kubeconfig", kubeconfigPath), zap.Error(err))
 
-	err, errLog, traces := bootstrap.Bootstrap(bootstrapCtx, config)
+	errLog, traces, err := bootstrap.Bootstrap(bootstrapCtx, config)
 	endTime = time.Now()
 	result.Errors = errLog
 	result.Traces = traces.GetLastNTraces(5) // only keep the last 5 traces to avoid truncating guest agent event data
