@@ -13,19 +13,22 @@ import (
 )
 
 type Config struct {
-	CloudProviderConfig     *cloud.ProviderConfig
-	CloudProviderConfigPath string        `json:"cloudProviderConfigPath"`
-	APIServerFQDN           string        `json:"apiServerFqdn"`
-	UserAssignedIdentityID  string        `json:"userAssignedIdentityId"`
-	NextProto               string        `json:"nextProto"`
-	AADResource             string        `json:"aadResource"`
-	ClusterCAFilePath       string        `json:"clusterCaFilePath"`
-	KubeconfigPath          string        `json:"kubeconfigPath"`
-	CertDir                 string        `json:"credFilePath"`
-	TLSMinVersion           string        `json:"tlsMinVersion"`
-	InsecureSkipTLSVerify   bool          `json:"insecureSkipTlsVerify"`
-	EnsureAuthorizedClient  bool          `json:"ensureAuthorizedClient"`
-	Deadline                time.Duration `json:"deadline"`
+	CloudProviderConfig        *cloud.ProviderConfig
+	CloudProviderConfigPath    string        `json:"cloudProviderConfigPath"`
+	APIServerFQDN              string        `json:"apiServerFqdn"`
+	UserAssignedIdentityID     string        `json:"userAssignedIdentityId"`
+	NextProto                  string        `json:"nextProto"`
+	AADResource                string        `json:"aadResource"`
+	ClusterCAFilePath          string        `json:"clusterCaFilePath"`
+	KubeconfigPath             string        `json:"kubeconfigPath"`
+	CertDir                    string        `json:"credFilePath"`
+	TLSMinVersion              string        `json:"tlsMinVersion"`
+	InsecureSkipTLSVerify      bool          `json:"insecureSkipTlsVerify"`
+	EnsureAuthorizedClient     bool          `json:"ensureAuthorizedClient"`
+	Deadline                   time.Duration `json:"deadline"`
+	GetAccessTokenTimeout      time.Duration `json:"getAccessTokenTimeout"`
+	GetNonceTimeout            time.Duration `json:"getNonceTimeout"`
+	GetCredentialTimeout       time.Duration `json:"getCredentialTimeout"`
 }
 
 func (c *Config) LoadFromFile(path string) error {
@@ -47,6 +50,15 @@ func (c *Config) DefaultAndValidate() error {
 func (c *Config) applyDefaults() {
 	if c.Deadline == 0 {
 		c.Deadline = 2 * time.Minute
+	}
+	if c.GetAccessTokenTimeout == 0 {
+		c.GetAccessTokenTimeout = 30 * time.Second
+	}
+	if c.GetNonceTimeout == 0 {
+		c.GetNonceTimeout = 30 * time.Second
+	}
+	if c.GetCredentialTimeout == 0 {
+		c.GetCredentialTimeout = time.Minute
 	}
 }
 

@@ -34,7 +34,9 @@ func newClient(ctx context.Context) *client {
 func (c *client) bootstrap(ctx context.Context, config *Config) (clientcmdapi.Config, error) {
 	logger := log.MustGetLogger(ctx)
 
-	token, err := c.getAccessToken(ctx, config.UserAssignedIdentityID, config.AADResource, config.CloudProviderConfig)
+	accessTokenCtx, accessTokenCancel := context.WithTimeout(ctx, config.GetAccessTokenTimeout)
+	defer accessTokenCancel()
+	token, err := c.getAccessToken(accessTokenCtx, config.UserAssignedIdentityID, config.AADResource, config.CloudProviderConfig)
 	if err != nil {
 		logger.Error(err.Error())
 		return clientcmdapi.Config{}, err
@@ -68,7 +70,9 @@ func (c *client) bootstrap(ctx context.Context, config *Config) (clientcmdapi.Co
 	}
 	logger.Info("retrieved instance metadata from IMDS", zap.String("resourceId", instanceData.Compute.ResourceID))
 
-	nonce, err := c.getNonce(ctx, serviceClient, &v1.GetNonceRequest{
+	nonceCtx, nonceCancel := context.WithTimeout(ctx, config.GetNonceTimeout)
+	defer nonceCancel()
+	nonce, err := c.getNonce(nonceCtx, serviceClient, &v1.GetNonceRequest{
 		ResourceId: instanceData.Compute.ResourceID,
 	})
 	if err != nil {
@@ -103,7 +107,9 @@ func (c *client) bootstrap(ctx context.Context, config *Config) (clientcmdapi.Co
 	}
 	logger.Info("generated kubelet client CSR and associated private key")
 
-	certPEM, err := c.getCredential(ctx, serviceClient, &v1.GetCredentialRequest{
+	credentialCtx, credentialCancel := context.WithTimeout(ctx, config.GetCredentialTimeout)
+	defer credentialCancel()
+	certPEM, err := c.getCredential(credentialCtx, serviceClient, &v1.GetCredentialRequest{
 		ResourceId:    instanceData.Compute.ResourceID,
 		Nonce:         nonce,
 		AttestedData:  attestedData.Signature,

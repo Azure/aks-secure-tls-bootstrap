@@ -160,6 +160,9 @@ func TestConfigDefaultAndValidate(t *testing.T) {
 					CloudName:              azure.PublicCloud.Name,
 				}, c.CloudProviderConfig)
 				assert.Equal(t, 2*time.Minute, c.Deadline)
+				assert.Equal(t, 30*time.Second, c.GetAccessTokenTimeout)
+				assert.Equal(t, 30*time.Second, c.GetNonceTimeout)
+				assert.Equal(t, time.Minute, c.GetCredentialTimeout)
 			},
 			expectedErr: nil,
 		},

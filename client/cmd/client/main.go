@@ -46,6 +46,9 @@ func init() {
 	flag.BoolVar(&config.InsecureSkipTLSVerify, "insecure-skip-tls-verify", false, "skip TLS verification when connecting to the control plane")
 	flag.BoolVar(&config.EnsureAuthorizedClient, "ensure-authorized", false, "ensure the specified kubeconfig contains an authorized clientset before bootstrapping")
 	flag.DurationVar(&config.Deadline, "deadline", 0, "the deadline within which bootstrapping must succeed")
+	flag.DurationVar(&config.GetAccessTokenTimeout, "get-access-token-timeout", 0, "the timeout for retrieving an AAD access token")
+	flag.DurationVar(&config.GetNonceTimeout, "get-nonce-timeout", 0, "the timeout for retrieving a nonce from the bootstrap server")
+	flag.DurationVar(&config.GetCredentialTimeout, "get-credential-timeout", 0, "the timeout for retrieving a credential from the bootstrap server")
 
 	flag.Usage = func() {
 		_, _ = fmt.Fprintf(os.Stderr, "Usage of %s - %s:\n", os.Args[0], build.GetVersion())
