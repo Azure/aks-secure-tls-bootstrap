@@ -25,10 +25,13 @@ type Config struct {
 	TLSMinVersion              string        `json:"tlsMinVersion"`
 	InsecureSkipTLSVerify      bool          `json:"insecureSkipTlsVerify"`
 	EnsureAuthorizedClient     bool          `json:"ensureAuthorizedClient"`
-	Deadline                   time.Duration `json:"deadline"`
-	GetAccessTokenTimeout      time.Duration `json:"getAccessTokenTimeout"`
-	GetNonceTimeout            time.Duration `json:"getNonceTimeout"`
-	GetCredentialTimeout       time.Duration `json:"getCredentialTimeout"`
+	Deadline                        time.Duration `json:"deadline"`
+	GetAccessTokenTimeout           time.Duration `json:"getAccessTokenTimeout"`
+	GetAccessTokenTotalTimeout      time.Duration `json:"getAccessTokenTotalTimeout"`
+	GetNonceTimeout                 time.Duration `json:"getNonceTimeout"`
+	GetNonceTotalTimeout            time.Duration `json:"getNonceTotalTimeout"`
+	GetCredentialTimeout            time.Duration `json:"getCredentialTimeout"`
+	GetCredentialTotalTimeout       time.Duration `json:"getCredentialTotalTimeout"`
 }
 
 func (c *Config) LoadFromFile(path string) error {

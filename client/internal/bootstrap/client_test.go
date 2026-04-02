@@ -215,7 +215,7 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 			}
 			c.setupMocks(config, imdsClient, serviceClient)
 
-			kubeconfigData, err := client.bootstrap(telemetry.WithTracing(log.NewTestContext()), config)
+			kubeconfigData, err := client.bootstrap(telemetry.WithTracing(log.NewTestContext()), config, nil)
 			if c.expectedError == nil {
 				assert.NoError(t, err)
 				if !c.skipKubeconfigValidation {

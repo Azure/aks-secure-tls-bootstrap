@@ -31,14 +31,31 @@ func newClient(ctx context.Context) *client {
 	}
 }
 
-func (c *client) bootstrap(ctx context.Context, config *Config) (clientcmdapi.Config, error) {
+func (c *client) bootstrap(ctx context.Context, config *Config, budgets *operationBudgets) (clientcmdapi.Config, error) {
 	logger := log.MustGetLogger(ctx)
 
-	accessTokenCtx, accessTokenCancel := context.WithTimeout(ctx, config.GetAccessTokenTimeout)
+	accessTokenParent := ctx
+	nonceParent := ctx
+	credentialParent := ctx
+	if budgets != nil {
+		accessTokenParent = budgets.accessToken
+		nonceParent = budgets.nonce
+		credentialParent = budgets.credential
+	}
+
+	accessTokenCtx, accessTokenCancel := context.WithTimeout(accessTokenParent, config.GetAccessTokenTimeout)
 	defer accessTokenCancel()
 	token, err := c.getAccessToken(accessTokenCtx, config.UserAssignedIdentityID, config.AADResource, config.CloudProviderConfig)
 	if err != nil {
 		logger.Error(err.Error())
+		if accessTokenParent.Err() != nil {
+			// Total budget for getAccessToken is exhausted; stop retrying.
+			return clientcmdapi.Config{}, &bootstrapError{
+				errorType: ErrorTypeGetAccessTokenFailure,
+				retryable: false,
+				inner:     err,
+			}
+		}
 		return clientcmdapi.Config{}, err
 	}
 	logger.Info("generated access token for gRPC client connection")
@@ -70,16 +87,17 @@ func (c *client) bootstrap(ctx context.Context, config *Config) (clientcmdapi.Co
 	}
 	logger.Info("retrieved instance metadata from IMDS", zap.String("resourceId", instanceData.Compute.ResourceID))
 
-	nonceCtx, nonceCancel := context.WithTimeout(ctx, config.GetNonceTimeout)
+	nonceCtx, nonceCancel := context.WithTimeout(nonceParent, config.GetNonceTimeout)
 	defer nonceCancel()
 	nonce, err := c.getNonce(nonceCtx, serviceClient, &v1.GetNonceRequest{
 		ResourceId: instanceData.Compute.ResourceID,
 	})
 	if err != nil {
 		logger.Error(err.Error())
+		retryable := nonceParent.Err() == nil
 		return clientcmdapi.Config{}, &bootstrapError{
 			errorType: ErrorTypeGetNonceFailure,
-			retryable: true,
+			retryable: retryable,
 			inner:     err,
 		}
 	}
@@ -107,7 +125,7 @@ func (c *client) bootstrap(ctx context.Context, config *Config) (clientcmdapi.Co
 	}
 	logger.Info("generated kubelet client CSR and associated private key")
 
-	credentialCtx, credentialCancel := context.WithTimeout(ctx, config.GetCredentialTimeout)
+	credentialCtx, credentialCancel := context.WithTimeout(credentialParent, config.GetCredentialTimeout)
 	defer credentialCancel()
 	certPEM, err := c.getCredential(credentialCtx, serviceClient, &v1.GetCredentialRequest{
 		ResourceId:    instanceData.Compute.ResourceID,
@@ -117,9 +135,10 @@ func (c *client) bootstrap(ctx context.Context, config *Config) (clientcmdapi.Co
 	})
 	if err != nil {
 		logger.Error(err.Error())
+		retryable := credentialParent.Err() == nil
 		return clientcmdapi.Config{}, &bootstrapError{
 			errorType: ErrorTypeGetCredentialFailure,
-			retryable: true,
+			retryable: retryable,
 			inner:     err,
 		}
 	}

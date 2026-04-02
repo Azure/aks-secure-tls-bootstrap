@@ -13,6 +13,24 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
+// operationBudgets holds per-operation total-time budgets that span all retry attempts.
+// Each context is derived from the overall deadline context before the retry loop starts,
+// so its deadline (if set) limits the combined time all retries of that operation may use.
+type operationBudgets struct {
+	accessToken context.Context
+	nonce       context.Context
+	credential  context.Context
+}
+
+// ctxWithOptionalTimeout returns a child context with a deadline of timeout from now.
+// If timeout is zero or negative, the parent context is returned unchanged with a no-op cancel.
+func ctxWithOptionalTimeout(parent context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
+	if timeout <= 0 {
+		return parent, func() {}
+	}
+	return context.WithTimeout(parent, timeout)
+}
+
 // Bootstrap performs the secure TLS bootstrapping wrapped in a retry loop.
 // The retry loop will continue indefinitely until the specified context is done, whether that be through a timeout or cancellation.
 // If all retries fail, the last error encountered will be returned in finalErr.
@@ -22,6 +40,19 @@ import (
 func Bootstrap(ctx context.Context, config *Config) (errLog ErrorLog, traces *telemetry.TraceStore, err error) {
 	client := newClient(ctx)
 
+	accessTokenBudgetCtx, accessTokenBudgetCancel := ctxWithOptionalTimeout(ctx, config.GetAccessTokenTotalTimeout)
+	defer accessTokenBudgetCancel()
+	nonceBudgetCtx, nonceBudgetCancel := ctxWithOptionalTimeout(ctx, config.GetNonceTotalTimeout)
+	defer nonceBudgetCancel()
+	credentialBudgetCtx, credentialBudgetCancel := ctxWithOptionalTimeout(ctx, config.GetCredentialTotalTimeout)
+	defer credentialBudgetCancel()
+
+	budgets := &operationBudgets{
+		accessToken: accessTokenBudgetCtx,
+		nonce:       nonceBudgetCtx,
+		credential:  credentialBudgetCtx,
+	}
+
 	errLog = make(ErrorLog)
 	traces = telemetry.NewTraceStore()
 	err = retry.Do(
@@ -29,7 +60,7 @@ func Bootstrap(ctx context.Context, config *Config) (errLog ErrorLog, traces *te
 			defer func() {
 				traces.Add(telemetry.GetTrace(ctx))
 			}()
-			kubeconfigData, err := client.bootstrap(ctx, config)
+			kubeconfigData, err := client.bootstrap(ctx, config, budgets)
 			if err != nil {
 				return err
 			}
