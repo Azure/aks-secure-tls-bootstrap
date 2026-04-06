@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/cloud"
 	"github.com/Azure/go-autorest/autorest/azure"
@@ -159,7 +158,6 @@ func TestConfigDefaultAndValidate(t *testing.T) {
 					UserAssignedIdentityID: "identityId",
 					CloudName:              azure.PublicCloud.Name,
 				}, c.CloudProviderConfig)
-				assert.Equal(t, 2*time.Minute, c.Deadline)
 			},
 			expectedErr: nil,
 		},

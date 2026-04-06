@@ -44,9 +44,11 @@ func init() {
 	flag.StringVar(&config.TLSMinVersion, "tls-min-version", "", "the minimum TLS version used to communicate with control plane")
 	flag.BoolVar(&config.InsecureSkipTLSVerify, "insecure-skip-tls-verify", false, "skip TLS verification when connecting to the control plane")
 	flag.BoolVar(&config.EnsureAuthorizedClient, "ensure-authorized", false, "ensure the specified kubeconfig contains an authorized clientset before bootstrapping")
-	flag.DurationVar(&config.Deadline, "deadline", 0, "the deadline within which bootstrapping must succeed")
-	flag.DurationVar(&config.GetAccessTokenTimeout, "get-access-token-timeout", 0, "timeout applied to get get access token operation")
-	flag.DurationVar(&config.GetNonceTimeout, "get-nonce-timeout", 0, "timeout applied to the get nonce operation")
+	flag.DurationVar(&config.GetAccessTokenTimeout, "get-access-token-timeout", 0, "timeout applied to the get access token RPC")
+	flag.DurationVar(&config.GetInstanceDataTimeout, "get-instance-data-timeout", 0, "timeout applied to the get instance data RPC")
+	flag.DurationVar(&config.GetNonceTimeout, "get-nonce-timeout", 0, "timeout applied to the get nonce RPC")
+	flag.DurationVar(&config.GetAttestedDataTimeout, "get-attested-data-timeout", 0, "timeout applied to the get attested data RPC")
+	flag.DurationVar(&config.GetCredentialTimeout, "get-credential-timeout", 0, "timeout applied to the get credential RPC")
 
 	flag.Usage = func() {
 		_, _ = fmt.Fprintf(os.Stderr, "Usage of %s - %s:\n", os.Args[0], build.GetVersion())
@@ -82,23 +84,20 @@ func run(ctx context.Context) int {
 	}
 	defer flush()
 
+	ctx = log.WithLogger(telemetry.WithTracing(ctx), logger)
+
 	var startTime, endTime time.Time
 	result := &bootstrap.Result{
 		Status: bootstrap.StatusSuccess,
 	}
 	defer func() {
+		result.Trace = telemetry.GetTrace(ctx)
 		emitGuestAgentEvent(logger, startTime, endTime, result)
 	}()
 
 	startTime = time.Now()
-	deadline := startTime.Add(config.Deadline)
-	bootstrapCtx, cancel := context.WithDeadline(log.WithLogger(telemetry.WithTracing(ctx), logger), deadline)
-	defer cancel()
-	logger.Info("set bootstrap deadline", zap.Time("deadline", deadline))
-
-	err = bootstrap.Bootstrap(bootstrapCtx, config)
+	err = bootstrap.Bootstrap(ctx, config)
 	endTime = time.Now()
-	result.Trace = telemetry.GetTrace(bootstrapCtx)
 
 	var exitCode int
 	if err != nil {
@@ -108,10 +107,8 @@ func run(ctx context.Context) int {
 			logger.Error("context was canceled before bootstrapping could complete")
 		case errors.Is(err, context.DeadlineExceeded):
 			logger.Error(
-				"failed to successfully bootstrap before the specified deadline",
+				"failed to bootstrap due to exceeding context deadline",
 				zap.Error(err),
-				zap.Time("deadline", deadline),
-				zap.Duration("deadlineDuration", config.Deadline),
 			)
 		default:
 			logger.Error("failed to bootstrap", zap.Error(err))
