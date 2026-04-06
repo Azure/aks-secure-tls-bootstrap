@@ -32,25 +32,21 @@ func TestBootstrapError(t *testing.T) {
 	cases := []struct {
 		name      string
 		err       error
-		retryable bool
 		errorType ErrorType
 	}{
 		{
 			name:      "get access token failure",
 			err:       errors.New("get access token error"),
-			retryable: true,
 			errorType: ErrorTypeGetAccessTokenFailure,
 		},
 		{
 			name:      "get instance data failure",
 			err:       errors.New("get instance data error"),
-			retryable: true,
 			errorType: ErrorTypeGetInstanceDataFailure,
 		},
 		{
 			name:      "get attested data failure",
 			err:       errors.New("get attested data error"),
-			retryable: true,
 			errorType: ErrorTypeGetAttestedDataFailure,
 		},
 		{
@@ -84,12 +80,9 @@ func TestBootstrapError(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			bootstrapErr := &bootstrapError{
 				errorType: c.errorType,
-				retryable: c.retryable,
 				inner:     c.err,
 			}
-
 			assert.EqualError(t, bootstrapErr, fmt.Sprintf("%s: %s", bootstrapErr.errorType, bootstrapErr.inner.Error()))
-			assert.Equal(t, bootstrapErr.retryable, c.retryable)
 		})
 	}
 }

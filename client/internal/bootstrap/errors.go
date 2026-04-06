@@ -20,11 +20,8 @@ const (
 	ErrorTypeGenerateKubeconfigFailure ErrorType = "GenerateKubeconfigFailure"
 )
 
-type ErrorLog map[ErrorType]int
-
 type bootstrapError struct {
 	errorType ErrorType
-	retryable bool
 	inner     error
 }
 

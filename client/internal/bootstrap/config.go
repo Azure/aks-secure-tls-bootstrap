@@ -26,6 +26,11 @@ type Config struct {
 	InsecureSkipTLSVerify   bool          `json:"insecureSkipTlsVerify"`
 	EnsureAuthorizedClient  bool          `json:"ensureAuthorizedClient"`
 	Deadline                time.Duration `json:"deadline"`
+	GetAccessTokenTimeout   time.Duration `json:"getAccessTokenTimeout"`
+	GetInstanceDataTimeout  time.Duration
+	GetAttestedDataTimeout  time.Duration
+	GetNonceTimeout         time.Duration `json:"getNonceTimeout"`
+	GetCredentialTimeout    time.Duration
 }
 
 func (c *Config) LoadFromFile(path string) error {
@@ -47,6 +52,12 @@ func (c *Config) DefaultAndValidate() error {
 func (c *Config) applyDefaults() {
 	if c.Deadline == 0 {
 		c.Deadline = 2 * time.Minute
+	}
+	if c.GetAccessTokenTimeout == 0 {
+		c.GetAccessTokenTimeout = 30 * time.Second
+	}
+	if c.GetNonceTimeout == 0 {
+		c.GetNonceTimeout = 5 * time.Second
 	}
 }
 

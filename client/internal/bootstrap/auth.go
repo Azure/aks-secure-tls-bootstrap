@@ -13,21 +13,26 @@ import (
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/cloud"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/imds"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/log"
-	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/telemetry"
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"go.uber.org/zap"
 )
 
 const (
+	// service principal secrets containing this prefix are PFX certificates which need to be decoded,
+	// rather than raw password / secret strings
 	certificateSecretPrefix = "certificate:"
 )
 
 const (
+	// this will be the exact value of the "userAssignedIdentityID" field of the cloud provider config (azure.json)
+	// when the node is using a (user-assigned) managed identity, rather than a service principal
 	clientIDForMSI = "msi"
 )
 
 const (
+	// to avoid falling too deep into exponential backoff implemented by adal, which follows the public retry guidance:
+	// https://learn.microsoft.com/en-us/entra/identity/managed-identities-azure-resources/how-to-use-vm-token#retry-guidance
 	maxMSIRefreshAttempts = 3
 )
 
@@ -36,41 +41,36 @@ type extractAccessTokenFunc func(token *adal.ServicePrincipalToken, isMSI bool) 
 
 func extractAccessToken(token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
 	if err := token.Refresh(); err != nil {
-		return "", tokenRefreshErrorToGetAccessTokenFailure(err, isMSI)
+		return "", err
 	}
 	return token.OAuthToken(), nil
 }
 
-func (c *client) getAccessToken(ctx context.Context, userAssignedIdentityID, resource string, cloudProviderConfig *cloud.ProviderConfig) (string, error) {
-	endSpan := telemetry.StartSpan(ctx, "GetAccessToken")
-	defer endSpan()
-
+func (c *client) getToken(ctx context.Context, config *Config) (string, error) {
 	logger := log.MustGetLogger(ctx)
 
-	userAssignedID := cloudProviderConfig.UserAssignedIdentityID
-	if userAssignedIdentityID != "" {
-		userAssignedID = userAssignedIdentityID
+	userAssignedID := config.CloudProviderConfig.UserAssignedIdentityID
+	if config.UserAssignedIdentityID != "" {
+		userAssignedID = userAssignedID
 	}
 
 	if userAssignedID != "" {
 		logger.Info("generating MSI access token", zap.String("clientId", userAssignedID))
-		msiToken, err := adal.NewServicePrincipalTokenFromManagedIdentity(resource, &adal.ManagedIdentityOptions{
+		msiToken, err := adal.NewServicePrincipalTokenFromManagedIdentity(config.AADResource, &adal.ManagedIdentityOptions{
 			ClientID: userAssignedID,
 		})
 		if err != nil {
-			return "", makeNonRetryableGetAccessTokenFailure(fmt.Errorf("generating MSI access token: %w", err))
+			return "", fmt.Errorf("generating MSI access token: %w", err)
 		}
-		// to avoid falling too deep into exponential backoff implemented by adal, which follows the public retry guidance:
-		// https://learn.microsoft.com/en-us/entra/identity/managed-identities-azure-resources/how-to-use-vm-token#retry-guidance
 		msiToken.MaxMSIRefreshAttempts = maxMSIRefreshAttempts
 		return c.extractAccessTokenFunc(msiToken, true)
 	}
 
-	if cloudProviderConfig.ClientID == clientIDForMSI {
-		return "", makeNonRetryableGetAccessTokenFailure(fmt.Errorf("client ID within cloud provider config indicates usage of a managed identity, though no user-assigned identity ID was provided"))
+	if config.CloudProviderConfig.ClientID == clientIDForMSI {
+		return "", fmt.Errorf("client ID within cloud provider config indicates usage of a managed identity, though no user-assigned identity ID was provided")
 	}
 
-	servicePrincipalToken, err := getServicePrincipalToken(ctx, resource, cloudProviderConfig)
+	servicePrincipalToken, err := getServicePrincipalToken(ctx, config.AADResource, config.CloudProviderConfig)
 	if err != nil {
 		return "", err
 	}
@@ -85,18 +85,18 @@ func getServicePrincipalToken(ctx context.Context, resource string, cloudProvide
 
 	env, err := azure.EnvironmentFromName(cloudProviderConfig.CloudName)
 	if err != nil {
-		return nil, makeNonRetryableGetAccessTokenFailure(fmt.Errorf("getting azure environment config for cloud %q: %w", cloudProviderConfig.CloudName, err))
+		return nil, fmt.Errorf("getting azure environment config for cloud %q: %w", cloudProviderConfig.CloudName, err)
 	}
 	oauthConfig, err := adal.NewOAuthConfig(env.ActiveDirectoryEndpoint, cloudProviderConfig.TenantID)
 	if err != nil {
-		return nil, makeNonRetryableGetAccessTokenFailure(fmt.Errorf("creating oauth config with azure environment: %w", err))
+		return nil, fmt.Errorf("creating oauth config with azure environment: %w", err)
 	}
 
 	if !strings.HasPrefix(secret, certificateSecretPrefix) {
 		logger.Info("generating service principal access token with client secret", zap.String("clientId", cloudProviderConfig.ClientID))
 		token, err := adal.NewServicePrincipalToken(*oauthConfig, cloudProviderConfig.ClientID, secret, resource)
 		if err != nil {
-			return nil, makeNonRetryableGetAccessTokenFailure(fmt.Errorf("generating service principal access token with client secret: %w", err))
+			return nil, fmt.Errorf("generating service principal access token with client secret: %w", err)
 		}
 		return token, nil
 	}
@@ -105,17 +105,17 @@ func getServicePrincipalToken(ctx context.Context, resource string, cloudProvide
 
 	certData, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(secret, certificateSecretPrefix))
 	if err != nil {
-		return nil, makeNonRetryableGetAccessTokenFailure(fmt.Errorf("b64-decoding certificate data in client secret: %w", err))
+		return nil, fmt.Errorf("b64-decoding certificate data in client secret: %w", err)
 	}
 	certificate, privateKey, err := adal.DecodePfxCertificateData(certData, "")
 	if err != nil {
-		return nil, makeNonRetryableGetAccessTokenFailure(fmt.Errorf("decoding pfx certificate data in client secret: %w", err))
+		return nil, fmt.Errorf("decoding pfx certificate data in client secret: %w", err)
 	}
 
 	logger.Info("generating service principal access token with certificate", zap.String("clientId", cloudProviderConfig.ClientID))
 	token, err := adal.NewServicePrincipalTokenFromCertificate(*oauthConfig, cloudProviderConfig.ClientID, certificate, privateKey, resource)
 	if err != nil {
-		return nil, makeNonRetryableGetAccessTokenFailure(fmt.Errorf("generating service principal access token with certificate: %w", err))
+		return nil, fmt.Errorf("generating service principal access token with certificate: %w", err)
 	}
 
 	return token, nil
@@ -128,43 +128,37 @@ func maybeB64Decode(str string) string {
 	return str
 }
 
-func makeNonRetryableGetAccessTokenFailure(err error) error {
+func toGetAccessTokenFailure(err error) error {
 	return &bootstrapError{
 		errorType: ErrorTypeGetAccessTokenFailure,
-		retryable: false,
 		inner:     err,
 	}
 }
 
-func tokenRefreshErrorToGetAccessTokenFailure(err error, isMSI bool) error {
-	bootstrapErr := &bootstrapError{
-		errorType: ErrorTypeGetAccessTokenFailure,
-		retryable: true, // optimistically consider the error retryable from the start
-		inner:     fmt.Errorf("obtaining fresh access token: %w", err),
-	}
-
+func canRetryGetAccessToken(err error, isMSI bool) bool {
 	rerr, ok := err.(adal.TokenRefreshError)
 	if !ok {
-		return bootstrapErr
+		return false
 	}
+	return isRetryableTokenRefreshError(rerr, isMSI)
+}
 
+func isRetryableTokenRefreshError(rerr adal.TokenRefreshError, isMSI bool) bool {
 	resp := rerr.Response()
 	if resp == nil {
-		return bootstrapErr
+		return true
 	}
-
 	if !isMSI {
-		bootstrapErr.retryable = resp.StatusCode >= http.StatusInternalServerError
-		return bootstrapErr
+		return resp.StatusCode >= http.StatusInternalServerError
 	}
-
 	if resp.StatusCode != http.StatusBadRequest {
-		bootstrapErr.retryable = imds.IsRetryableHTTPStatusCode(resp.StatusCode)
-		return bootstrapErr
+		return imds.IsRetryableHTTPStatusCode(resp.StatusCode)
 	}
-
 	// 400s aren't normally retryable, though identity assignment can sometimes take a bit of time to propagate to IMDS,
 	// so we treat "Identity not found" errors as retryable
-	bootstrapErr.retryable = strings.Contains(strings.ToLower(err.Error()), "identity not found")
-	return bootstrapErr
+	return strings.Contains(strings.ToLower(rerr.Error()), "identity not found")
+}
+
+func isMSI(config *Config) bool {
+	return config.CloudProviderConfig.UserAssignedIdentityID != "" || config.UserAssignedIdentityID != ""
 }

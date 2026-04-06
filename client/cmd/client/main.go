@@ -15,7 +15,6 @@ import (
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/bootstrap"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/build"
-	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/kubeconfig"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/log"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/telemetry"
 	"go.uber.org/zap"
@@ -46,6 +45,8 @@ func init() {
 	flag.BoolVar(&config.InsecureSkipTLSVerify, "insecure-skip-tls-verify", false, "skip TLS verification when connecting to the control plane")
 	flag.BoolVar(&config.EnsureAuthorizedClient, "ensure-authorized", false, "ensure the specified kubeconfig contains an authorized clientset before bootstrapping")
 	flag.DurationVar(&config.Deadline, "deadline", 0, "the deadline within which bootstrapping must succeed")
+	flag.DurationVar(&config.GetAccessTokenTimeout, "get-access-token-timeout", 0, "timeout applied to get get access token operation")
+	flag.DurationVar(&config.GetNonceTimeout, "get-nonce-timeout", 0, "timeout applied to the get nonce operation")
 
 	flag.Usage = func() {
 		_, _ = fmt.Fprintf(os.Stderr, "Usage of %s - %s:\n", os.Args[0], build.GetVersion())
@@ -81,43 +82,31 @@ func run(ctx context.Context) int {
 	}
 	defer flush()
 
-	ctx = log.WithLogger(telemetry.WithTracing(ctx), logger)
-
-	var endTime time.Time
+	var startTime, endTime time.Time
 	result := &bootstrap.Result{
 		Status: bootstrap.StatusSuccess,
 	}
+	defer func() {
+		emitGuestAgentEvent(logger, startTime, endTime, result)
+	}()
 
-	startTime := time.Now()
+	startTime = time.Now()
 	deadline := startTime.Add(config.Deadline)
-	bootstrapCtx, cancel := context.WithDeadline(ctx, deadline)
+	bootstrapCtx, cancel := context.WithDeadline(log.WithLogger(telemetry.WithTracing(ctx), logger), deadline)
 	defer cancel()
 	logger.Info("set bootstrap deadline", zap.Time("deadline", deadline))
 
-	kubeconfigPath := config.KubeconfigPath
-	err = kubeconfig.NewValidator().Validate(bootstrapCtx, kubeconfigPath, config.EnsureAuthorizedClient)
-	if err == nil {
-		logger.Info("existing kubeconfig is valid, will not bootstrap a new kubelet client credential", zap.String("kubeconfig", kubeconfigPath))
-		endTime = time.Now()
-		emitGuestAgentEvent(logger, startTime, endTime, result)
-		return 0
-	}
-	logger.Info("failed to validate existing kubeconfig, will bootstrap a new kubelet client credential", zap.String("kubeconfig", kubeconfigPath), zap.Error(err))
-
-	errLog, traces, err := bootstrap.Bootstrap(bootstrapCtx, config)
+	err = bootstrap.Bootstrap(bootstrapCtx, config)
 	endTime = time.Now()
-	result.Errors = errLog
-	result.Traces = traces.GetLastNTraces(5) // only keep the last 5 traces to avoid truncating guest agent event data
-	result.TraceSummary = traces.GetTraceSummary()
+	result.Trace = telemetry.GetTrace(bootstrapCtx)
 
 	var exitCode int
 	if err != nil {
 		result.Status = bootstrap.StatusFailure
 		switch {
 		case errors.Is(err, context.Canceled):
-			logger.Error("context was cancelled before bootstrapping could complete")
+			logger.Error("context was canceled before bootstrapping could complete")
 		case errors.Is(err, context.DeadlineExceeded):
-			err = errors.Unwrap(err)
 			logger.Error(
 				"failed to successfully bootstrap before the specified deadline",
 				zap.Error(err),
@@ -131,13 +120,11 @@ func run(ctx context.Context) int {
 		exitCode = 1
 	}
 
-	emitGuestAgentEvent(logger, startTime, endTime, result)
 	return exitCode
 }
 
 func emitGuestAgentEvent(logger *zap.Logger, startTime, endTime time.Time, result *bootstrap.Result) {
 	result.ElapsedMilliseconds = endTime.Sub(startTime).Milliseconds()
-
 	bootstrapEvent := &bootstrap.Event{
 		Start: startTime,
 		End:   endTime,
