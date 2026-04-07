@@ -8,7 +8,9 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/cloud"
 	"github.com/Azure/go-autorest/autorest/azure"
@@ -158,6 +160,15 @@ func TestConfigDefaultAndValidate(t *testing.T) {
 					UserAssignedIdentityID: "identityId",
 					CloudName:              azure.PublicCloud.Name,
 				}, c.CloudProviderConfig)
+				assert.True(t, strings.HasSuffix(c.ClusterCAFilePath, "ca.crt"))
+				assert.True(t, strings.HasSuffix(c.CloudProviderConfigPath, "azure.json"))
+				assert.Equal(t, "1.3", c.TLSMinVersion)
+				assert.Equal(t, 30*time.Second, c.ValidateKubeconfigTimeout)
+				assert.Equal(t, 30*time.Second, c.GetAccessTokenTimeout)
+				assert.Equal(t, 5*time.Second, c.GetInstanceDataTimeout)
+				assert.Equal(t, 5*time.Second, c.GetNonceTimeout)
+				assert.Equal(t, 5*time.Second, c.GetAttestedDataTimeout)
+				assert.Equal(t, 6*time.Minute, c.GetCredentialTimeout)
 			},
 			expectedErr: nil,
 		},

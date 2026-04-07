@@ -23,11 +23,11 @@ import (
 func makeKubeletClientCSR(ctx context.Context) (csrPEM, keyPEM []byte, err error) {
 	logger := log.MustGetLogger(ctx)
 
-	hostName, err := getHostname()
+	hostname, err := getHostname()
 	if err != nil {
 		return nil, nil, fmt.Errorf("resolving hostname: %w", err)
 	}
-	logger.Info("resolved hostname", zap.String("hostname", hostName))
+	logger.Info("resolved hostname", zap.String("hostname", hostname))
 
 	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), cryptorand.Reader)
 	if err != nil {
@@ -37,7 +37,7 @@ func makeKubeletClientCSR(ctx context.Context) (csrPEM, keyPEM []byte, err error
 	template := x509.CertificateRequest{
 		Subject: pkix.Name{
 			Organization: []string{"system:nodes"},
-			CommonName:   fmt.Sprintf("system:node:%s", hostName),
+			CommonName:   fmt.Sprintf("system:node:%s", hostname),
 		},
 		SignatureAlgorithm: x509.ECDSAWithSHA256,
 	}
@@ -66,17 +66,17 @@ func makeKubeletClientCSR(ctx context.Context) (csrPEM, keyPEM []byte, err error
 
 // Returns the canonicalized (trimmed and lowercased) hostname of the VM.
 func getHostname() (string, error) {
-	hostName, err := os.Hostname()
+	hostname, err := os.Hostname()
 	if err != nil {
 		return "", fmt.Errorf("resolving hostname: %w", err)
 	}
 
 	// Trim whitespaces first to avoid getting an empty hostname
 	// For linux, the hostname is read from file /proc/sys/kernel/hostname directly
-	hostName = strings.TrimSpace(hostName)
-	if len(hostName) == 0 {
+	hostname = strings.TrimSpace(hostname)
+	if len(hostname) == 0 {
 		return "", fmt.Errorf("empty hostname is invalid")
 	}
 
-	return strings.ToLower(hostName), nil
+	return strings.ToLower(hostname), nil
 }

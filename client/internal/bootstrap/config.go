@@ -70,13 +70,13 @@ func (c *Config) applyDefaults() {
 		c.GetAccessTokenTimeout = 30 * time.Second
 	}
 	if c.GetInstanceDataTimeout == 0 {
-		c.GetInstanceDataTimeout = 2 * time.Second
+		c.GetInstanceDataTimeout = 5 * time.Second
 	}
 	if c.GetNonceTimeout == 0 {
 		c.GetNonceTimeout = 5 * time.Second
 	}
 	if c.GetAttestedDataTimeout == 0 {
-		c.GetAttestedDataTimeout = 2 * time.Second
+		c.GetAttestedDataTimeout = 5 * time.Second
 	}
 	if c.GetCredentialTimeout == 0 {
 		c.GetCredentialTimeout = 6 * time.Minute
@@ -99,7 +99,7 @@ func (c *Config) validate() error {
 	if c.CertDir == "" {
 		return fmt.Errorf("cert dir must be specified")
 	}
-	if c.TLSMinVersion != "" && c.TLSMinVersion != "1.2" && c.TLSMinVersion != "1.3" {
+	if c.TLSMinVersion != "1.2" && c.TLSMinVersion != "1.3" {
 		return fmt.Errorf(`when specified, TLS min version can either be "1.2" or "1.3"`)
 	}
 

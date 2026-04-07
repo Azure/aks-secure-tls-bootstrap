@@ -44,6 +44,7 @@ func init() {
 	flag.StringVar(&config.TLSMinVersion, "tls-min-version", "", "the minimum TLS version used to communicate with control plane")
 	flag.BoolVar(&config.InsecureSkipTLSVerify, "insecure-skip-tls-verify", false, "skip TLS verification when connecting to the control plane")
 	flag.BoolVar(&config.EnsureAuthorizedClient, "ensure-authorized", false, "ensure the specified kubeconfig contains an authorized clientset before bootstrapping")
+	flag.DurationVar(&config.ValidateKubeconfigTimeout, "validate-kubeconfig-timeout", 0, "timeout applied to existing kubeconfig validation")
 	flag.DurationVar(&config.GetAccessTokenTimeout, "get-access-token-timeout", 0, "timeout applied to the get access token RPC")
 	flag.DurationVar(&config.GetInstanceDataTimeout, "get-instance-data-timeout", 0, "timeout applied to the get instance data RPC")
 	flag.DurationVar(&config.GetNonceTimeout, "get-nonce-timeout", 0, "timeout applied to the get nonce RPC")
