@@ -161,6 +161,7 @@ func (c *client) getAccessToken(ctx context.Context, config *Config) (string, er
 			return canRetryGetAccessToken(err, isMSI(config))
 		}),
 		retry.Context(getAccessTokenCtx),
+		retry.WrapContextErrorWithLastError(true),
 		retry.DelayType(retry.CombineDelay(retry.BackOffDelay, retry.RandomDelay)),
 		retry.Delay(500*time.Millisecond),
 		retry.MaxDelay(2*time.Second+500*time.Millisecond),

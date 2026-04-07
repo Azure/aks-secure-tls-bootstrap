@@ -10,6 +10,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
@@ -36,6 +37,7 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 	cases := []struct {
 		name                     string
 		setupMocks               func(config *Config, kubeconfigValidator *kubeconfigmocks.MockValidator, imdsClient *imdsmocks.MockClient, serviceClient *v1mocks.MockSecureTLSBootstrapServiceClient)
+		extractAccessTokenFunc   func(token *adal.ServicePrincipalToken, isMSI bool) (string, error)
 		skipKubeconfigValidation bool
 		expectedError            *bootstrapError
 	}{
@@ -60,6 +62,25 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 			expectedError: &bootstrapError{
 				errorType: ErrorTypeGetAccessTokenFailure,
 				inner:     fmt.Errorf("generating service principal access token with client secret"),
+			},
+		},
+		{
+			name: "timeout while retrieving access token",
+			setupMocks: func(config *Config, kubeconfigValidator *kubeconfigmocks.MockValidator, imdsClient *imdsmocks.MockClient, serviceClient *v1mocks.MockSecureTLSBootstrapServiceClient) {
+				config.KubeconfigPath = "path/to/kubeconfig"
+				config.EnsureAuthorizedClient = true
+				kubeconfigValidator.EXPECT().Validate(gomock.Any(), "path/to/kubeconfig", true).Return(errors.New("kubeconfig is invalid")).Times(1)
+			},
+			extractAccessTokenFunc: func(token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
+				time.Sleep(2 * time.Second)
+				return "", &fakeTokenRefreshError{
+					resp: &http.Response{StatusCode: http.StatusInternalServerError},
+					err:  errors.New("server error"),
+				}
+			},
+			expectedError: &bootstrapError{
+				errorType: ErrorTypeGetAccessTokenFailure,
+				inner:     fmt.Errorf("context deadline exceeded"),
 			},
 		},
 		{
@@ -242,25 +263,28 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 					ClientSecret: "service-principal-secret",
 					TenantID:     "tenantId",
 				},
-				GetAccessTokenTimeout:  time.Second,
-				GetInstanceDataTimeout: time.Second,
-				GetNonceTimeout:        time.Second,
-				GetAttestedDataTimeout: time.Second,
-				GetCredentialTimeout:   time.Second,
+				GetAccessTokenTimeout:  500 * time.Millisecond,
+				GetInstanceDataTimeout: 0 * time.Millisecond,
+				GetNonceTimeout:        0 * time.Millisecond,
+				GetAttestedDataTimeout: 0 * time.Millisecond,
+				GetCredentialTimeout:   0 * time.Millisecond,
 			}
 			c.setupMocks(config, kubeconfigValidator, imdsClient, serviceClient)
 
 			client := &client{
-				kubeconfigValidator: kubeconfigValidator,
-				imdsClient:          imdsClient,
+				kubeconfigValidator:    kubeconfigValidator,
+				imdsClient:             imdsClient,
+				extractAccessTokenFunc: c.extractAccessTokenFunc,
 				getServiceClientFunc: func(_ string, _ *Config) (v1.SecureTLSBootstrapServiceClient, closeFunc, error) {
 					return serviceClient, func() error { return nil }, nil
 				},
-				extractAccessTokenFunc: func(token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
+			}
+			if client.extractAccessTokenFunc == nil {
+				client.extractAccessTokenFunc = func(token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
 					assert.NotNil(t, token)
 					assert.False(t, isMSI)
 					return "token", nil
-				},
+				}
 			}
 
 			kubeconfigData, err := client.bootstrap(telemetry.WithTracing(log.NewTestContext()), config)
