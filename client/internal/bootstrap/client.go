@@ -35,20 +35,20 @@ func newClient(ctx context.Context) *client {
 	}
 }
 
-func (c *client) bootstrap(ctx context.Context, config *Config) (clientcmdapi.Config, error) {
+func (c *client) bootstrap(ctx context.Context, config *Config) (*clientcmdapi.Config, error) {
 	logger := log.MustGetLogger(ctx)
 
 	err := c.kubeconfigValidator.Validate(ctx, config.KubeconfigPath, config.EnsureAuthorizedClient)
 	if err == nil {
 		logger.Info("existing kubeconfig is valid, nothing to bootstrap", zap.String("kubeconfig", config.KubeconfigPath))
-		return clientcmdapi.Config{}, nil
+		return nil, nil
 	}
 	logger.Info("failed to validate existing kubeconfig, will bootstrap a new kubelet client credential", zap.String("kubeconfig", config.KubeconfigPath), zap.Error(err))
 
 	token, err := c.getAccessToken(ctx, config)
 	if err != nil {
 		logger.Error(err.Error())
-		return clientcmdapi.Config{}, &bootstrapError{
+		return nil, &bootstrapError{
 			errorType: ErrorTypeGetAccessTokenFailure,
 			inner:     err,
 		}
@@ -58,7 +58,7 @@ func (c *client) bootstrap(ctx context.Context, config *Config) (clientcmdapi.Co
 	serviceClient, closer, err := c.getServiceClient(ctx, token, config)
 	if err != nil {
 		logger.Error(err.Error())
-		return clientcmdapi.Config{}, &bootstrapError{
+		return nil, &bootstrapError{
 			errorType: ErrorTypeGetServiceClientFailure,
 			inner:     err,
 		}
@@ -73,7 +73,7 @@ func (c *client) bootstrap(ctx context.Context, config *Config) (clientcmdapi.Co
 	instanceData, err := c.getInstanceData(ctx, config)
 	if err != nil {
 		logger.Error(err.Error())
-		return clientcmdapi.Config{}, &bootstrapError{
+		return nil, &bootstrapError{
 			errorType: ErrorTypeGetInstanceDataFailure,
 			inner:     err,
 		}
@@ -85,7 +85,7 @@ func (c *client) bootstrap(ctx context.Context, config *Config) (clientcmdapi.Co
 	})
 	if err != nil {
 		logger.Error(err.Error())
-		return clientcmdapi.Config{}, &bootstrapError{
+		return nil, &bootstrapError{
 			errorType: ErrorTypeGetNonceFailure,
 			inner:     err,
 		}
@@ -95,7 +95,7 @@ func (c *client) bootstrap(ctx context.Context, config *Config) (clientcmdapi.Co
 	attestedData, err := c.getAttestedData(ctx, nonce, config)
 	if err != nil {
 		logger.Error(err.Error())
-		return clientcmdapi.Config{}, &bootstrapError{
+		return nil, &bootstrapError{
 			errorType: ErrorTypeGetAttestedDataFailure,
 			inner:     err,
 		}
@@ -105,7 +105,7 @@ func (c *client) bootstrap(ctx context.Context, config *Config) (clientcmdapi.Co
 	csrPEM, keyPEM, err := c.getCSR(ctx)
 	if err != nil {
 		logger.Error(err.Error())
-		return clientcmdapi.Config{}, &bootstrapError{
+		return nil, &bootstrapError{
 			errorType: ErrorTypeGetCSRFailure,
 			inner:     err,
 		}
@@ -120,7 +120,7 @@ func (c *client) bootstrap(ctx context.Context, config *Config) (clientcmdapi.Co
 	})
 	if err != nil {
 		logger.Error(err.Error())
-		return clientcmdapi.Config{}, &bootstrapError{
+		return nil, &bootstrapError{
 			errorType: ErrorTypeGetCredentialFailure,
 			inner:     err,
 		}
@@ -134,14 +134,14 @@ func (c *client) bootstrap(ctx context.Context, config *Config) (clientcmdapi.Co
 	})
 	if err != nil {
 		logger.Error(err.Error())
-		return clientcmdapi.Config{}, &bootstrapError{
+		return nil, &bootstrapError{
 			errorType: ErrorTypeGenerateKubeconfigFailure,
 			inner:     err,
 		}
 	}
 	logger.Info("successfully generated new kubeconfig data")
 
-	return kubeconfigData, nil
+	return &kubeconfigData, nil
 }
 
 func (c *client) getAccessToken(ctx context.Context, config *Config) (string, error) {

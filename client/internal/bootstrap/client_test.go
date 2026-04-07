@@ -290,11 +290,14 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 			kubeconfigData, err := client.bootstrap(telemetry.WithTracing(log.NewTestContext()), config)
 			if c.expectedError == nil {
 				assert.NoError(t, err)
-				if !c.skipKubeconfigValidation {
-					expectCorrectKubeconfigData(t, kubeconfigData, config)
+				if c.skipKubeconfigValidation {
+					assert.Nil(t, kubeconfigData)
+				} else {
+					assert.NotNil(t, kubeconfigData)
+					expectCorrectKubeconfigData(t, *kubeconfigData, config)
 				}
 			} else {
-				assert.Equal(t, clientcmdapi.Config{}, kubeconfigData)
+				assert.Nil(t, kubeconfigData)
 				assert.Error(t, err)
 				var bootstrapErr *bootstrapError
 				assert.Error(t, err)
