@@ -67,7 +67,7 @@ func (c *Config) applyDefaults() {
 		c.ValidateKubeconfigTimeout = 30 * time.Second
 	}
 	if c.GetAccessTokenTimeout == 0 {
-		c.GetAccessTokenTimeout = 30 * time.Second
+		c.GetAccessTokenTimeout = time.Minute
 	}
 	if c.GetInstanceDataTimeout == 0 {
 		c.GetInstanceDataTimeout = 5 * time.Second

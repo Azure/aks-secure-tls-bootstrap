@@ -164,7 +164,7 @@ func TestConfigDefaultAndValidate(t *testing.T) {
 				assert.True(t, strings.HasSuffix(c.CloudProviderConfigPath, "azure.json"))
 				assert.Equal(t, "1.3", c.TLSMinVersion)
 				assert.Equal(t, 30*time.Second, c.ValidateKubeconfigTimeout)
-				assert.Equal(t, 30*time.Second, c.GetAccessTokenTimeout)
+				assert.Equal(t, time.Minute, c.GetAccessTokenTimeout)
 				assert.Equal(t, 5*time.Second, c.GetInstanceDataTimeout)
 				assert.Equal(t, 5*time.Second, c.GetNonceTimeout)
 				assert.Equal(t, 5*time.Second, c.GetAttestedDataTimeout)
