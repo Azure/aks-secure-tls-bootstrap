@@ -21,7 +21,7 @@ type Config struct {
 	AADResource               string        `json:"aadResource"`
 	ClusterCAFilePath         string        `json:"clusterCaFilePath"`
 	KubeconfigPath            string        `json:"kubeconfigPath"`
-	CertDir                   string        `json:"credFilePath"`
+	CertDir                   string        `json:"certDir"`
 	TLSMinVersion             string        `json:"tlsMinVersion"`
 	InsecureSkipTLSVerify     bool          `json:"insecureSkipTlsVerify"`
 	EnsureAuthorizedClient    bool          `json:"ensureAuthorizedClient"`
