@@ -30,6 +30,10 @@ type Config struct {
 	GetNonceTimeout         time.Duration `json:"getNonceTimeout"`
 	GetAttestedDataTimeout  time.Duration `json:"getAttestedDataTimeout"`
 	GetCredentialTimeout    time.Duration `json:"getCredentialTimeout"`
+
+	// Deadline is now deprecated and will not be respected.
+	// Use per-RPC timeouts instead.
+	Deadline time.Duration `json:"deadline"`
 }
 
 func (c *Config) LoadFromFile(path string) error {

@@ -49,6 +49,7 @@ func init() {
 	flag.DurationVar(&config.GetNonceTimeout, "get-nonce-timeout", 0, "timeout applied to the get nonce RPC")
 	flag.DurationVar(&config.GetAttestedDataTimeout, "get-attested-data-timeout", 0, "timeout applied to the get attested data RPC")
 	flag.DurationVar(&config.GetCredentialTimeout, "get-credential-timeout", 0, "timeout applied to the get credential RPC")
+	flag.DurationVar(&config.Deadline, "deadline", 0, "the deadline within which bootstrapping must succeed - DEPRECATED, use RPC timeouts instead")
 
 	flag.Usage = func() {
 		_, _ = fmt.Fprintf(os.Stderr, "Usage of %s - %s:\n", os.Args[0], build.GetVersion())
