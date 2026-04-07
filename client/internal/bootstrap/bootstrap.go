@@ -15,5 +15,9 @@ func Bootstrap(ctx context.Context, config *Config) error {
 	if err != nil {
 		return err
 	}
-	return clientcmd.WriteToFile(kubeconfigData, config.KubeconfigPath)
+	if kubeconfigData == nil {
+		// kubeconfig was already valid, nothing to write
+		return nil
+	}
+	return clientcmd.WriteToFile(*kubeconfigData, config.KubeconfigPath)
 }
