@@ -51,7 +51,7 @@ func (c *client) getToken(ctx context.Context, config *Config) (string, error) {
 
 	userAssignedID := config.CloudProviderConfig.UserAssignedIdentityID
 	if config.UserAssignedIdentityID != "" {
-		userAssignedID = userAssignedID
+		userAssignedID = config.UserAssignedIdentityID
 	}
 
 	if userAssignedID != "" {
