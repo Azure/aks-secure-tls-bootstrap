@@ -7,14 +7,12 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"time"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/imds"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/kubeconfig"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/log"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/telemetry"
 	v1 "github.com/Azure/aks-secure-tls-bootstrap/service/pkg/gen/akssecuretlsbootstrap/v1"
-	"github.com/avast/retry-go/v4"
 	"go.uber.org/zap"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
@@ -150,23 +148,7 @@ func (c *client) getAccessToken(ctx context.Context, config *Config) (string, er
 	endSpan := telemetry.StartSpan(ctx, "GetAccessToken")
 	defer endSpan()
 
-	var token string
-	err := retry.Do(
-		func() error {
-			var err error
-			token, err = c.getToken(getAccessTokenCtx, config)
-			return err
-		},
-		retry.RetryIf(func(err error) bool {
-			return canRetryGetAccessToken(err, isMSI(config))
-		}),
-		retry.Context(getAccessTokenCtx),
-		retry.WrapContextErrorWithLastError(true),
-		retry.DelayType(retry.CombineDelay(retry.BackOffDelay, retry.RandomDelay)),
-		retry.Delay(500*time.Millisecond),
-		retry.MaxDelay(2*time.Second+500*time.Millisecond),
-		retry.Attempts(0), // retry indefinitely according to the context deadline
-	)
+	token, err := c.getToken(getAccessTokenCtx, config)
 	if err != nil {
 		return "", err
 	}

@@ -52,6 +52,12 @@ func (c *Config) DefaultAndValidate() error {
 	return c.validate()
 }
 
+// String returns the config's string representation in JSON format.
+func (c *Config) String() string {
+	jsonBytes, _ := json.Marshal(c)
+	return string(jsonBytes)
+}
+
 func (c *Config) applyDefaults() {
 	if c.TLSMinVersion == "" {
 		c.TLSMinVersion = "1.3"

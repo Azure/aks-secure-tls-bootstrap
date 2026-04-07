@@ -87,6 +87,8 @@ func run(ctx context.Context) int {
 
 	ctx = log.WithLogger(telemetry.WithTracing(ctx), logger)
 
+	logger.Info("running with config", zap.String("config", config.String()))
+
 	var startTime, endTime time.Time
 	result := &bootstrap.Result{
 		Status: bootstrap.StatusSuccess,

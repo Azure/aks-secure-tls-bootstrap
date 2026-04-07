@@ -7,11 +7,9 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"net/http"
 	"strings"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/cloud"
-	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/imds"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/log"
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure"
@@ -33,14 +31,14 @@ const (
 const (
 	// to avoid falling too deep into exponential backoff implemented by adal, which follows the public retry guidance:
 	// https://learn.microsoft.com/en-us/entra/identity/managed-identities-azure-resources/how-to-use-vm-token#retry-guidance
-	maxMSIRefreshAttempts = 3
+	maxMSIRefreshAttempts = 5
 )
 
 // extractAccessTokenFunc extracts an oauth access token from the specified service principal token after a refresh, fake implementations given in unit tests.
-type extractAccessTokenFunc func(token *adal.ServicePrincipalToken, isMSI bool) (string, error)
+type extractAccessTokenFunc func(ctx context.Context, token *adal.ServicePrincipalToken, isMSI bool) (string, error)
 
-func extractAccessToken(token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
-	if err := token.Refresh(); err != nil {
+func extractAccessToken(ctx context.Context, token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
+	if err := token.RefreshWithContext(ctx); err != nil {
 		return "", err
 	}
 	return token.OAuthToken(), nil
@@ -63,7 +61,7 @@ func (c *client) getToken(ctx context.Context, config *Config) (string, error) {
 			return "", fmt.Errorf("generating MSI access token: %w", err)
 		}
 		msiToken.MaxMSIRefreshAttempts = maxMSIRefreshAttempts
-		return c.extractAccessTokenFunc(msiToken, true)
+		return c.extractAccessTokenFunc(ctx, msiToken, true)
 	}
 
 	if config.CloudProviderConfig.ClientID == clientIDForMSI {
@@ -75,7 +73,7 @@ func (c *client) getToken(ctx context.Context, config *Config) (string, error) {
 		return "", err
 	}
 
-	return c.extractAccessTokenFunc(servicePrincipalToken, false)
+	return c.extractAccessTokenFunc(ctx, servicePrincipalToken, false)
 }
 
 func getServicePrincipalToken(ctx context.Context, resource string, cloudProviderConfig *cloud.ProviderConfig) (*adal.ServicePrincipalToken, error) {
@@ -126,32 +124,4 @@ func maybeB64Decode(str string) string {
 		return string(decoded)
 	}
 	return str
-}
-
-func canRetryGetAccessToken(err error, isMSI bool) bool {
-	rerr, ok := err.(adal.TokenRefreshError)
-	if !ok {
-		return false
-	}
-	return isRetryableTokenRefreshError(rerr, isMSI)
-}
-
-func isRetryableTokenRefreshError(rerr adal.TokenRefreshError, isMSI bool) bool {
-	resp := rerr.Response()
-	if resp == nil {
-		return true
-	}
-	if !isMSI {
-		return resp.StatusCode >= http.StatusInternalServerError
-	}
-	if resp.StatusCode != http.StatusBadRequest {
-		return imds.IsRetryableHTTPStatusCode(resp.StatusCode)
-	}
-	// 400s aren't normally retryable, though identity assignment can sometimes take a bit of time to propagate to IMDS,
-	// so we treat "Identity not found" errors as retryable
-	return strings.Contains(strings.ToLower(rerr.Error()), "identity not found")
-}
-
-func isMSI(config *Config) bool {
-	return config.CloudProviderConfig.UserAssignedIdentityID != "" || config.UserAssignedIdentityID != ""
 }

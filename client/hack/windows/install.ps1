@@ -17,7 +17,7 @@ param(
 
 Write-Host "Downloading aks-secure-tls-bootstrap-client version $Version from storage account $StorageAccountName"
 
-$downloadUrl = "https://$StorageAccountName.z22.web.core.windows.net/client/windows/amd64/$Version"
+$downloadUrl = "https://$StorageAccountName.z22.web.core.windows.net/client/windows/amd64/$Version.zip"
 $archivePath = "windows-amd64.zip"
 
 Write-Host "Downloading from: $downloadUrl"
