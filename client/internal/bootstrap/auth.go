@@ -128,13 +128,6 @@ func maybeB64Decode(str string) string {
 	return str
 }
 
-func toGetAccessTokenFailure(err error) error {
-	return &bootstrapError{
-		errorType: ErrorTypeGetAccessTokenFailure,
-		inner:     err,
-	}
-}
-
 func canRetryGetAccessToken(err error, isMSI bool) bool {
 	rerr, ok := err.(adal.TokenRefreshError)
 	if !ok {

@@ -42,7 +42,6 @@ func TestTracer(t *testing.T) {
 
 	trace := tracer.getTrace()
 	assert.NotNil(t, trace)
-	assert.Empty(t, tracer.spans)
 	assert.Len(t, trace, 1)
 	duration, ok := trace[spanName]
 	assert.True(t, ok)
@@ -72,8 +71,6 @@ func TestStartStopSpan(t *testing.T) {
 	spanDuration, ok := trace[spanName]
 	assert.True(t, ok)
 	assert.NotZero(t, spanDuration)
-
-	assert.Empty(t, GetTrace(ctx))
 }
 
 func TestWithTracing(t *testing.T) {

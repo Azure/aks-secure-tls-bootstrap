@@ -48,7 +48,10 @@ func (c *client) bootstrap(ctx context.Context, config *Config) (clientcmdapi.Co
 	token, err := c.getAccessToken(ctx, config)
 	if err != nil {
 		logger.Error(err.Error())
-		return clientcmdapi.Config{}, err
+		return clientcmdapi.Config{}, &bootstrapError{
+			errorType: ErrorTypeGetAccessTokenFailure,
+			inner:     err,
+		}
 	}
 	logger.Info("generated access token for gRPC client connection")
 

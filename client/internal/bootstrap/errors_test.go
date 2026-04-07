@@ -13,18 +13,18 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-type fakeRefreshError struct {
+type fakeTokenRefreshError struct {
 	resp *http.Response
 	err  error
 }
 
-var _ adal.TokenRefreshError = (*fakeRefreshError)(nil)
+var _ adal.TokenRefreshError = (*fakeTokenRefreshError)(nil)
 
-func (e *fakeRefreshError) Response() *http.Response {
+func (e *fakeTokenRefreshError) Response() *http.Response {
 	return e.resp
 }
 
-func (e *fakeRefreshError) Error() string {
+func (e *fakeTokenRefreshError) Error() string {
 	return e.err.Error()
 }
 
