@@ -4,6 +4,7 @@
 package bootstrap
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	cryptorand "crypto/rand"
@@ -13,14 +14,21 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/log"
+	"go.uber.org/zap"
 )
 
 // makeKubeletClientCSR returns a valid kubelet client CSR for the bootstrapping host, along with the associated (ECDSA) private key.
-func makeKubeletClientCSR() (csrPEM, keyPEM []byte, err error) {
+func makeKubeletClientCSR(ctx context.Context) (csrPEM, keyPEM []byte, err error) {
+	logger := log.MustGetLogger(ctx)
+
 	hostName, err := getHostname()
 	if err != nil {
 		return nil, nil, fmt.Errorf("resolving hostname: %w", err)
 	}
+	logger.Info("resolved hostname", zap.String("hostname", hostName))
+
 	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), cryptorand.Reader)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to generate ECDSA 256 private key for kubelet client CSR: %w", err)
@@ -33,6 +41,7 @@ func makeKubeletClientCSR() (csrPEM, keyPEM []byte, err error) {
 		},
 		SignatureAlgorithm: x509.ECDSAWithSHA256,
 	}
+	logger.Info("generated CSR subject common name", zap.String("subjectCommonName", template.Subject.CommonName))
 
 	csrDER, err := x509.CreateCertificateRequest(cryptorand.Reader, &template, privateKey)
 	if err != nil {

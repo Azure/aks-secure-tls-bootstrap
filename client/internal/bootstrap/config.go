@@ -13,23 +13,24 @@ import (
 )
 
 type Config struct {
-	CloudProviderConfig     *cloud.ProviderConfig
-	CloudProviderConfigPath string        `json:"cloudProviderConfigPath"`
-	APIServerFQDN           string        `json:"apiServerFqdn"`
-	UserAssignedIdentityID  string        `json:"userAssignedIdentityId"`
-	NextProto               string        `json:"nextProto"`
-	AADResource             string        `json:"aadResource"`
-	ClusterCAFilePath       string        `json:"clusterCaFilePath"`
-	KubeconfigPath          string        `json:"kubeconfigPath"`
-	CertDir                 string        `json:"credFilePath"`
-	TLSMinVersion           string        `json:"tlsMinVersion"`
-	InsecureSkipTLSVerify   bool          `json:"insecureSkipTlsVerify"`
-	EnsureAuthorizedClient  bool          `json:"ensureAuthorizedClient"`
-	GetAccessTokenTimeout   time.Duration `json:"getAccessTokenTimeout"`
-	GetInstanceDataTimeout  time.Duration `json:"getInstanceDataTimeout"`
-	GetNonceTimeout         time.Duration `json:"getNonceTimeout"`
-	GetAttestedDataTimeout  time.Duration `json:"getAttestedDataTimeout"`
-	GetCredentialTimeout    time.Duration `json:"getCredentialTimeout"`
+	CloudProviderConfig       *cloud.ProviderConfig
+	CloudProviderConfigPath   string        `json:"cloudProviderConfigPath"`
+	APIServerFQDN             string        `json:"apiServerFqdn"`
+	UserAssignedIdentityID    string        `json:"userAssignedIdentityId"`
+	NextProto                 string        `json:"nextProto"`
+	AADResource               string        `json:"aadResource"`
+	ClusterCAFilePath         string        `json:"clusterCaFilePath"`
+	KubeconfigPath            string        `json:"kubeconfigPath"`
+	CertDir                   string        `json:"credFilePath"`
+	TLSMinVersion             string        `json:"tlsMinVersion"`
+	InsecureSkipTLSVerify     bool          `json:"insecureSkipTlsVerify"`
+	EnsureAuthorizedClient    bool          `json:"ensureAuthorizedClient"`
+	ValidateKubeconfigTimeout time.Duration `json:"validateKubeconfigTimeout"`
+	GetAccessTokenTimeout     time.Duration `json:"getAccessTokenTimeout"`
+	GetInstanceDataTimeout    time.Duration `json:"getInstanceDataTimeout"`
+	GetNonceTimeout           time.Duration `json:"getNonceTimeout"`
+	GetAttestedDataTimeout    time.Duration `json:"getAttestedDataTimeout"`
+	GetCredentialTimeout      time.Duration `json:"getCredentialTimeout"`
 
 	// Deadline is now deprecated and will not be respected.
 	// Use per-RPC timeouts instead.
@@ -61,6 +62,9 @@ func (c *Config) String() string {
 func (c *Config) applyDefaults() {
 	if c.TLSMinVersion == "" {
 		c.TLSMinVersion = "1.3"
+	}
+	if c.ValidateKubeconfigTimeout == 0 {
+		c.ValidateKubeconfigTimeout = 30 * time.Second
 	}
 	if c.GetAccessTokenTimeout == 0 {
 		c.GetAccessTokenTimeout = 30 * time.Second

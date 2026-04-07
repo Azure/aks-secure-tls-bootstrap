@@ -36,7 +36,7 @@ func newClient(ctx context.Context) *client {
 func (c *client) bootstrap(ctx context.Context, config *Config) (*clientcmdapi.Config, error) {
 	logger := log.MustGetLogger(ctx)
 
-	err := c.kubeconfigValidator.Validate(ctx, config.KubeconfigPath, config.EnsureAuthorizedClient)
+	err := c.validateKubeConfig(ctx, config)
 	if err == nil {
 		logger.Info("existing kubeconfig is valid, nothing to bootstrap", zap.String("kubeconfig", config.KubeconfigPath))
 		return nil, nil
@@ -139,7 +139,16 @@ func (c *client) bootstrap(ctx context.Context, config *Config) (*clientcmdapi.C
 	}
 	logger.Info("successfully generated new kubeconfig data")
 
-	return &kubeconfigData, nil
+	return kubeconfigData, nil
+}
+
+func (c *client) validateKubeConfig(ctx context.Context, config *Config) error {
+	validateKubeconfigDeadline, cancel := context.WithTimeout(ctx, config.ValidateKubeconfigTimeout)
+	defer cancel()
+	endSpan := telemetry.StartSpan(ctx, "ValidateKubeconfig")
+	defer endSpan()
+
+	return c.kubeconfigValidator.Validate(validateKubeconfigDeadline, config.KubeconfigPath, config.EnsureAuthorizedClient)
 }
 
 func (c *client) getAccessToken(ctx context.Context, config *Config) (string, error) {
@@ -211,7 +220,7 @@ func (c *client) getCSR(ctx context.Context) ([]byte, []byte, error) {
 	endSpan := telemetry.StartSpan(ctx, "GetCSR")
 	defer endSpan()
 
-	csrPEM, keyPEM, err := makeKubeletClientCSR()
+	csrPEM, keyPEM, err := makeKubeletClientCSR(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create kubelet client CSR: %w", err)
 	}
@@ -241,13 +250,13 @@ func (c *client) getCredential(ctx context.Context, serviceClient v1.SecureTLSBo
 	return certPEM, nil
 }
 
-func (c *client) generateKubeconfig(ctx context.Context, certPEM, keyPEM []byte, config *kubeconfig.Config) (clientcmdapi.Config, error) {
+func (c *client) generateKubeconfig(ctx context.Context, certPEM, keyPEM []byte, config *kubeconfig.Config) (*clientcmdapi.Config, error) {
 	endSpan := telemetry.StartSpan(ctx, "GenerateKubeconfig")
 	defer endSpan()
 
 	kubeconfigData, err := kubeconfig.GenerateForCertAndKey(certPEM, keyPEM, config)
 	if err != nil {
-		return clientcmdapi.Config{}, fmt.Errorf("failed to generate kubeconfig for new client cert and key: %w", err)
+		return nil, fmt.Errorf("failed to generate kubeconfig for new client cert and key: %w", err)
 	}
 	return kubeconfigData, nil
 }

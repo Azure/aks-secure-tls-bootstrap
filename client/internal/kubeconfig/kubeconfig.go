@@ -28,18 +28,18 @@ type Config struct {
 // The cert and key will have their PEM-encodings written out to a single pair file to be
 // referenced within the generated kubeconfig. If needed, a kubelet-client-current.pem symlink
 // will also be created, pointing to the newly-created cert file to emulate kubelet's TLS bootstrapping behavior.
-func GenerateForCertAndKey(certPEM, keyPEM []byte, config *Config) (clientcmdapi.Config, error) {
+func GenerateForCertAndKey(certPEM, keyPEM []byte, config *Config) (*clientcmdapi.Config, error) {
 	certPath, err := createClientCertFile(certPEM, keyPEM, config.CertDir)
 	if err != nil {
-		return clientcmdapi.Config{}, fmt.Errorf("creating kubelet client cert file: %w", err)
+		return nil, fmt.Errorf("creating kubelet client cert file: %w", err)
 	}
 
 	currentPath, err := createCurrentClientSymlink(config.CertDir, certPath)
 	if err != nil {
-		return clientcmdapi.Config{}, fmt.Errorf("creating kubelet client current symlink: %w", err)
+		return nil, fmt.Errorf("creating kubelet client current symlink: %w", err)
 	}
 
-	return clientcmdapi.Config{
+	return &clientcmdapi.Config{
 		// define cluster based on the specified apiserver FQDN and cluster CA
 		Clusters: map[string]*clientcmdapi.Cluster{
 			"default-cluster": {
