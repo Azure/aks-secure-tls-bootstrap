@@ -98,9 +98,9 @@ func run(ctx context.Context) int {
 	defer func() {
 		if bootstrapErr != nil {
 			result.Status = bootstrap.StatusFailure
+			result.FinalErrorType = bootstrap.GetErrorType(bootstrapErr)
+			result.FinalError = bootstrapErr.Error()
 		}
-		result.FinalErrorType = bootstrap.GetErrorType(bootstrapErr)
-		result.FinalError = bootstrapErr.Error()
 		result.Trace = telemetry.GetTrace(ctx)
 		emitGuestAgentEvent(logger, startTime, endTime, result)
 	}()
