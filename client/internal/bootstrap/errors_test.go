@@ -86,3 +86,87 @@ func TestBootstrapError(t *testing.T) {
 		})
 	}
 }
+
+func TestGetErrorType(t *testing.T) {
+	cases := []struct {
+		name     string
+		err      error
+		expected ErrorType
+	}{
+		{
+			name: "error is a GetAccessTokenFailure",
+			err: &bootstrapError{
+				errorType: ErrorTypeGetAccessTokenFailure,
+				inner:     errors.New("get access token failure"),
+			},
+			expected: ErrorTypeGetAccessTokenFailure,
+		},
+		{
+			name: "error is a GetServiceClientFailure",
+			err: &bootstrapError{
+				errorType: ErrorTypeGetServiceClientFailure,
+				inner:     errors.New("get service client failure"),
+			},
+			expected: ErrorTypeGetServiceClientFailure,
+		},
+		{
+			name: "error is a GetInstanceDataFailure",
+			err: &bootstrapError{
+				errorType: ErrorTypeGetInstanceDataFailure,
+				inner:     errors.New("get instance data failure"),
+			},
+			expected: ErrorTypeGetInstanceDataFailure,
+		},
+		{
+			name: "error is a GetAttestedDataFailure",
+			err: &bootstrapError{
+				errorType: ErrorTypeGetAttestedDataFailure,
+				inner:     errors.New("get attested data failure"),
+			},
+			expected: ErrorTypeGetAttestedDataFailure,
+		},
+		{
+			name: "error is a GetNonceFailure",
+			err: &bootstrapError{
+				errorType: ErrorTypeGetNonceFailure,
+				inner:     errors.New("get nonce failure"),
+			},
+			expected: ErrorTypeGetNonceFailure,
+		},
+		{
+			name: "error is a GetCSRFailure",
+			err: &bootstrapError{
+				errorType: ErrorTypeGetCSRFailure,
+				inner:     errors.New("get CSR failure"),
+			},
+			expected: ErrorTypeGetCSRFailure,
+		},
+		{
+			name: "error is a GetCredentialFailure",
+			err: &bootstrapError{
+				errorType: ErrorTypeGetCredentialFailure,
+				inner:     errors.New("get credential failure"),
+			},
+			expected: ErrorTypeGetCredentialFailure,
+		},
+		{
+			name: "error is a GenerateKubeconfigFailure",
+			err: &bootstrapError{
+				errorType: ErrorTypeGenerateKubeconfigFailure,
+				inner:     errors.New("generate kubeconfig failure"),
+			},
+			expected: ErrorTypeGenerateKubeconfigFailure,
+		},
+		{
+			name:     "error is not an instance of bootstrapError",
+			err:      errors.New("an error"),
+			expected: "",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			assert.Equal(t, c.expected, GetErrorType(c.err))
+		})
+	}
+}

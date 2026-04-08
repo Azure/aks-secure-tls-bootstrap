@@ -4,6 +4,7 @@
 package bootstrap
 
 import (
+	"errors"
 	"fmt"
 )
 
@@ -31,4 +32,12 @@ func (e *bootstrapError) Error() string {
 
 func (e *bootstrapError) Unwrap() error {
 	return e.inner
+}
+
+func GetErrorType(err error) ErrorType {
+	var bootstrapErr *bootstrapError
+	if !errors.As(err, &bootstrapErr) {
+		return ""
+	}
+	return bootstrapErr.errorType
 }

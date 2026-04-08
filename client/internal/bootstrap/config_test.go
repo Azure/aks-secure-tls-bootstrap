@@ -15,9 +15,22 @@ import (
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/cloud"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap"
 )
 
-func TestConfigDefaultAndValidate(t *testing.T) {
+func TestConfigDefault(t *testing.T) {
+	config := new(Config)
+	config.applyDefaults()
+	assert.Equal(t, defaultTLSMinVersion, config.TLSMinVersion)
+	assert.Equal(t, defaultValidateKubeconfigTimeout, config.ValidateKubeconfigTimeout)
+	assert.Equal(t, defaultGetAccessTokenTimeout, config.GetAccessTokenTimeout)
+	assert.Equal(t, defaultGetInstanceDataTimeout, config.GetInstanceDataTimeout)
+	assert.Equal(t, defaultGetNonceTimeout, config.GetNonceTimeout)
+	assert.Equal(t, defaultGetAttestedDataTimeout, config.GetAttestedDataTimeout)
+	assert.Equal(t, defaultGetCredentialTimeout, config.GetCredentialTimeout)
+}
+
+func TestConfigValidate(t *testing.T) {
 	cases := []struct {
 		name                string
 		setupConfig         func(t *testing.T, c *Config)
@@ -162,13 +175,6 @@ func TestConfigDefaultAndValidate(t *testing.T) {
 				}, c.CloudProviderConfig)
 				assert.True(t, strings.HasSuffix(c.ClusterCAFilePath, "ca.crt"))
 				assert.True(t, strings.HasSuffix(c.CloudProviderConfigPath, "azure.json"))
-				assert.Equal(t, "1.3", c.TLSMinVersion)
-				assert.Equal(t, 30*time.Second, c.ValidateKubeconfigTimeout)
-				assert.Equal(t, time.Minute, c.GetAccessTokenTimeout)
-				assert.Equal(t, 5*time.Second, c.GetInstanceDataTimeout)
-				assert.Equal(t, 5*time.Second, c.GetNonceTimeout)
-				assert.Equal(t, 5*time.Second, c.GetAttestedDataTimeout)
-				assert.Equal(t, 6*time.Minute, c.GetCredentialTimeout)
 			},
 			expectedErr: nil,
 		},
@@ -292,4 +298,48 @@ func TestLoadFromFile(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestToZapFields(t *testing.T) {
+	config := &Config{
+		CloudProviderConfigPath:   "path/to/azure.json",
+		APIServerFQDN:             "fqdn",
+		UserAssignedIdentityID:    "clientId",
+		NextProto:                 "alpn",
+		AADResource:               "appID",
+		ClusterCAFilePath:         "path/to/ca.crt",
+		KubeconfigPath:            "path/to/kubeconfig",
+		CertDir:                   "path/to/certs",
+		TLSMinVersion:             "1.3",
+		InsecureSkipTLSVerify:     true,
+		EnsureAuthorizedClient:    true,
+		ValidateKubeconfigTimeout: 15 * time.Second,
+		GetAccessTokenTimeout:     time.Minute,
+		GetInstanceDataTimeout:    15 * time.Second,
+		GetNonceTimeout:           15 * time.Second,
+		GetAttestedDataTimeout:    15 * time.Second,
+		GetCredentialTimeout:      6 * time.Minute,
+		Deadline:                  10 * time.Minute,
+	}
+	expectedFields := []zap.Field{
+		zap.String("cloudProviderConfigPath", "path/to/azure.json"),
+		zap.String("apiServerFqdn", "fqdn"),
+		zap.String("userAssignedIdentityId", "clientId"),
+		zap.String("nextProto", "alpn"),
+		zap.String("aadResource", "appID"),
+		zap.String("clusterCaFilePath", "path/to/ca.crt"),
+		zap.String("kubeconfigPath", "path/to/kubeconfig"),
+		zap.String("certDir", "path/to/certs"),
+		zap.String("tlsMinVersion", "1.3"),
+		zap.Bool("insecureSkipTlsVerify", true),
+		zap.Bool("ensureAuthorizedClient", true),
+		zap.Int64("validateKubeconfigTimeoutMilliseconds", 15000),
+		zap.Int64("getAccessTokenTimeoutMilliseconds", 60000),
+		zap.Int64("getInstanceDataTimeoutMilliseconds", 15000),
+		zap.Int64("getNonceTimeoutMilliseconds", 15000),
+		zap.Int64("getAttestedDataTimeoutMilliseconds", 15000),
+		zap.Int64("getCredentialTimeoutMilliseconds", 360000),
+		zap.Int64("deadlineMilliseconds", 600000),
+	}
+	assert.Equal(t, expectedFields, config.ToZapFields())
 }

@@ -1,6 +1,17 @@
 name: $(SourceBranchName)_$(Date:yyyyMMdd).$(Rev:r)
 
-trigger: none # manual trigger only
+pr:
+  branches:
+    include:
+    - main
+    - official/*
+  paths:
+    include:
+    - client/go.mod
+    - client/go.sum
+    - client/**/*.go
+    - .pipelines/client/e2e.yaml
+    - .pipelines/client/scripts/run-pipeline.sh
 
 pool:
   name: $(POOL_NAME)

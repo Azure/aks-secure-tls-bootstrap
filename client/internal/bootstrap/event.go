@@ -64,6 +64,8 @@ type Result struct {
 	ElapsedMilliseconds int64 `json:"ElapsedMilliseconds"`
 	// Trace maps individual span names to their respective durations.
 	Trace telemetry.Trace `json:"Trace,omitempty"`
+	// FinalErrorType indicates the type of error last encountered before the bootstrapping event entered a failed terminal state.
+	FinalErrorType ErrorType `json:"FinalErrorType,omitempty"`
 	// FinalError stores the last encountered error before the bootstrapping event entered a failed terminal state.
 	FinalError string `json:"FinalError,omitempty"`
 }

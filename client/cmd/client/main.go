@@ -88,36 +88,37 @@ func run(ctx context.Context) int {
 
 	ctx = log.WithLogger(telemetry.WithTracing(ctx), logger)
 
-	logger.Info("running with config", zap.String("config", config.String()))
+	logger.Info("running with config", config.ToZapFields()...)
 
+	var bootstrapErr error
 	var startTime, endTime time.Time
 	result := &bootstrap.Result{
 		Status: bootstrap.StatusSuccess,
 	}
 	defer func() {
+		if bootstrapErr != nil {
+			result.Status = bootstrap.StatusFailure
+		}
+		result.FinalErrorType = bootstrap.GetErrorType(bootstrapErr)
+		result.FinalError = bootstrapErr.Error()
 		result.Trace = telemetry.GetTrace(ctx)
 		emitGuestAgentEvent(logger, startTime, endTime, result)
 	}()
 
 	startTime = time.Now()
-	err = bootstrap.Bootstrap(ctx, config)
+	bootstrapErr = bootstrap.Bootstrap(ctx, config)
 	endTime = time.Now()
 
 	var exitCode int
-	if err != nil {
-		result.Status = bootstrap.StatusFailure
+	if bootstrapErr != nil {
 		switch {
-		case errors.Is(err, context.Canceled):
+		case errors.Is(bootstrapErr, context.Canceled):
 			logger.Error("context was canceled before bootstrapping could complete")
-		case errors.Is(err, context.DeadlineExceeded):
-			logger.Error(
-				"failed to bootstrap due to exceeding context deadline",
-				zap.Error(err),
-			)
+		case errors.Is(bootstrapErr, context.DeadlineExceeded):
+			logger.Error("failed to bootstrap due to exceeding context deadline", zap.Error(bootstrapErr))
 		default:
-			logger.Error("failed to bootstrap", zap.Error(err))
+			logger.Error("failed to bootstrap", zap.Error(bootstrapErr))
 		}
-		result.FinalError = err.Error()
 		exitCode = 1
 	}
 

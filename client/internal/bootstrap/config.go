@@ -10,6 +10,17 @@ import (
 	"time"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/cloud"
+	"go.uber.org/zap"
+)
+
+const (
+	defaultTLSMinVersion             = "1.3"
+	defaultValidateKubeconfigTimeout = 15 * time.Second
+	defaultGetAccessTokenTimeout     = time.Minute
+	defaultGetInstanceDataTimeout    = 15 * time.Second
+	defaultGetNonceTimeout           = 15 * time.Second
+	defaultGetAttestedDataTimeout    = 15 * time.Second
+	defaultGetCredentialTimeout      = 6 * time.Minute
 )
 
 type Config struct {
@@ -53,33 +64,50 @@ func (c *Config) DefaultAndValidate() error {
 	return c.validate()
 }
 
-// String returns the config's string representation in JSON format.
-func (c *Config) String() string {
-	jsonBytes, _ := json.Marshal(c)
-	return string(jsonBytes)
+func (c *Config) ToZapFields() []zap.Field {
+	return []zap.Field{
+		zap.String("cloudProviderConfigPath", c.CloudProviderConfigPath),
+		zap.String("apiServerFqdn", c.APIServerFQDN),
+		zap.String("userAssignedIdentityId", c.UserAssignedIdentityID),
+		zap.String("nextProto", c.NextProto),
+		zap.String("aadResource", c.AADResource),
+		zap.String("clusterCaFilePath", c.ClusterCAFilePath),
+		zap.String("kubeconfigPath", c.KubeconfigPath),
+		zap.String("certDir", c.CertDir),
+		zap.String("tlsMinVersion", c.TLSMinVersion),
+		zap.Bool("insecureSkipTlsVerify", c.InsecureSkipTLSVerify),
+		zap.Bool("ensureAuthorizedClient", c.EnsureAuthorizedClient),
+		zap.Int64("validateKubeconfigTimeoutMilliseconds", c.ValidateKubeconfigTimeout.Milliseconds()),
+		zap.Int64("getAccessTokenTimeoutMilliseconds", c.GetAccessTokenTimeout.Milliseconds()),
+		zap.Int64("getInstanceDataTimeoutMilliseconds", c.GetInstanceDataTimeout.Milliseconds()),
+		zap.Int64("getNonceTimeoutMilliseconds", c.GetNonceTimeout.Milliseconds()),
+		zap.Int64("getAttestedDataTimeoutMilliseconds", c.GetAttestedDataTimeout.Milliseconds()),
+		zap.Int64("getCredentialTimeoutMilliseconds", c.GetCredentialTimeout.Milliseconds()),
+		zap.Int64("deadlineMilliseconds", c.Deadline.Milliseconds()),
+	}
 }
 
 func (c *Config) applyDefaults() {
 	if c.TLSMinVersion == "" {
-		c.TLSMinVersion = "1.3"
+		c.TLSMinVersion = defaultTLSMinVersion
 	}
 	if c.ValidateKubeconfigTimeout == 0 {
-		c.ValidateKubeconfigTimeout = 30 * time.Second
+		c.ValidateKubeconfigTimeout = defaultValidateKubeconfigTimeout
 	}
 	if c.GetAccessTokenTimeout == 0 {
-		c.GetAccessTokenTimeout = time.Minute
+		c.GetAccessTokenTimeout = defaultGetAccessTokenTimeout
 	}
 	if c.GetInstanceDataTimeout == 0 {
-		c.GetInstanceDataTimeout = 5 * time.Second
+		c.GetInstanceDataTimeout = defaultGetInstanceDataTimeout
 	}
 	if c.GetNonceTimeout == 0 {
-		c.GetNonceTimeout = 5 * time.Second
+		c.GetNonceTimeout = defaultGetNonceTimeout
 	}
 	if c.GetAttestedDataTimeout == 0 {
-		c.GetAttestedDataTimeout = 5 * time.Second
+		c.GetAttestedDataTimeout = defaultGetAttestedDataTimeout
 	}
 	if c.GetCredentialTimeout == 0 {
-		c.GetCredentialTimeout = 6 * time.Minute
+		c.GetCredentialTimeout = defaultGetCredentialTimeout
 	}
 }
 
@@ -102,7 +130,6 @@ func (c *Config) validate() error {
 	if c.TLSMinVersion != "1.2" && c.TLSMinVersion != "1.3" {
 		return fmt.Errorf(`when specified, TLS min version can either be "1.2" or "1.3"`)
 	}
-
 	if c.CloudProviderConfigPath == "" {
 		return fmt.Errorf("cloud provider config path must be specified")
 	}
@@ -114,7 +141,6 @@ func (c *Config) validate() error {
 	if err = json.Unmarshal(data, c.CloudProviderConfig); err != nil {
 		return fmt.Errorf("cannot unmarshal cloud provider config data: %w", err)
 	}
-
 	if c.ClusterCAFilePath == "" {
 		return fmt.Errorf("cluster CA file path must be specified")
 	}
@@ -124,6 +150,5 @@ func (c *Config) validate() error {
 		}
 		return fmt.Errorf("unable to verify existence of cluster CA file: %w", err)
 	}
-
 	return nil
 }
