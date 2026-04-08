@@ -82,7 +82,7 @@ stages:
           ADO_PAT: $(PAT-aksdevassistant)
           ORGANIZATION: $(ORGANIZATION)
           PROJECT: $(PROJECT)
-        condition: succeeded()
+        condition: and(succeeded(), ne(variables.SKIP_E2E, 'True'))
         displayName: ADO Login
 
       - bash: /bin/bash .pipelines/client/scripts/run-pipeline.sh
