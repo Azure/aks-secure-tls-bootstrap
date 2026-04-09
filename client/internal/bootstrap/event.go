@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"time"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/telemetry"
@@ -17,22 +16,6 @@ import (
 const (
 	performSecureTLSBootstrappingGuestAgentEventName = "AKS.Bootstrap.SecureTLSBootstrapping"
 )
-
-var (
-	guestAgentEventsPathLinux   string
-	guestAgentEventsPathWindows string
-)
-
-var isWindows func() bool
-
-func init() {
-	guestAgentEventsPathLinux = "/var/log/azure/Microsoft.Azure.Extensions.CustomScript/events"
-	guestAgentEventsPathWindows = "C:\\WindowsAzure\\Logs\\Plugins\\Microsoft.Compute.CustomScriptExtension\\Events"
-
-	isWindows = func() bool {
-		return runtime.GOOS == "windows"
-	}
-}
 
 func getGuestAgentEventsPath() string {
 	if isWindows() {

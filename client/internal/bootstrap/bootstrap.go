@@ -11,7 +11,7 @@ import (
 
 // Bootstrap performs the secure TLS bootstrapping protocol using the specified config.
 func Bootstrap(ctx context.Context, config *Config) error {
-	kubeconfigData, err := newClient(ctx).bootstrap(ctx, config)
+	kubeconfigData, err := bootstrapFunc(ctx, config)
 	if err != nil {
 		return err
 	}

@@ -110,7 +110,7 @@ func TestWindowsEvent(t *testing.T) {
 	assert.Equal(t, "0", eventData["EventTid"])
 }
 
-func TestWithResult(t *testing.T) {
+func TestWriteWithResult(t *testing.T) {
 	guestAgentEventsPathLinux = t.TempDir()
 	isWindows = func() bool {
 		return false
