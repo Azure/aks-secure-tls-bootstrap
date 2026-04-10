@@ -9,11 +9,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/log"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestMakeKubeletClientCSR(t *testing.T) {
-	csrPEM, keyPEM, err := makeKubeletClientCSR()
+	ctx := log.NewTestContext()
+
+	csrPEM, keyPEM, err := makeKubeletClientCSR(ctx)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, keyPEM)
 	assert.NotEmpty(t, csrPEM)

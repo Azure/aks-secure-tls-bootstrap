@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"time"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/telemetry"
@@ -17,22 +16,6 @@ import (
 const (
 	performSecureTLSBootstrappingGuestAgentEventName = "AKS.Bootstrap.SecureTLSBootstrapping"
 )
-
-var (
-	guestAgentEventsPathLinux   string
-	guestAgentEventsPathWindows string
-)
-
-var isWindows func() bool
-
-func init() {
-	guestAgentEventsPathLinux = "/var/log/azure/Microsoft.Azure.Extensions.CustomScript/events"
-	guestAgentEventsPathWindows = "C:\\WindowsAzure\\Logs\\Plugins\\Microsoft.Compute.CustomScriptExtension\\Events"
-
-	isWindows = func() bool {
-		return runtime.GOOS == "windows"
-	}
-}
 
 func getGuestAgentEventsPath() string {
 	if isWindows() {
@@ -58,18 +41,15 @@ const (
 )
 
 type Result struct {
-	// Status is terminal status of the bootstrapping event.
+	// Status is the terminal status of the bootstrapping event.
 	Status Status `json:"Status"`
 	// ElapsedMilliseconds measures how long the bootstrapping event took to execute, in milliseconds.
 	ElapsedMilliseconds int64 `json:"ElapsedMilliseconds"`
-	// Errors is a mapping from top-level bootstrapping error type of the number of times it occurred during the event.
-	Errors map[ErrorType]int `json:"Errors,omitempty"`
-	// Traces is a mapping from retry attempt to corresponding Trace. A Trace maps span names to their respective durations.
-	// This will only ever contain data for the last 3 retries to avoid truncating guest agent event data.
-	Traces map[int]telemetry.Trace `json:"Traces,omitempty"`
-	// TraceSummary is a special Trace which maps span names to their total durations across all retry attempts.
-	TraceSummary telemetry.Trace `json:"TraceSummary,omitempty"`
-	// FinalError is the the error returned by the last retry attempt, assuming the overall bootstrapping event failed.
+	// Trace maps individual span names to their respective durations.
+	Trace telemetry.Trace `json:"Trace,omitempty"`
+	// FinalErrorType indicates the type of error last encountered before the bootstrapping event entered a failed terminal state.
+	FinalErrorType ErrorType `json:"FinalErrorType,omitempty"`
+	// FinalError stores the last encountered error before the bootstrapping event entered a failed terminal state.
 	FinalError string `json:"FinalError,omitempty"`
 }
 

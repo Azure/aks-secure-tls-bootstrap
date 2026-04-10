@@ -47,14 +47,12 @@ func (r *tracer) endSpan(spanName string) {
 	r.spans[spanName].end = endTime
 }
 
-// GetTrace returns the duration of all spans recorded since the tracer was originally created,
-// OR the last time GetTrace was called. After calling this method, all span data is cleared.
+// GetTrace returns the duration of all spans recorded since the tracer was originally created.
 func (r *tracer) getTrace() Trace {
 	trace := make(Trace, len(r.spans))
 	for spanName, span := range r.spans {
 		trace[spanName] = span.end.Sub(span.start)
 	}
-	r.spans = make(map[string]*span)
 	return trace
 }
 
@@ -85,41 +83,4 @@ func mustGetTracer(ctx context.Context) *tracer {
 		panic("Tracer is missing from context")
 	}
 	return tracer
-}
-
-// TraceStore stores a collection of traces in-memory.
-type TraceStore struct {
-	traces []Trace
-}
-
-func NewTraceStore() *TraceStore {
-	return &TraceStore{
-		traces: make([]Trace, 0),
-	}
-}
-
-// Add adds the specified trace to the TraceStore.
-func (t *TraceStore) Add(trace Trace) {
-	t.traces = append(t.traces, trace)
-}
-
-// GetLastNTraces returns the latest N traces within the TraceStore.
-// If N is >= the number of traces stored, all traces are returned.
-func (t *TraceStore) GetLastNTraces(n int) map[int]Trace {
-	result := make(map[int]Trace, n)
-	for id := max(len(t.traces)-n, 0); id < len(t.traces); id++ {
-		result[id] = t.traces[id]
-	}
-	return result
-}
-
-// GetTraceSummary returns a Trace which summarizes the total duration of each span across all stored traces.
-func (t *TraceStore) GetTraceSummary() Trace {
-	total := make(Trace)
-	for _, trace := range t.traces {
-		for spanName, duration := range trace {
-			total[spanName] += duration
-		}
-	}
-	return total
 }

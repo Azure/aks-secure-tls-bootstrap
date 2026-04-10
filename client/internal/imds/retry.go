@@ -11,12 +11,13 @@ import (
 )
 
 func IsRetryableHTTPStatusCode(code int) bool {
-	// 4XX retry status codes specific to IMDS - taken from adal's token refresh implementation
-	if code == http.StatusTooManyRequests || code == http.StatusRequestTimeout ||
-		code == http.StatusNotFound || code == http.StatusGone {
+	switch code {
+	case http.StatusTooManyRequests, http.StatusRequestTimeout, http.StatusNotFound, http.StatusGone:
+		// 4XX retry status codes specific to IMDS - taken from adal's token refresh implementation
 		return true
+	default:
+		return code >= http.StatusInternalServerError
 	}
-	return code >= http.StatusInternalServerError
 }
 
 func wrapWithRetryableIMDSStatusCodes(defaultShouldRetry bool, resp *http.Response, err error) (bool, error) {

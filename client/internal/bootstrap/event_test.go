@@ -110,7 +110,7 @@ func TestWindowsEvent(t *testing.T) {
 	assert.Equal(t, "0", eventData["EventTid"])
 }
 
-func TestWithResult(t *testing.T) {
+func TestWriteWithResult(t *testing.T) {
 	guestAgentEventsPathLinux = t.TempDir()
 	isWindows = func() bool {
 		return false
@@ -126,23 +126,16 @@ func TestWithResult(t *testing.T) {
 
 	result := &Result{
 		Status:              StatusFailure,
-		ElapsedMilliseconds: time.Minute.Milliseconds(),
-		Errors: ErrorLog{
-			ErrorTypeGetAccessTokenFailure: 3,
-		},
-		Traces: map[int]telemetry.Trace{
-			0: {
-				"GetAccessToken": 100 * time.Millisecond,
-			},
-			1: {
-				"GetAccessToken": 100 * time.Millisecond,
-			},
-			2: {
-				"GetAccessToken": 100 * time.Millisecond,
-			},
-		},
-		TraceSummary: telemetry.Trace{
-			"GetAccessToken": 300 * time.Millisecond,
+		ElapsedMilliseconds: (3700 * time.Millisecond).Milliseconds(),
+		Trace: telemetry.Trace{
+			"GetAccessToken":     100 * time.Millisecond,
+			"GetServiceClient":   200 * time.Millisecond,
+			"GetInstanceData":    300 * time.Millisecond,
+			"GetNonce":           400 * time.Millisecond,
+			"GetAttestedData":    500 * time.Millisecond,
+			"GetCSR":             600 * time.Millisecond,
+			"GetCredential":      700 * time.Millisecond,
+			"GenerateKubeconfig": 800 * time.Millisecond,
 		},
 	}
 
@@ -176,5 +169,5 @@ func TestWithResult(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, StatusFailure, loadedResult.Status)
-	assert.Equal(t, time.Minute.Milliseconds(), loadedResult.ElapsedMilliseconds)
+	assert.Equal(t, (3700 * time.Millisecond).Milliseconds(), loadedResult.ElapsedMilliseconds)
 }

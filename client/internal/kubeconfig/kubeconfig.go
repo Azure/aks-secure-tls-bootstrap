@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"time"
 
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/client-go/tools/clientcmd/api"
 )
 
 const (
@@ -28,34 +28,34 @@ type Config struct {
 // The cert and key will have their PEM-encodings written out to a single pair file to be
 // referenced within the generated kubeconfig. If needed, a kubelet-client-current.pem symlink
 // will also be created, pointing to the newly-created cert file to emulate kubelet's TLS bootstrapping behavior.
-func GenerateForCertAndKey(certPEM, keyPEM []byte, config *Config) (clientcmdapi.Config, error) {
+func GenerateForCertAndKey(certPEM, keyPEM []byte, config *Config) (*api.Config, error) {
 	certPath, err := createClientCertFile(certPEM, keyPEM, config.CertDir)
 	if err != nil {
-		return clientcmdapi.Config{}, fmt.Errorf("creating kubelet client cert file: %w", err)
+		return nil, fmt.Errorf("creating kubelet client cert file: %w", err)
 	}
 
 	currentPath, err := createCurrentClientSymlink(config.CertDir, certPath)
 	if err != nil {
-		return clientcmdapi.Config{}, fmt.Errorf("creating kubelet client current symlink: %w", err)
+		return nil, fmt.Errorf("creating kubelet client current symlink: %w", err)
 	}
 
-	return clientcmdapi.Config{
+	return &api.Config{
 		// define cluster based on the specified apiserver FQDN and cluster CA
-		Clusters: map[string]*clientcmdapi.Cluster{
+		Clusters: map[string]*api.Cluster{
 			"default-cluster": {
 				Server:               fmt.Sprintf("https://%s:443", config.APIServerFQDN),
 				CertificateAuthority: config.ClusterCAFilePath,
 			},
 		},
 		// define auth based on the obtained client cert
-		AuthInfos: map[string]*clientcmdapi.AuthInfo{
+		AuthInfos: map[string]*api.AuthInfo{
 			"default-auth": {
 				ClientCertificate: currentPath,
 				ClientKey:         currentPath,
 			},
 		},
 		// define a context that connects the auth info and cluster, and set it as the default
-		Contexts: map[string]*clientcmdapi.Context{
+		Contexts: map[string]*api.Context{
 			"default-context": {
 				Cluster:  "default-cluster",
 				AuthInfo: "default-auth",
