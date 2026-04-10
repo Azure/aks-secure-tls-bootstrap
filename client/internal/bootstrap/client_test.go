@@ -29,7 +29,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/client-go/tools/clientcmd/api"
 )
 
 func TestBootstrapKubeletClientCredential(t *testing.T) {
@@ -274,7 +274,7 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 					assert.Nil(t, kubeconfigData)
 				} else {
 					assert.NotNil(t, kubeconfigData)
-					expectCorrectKubeconfigData(t, *kubeconfigData, config)
+					expectCorrectKubeconfigData(t, kubeconfigData, config)
 				}
 			} else {
 				assert.Nil(t, kubeconfigData)
@@ -289,7 +289,7 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 	}
 }
 
-func expectCorrectKubeconfigData(t *testing.T, data clientcmdapi.Config, config *Config) {
+func expectCorrectKubeconfigData(t *testing.T, data *api.Config, config *Config) {
 	assert.NotNil(t, data)
 
 	// validate default configurations

@@ -14,7 +14,7 @@ import (
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/telemetry"
 	v1 "github.com/Azure/aks-secure-tls-bootstrap/service/pkg/gen/akssecuretlsbootstrap/v1"
 	"go.uber.org/zap"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/client-go/tools/clientcmd/api"
 )
 
 type client struct {
@@ -33,7 +33,7 @@ func newClient(ctx context.Context) *client {
 	}
 }
 
-func (c *client) bootstrap(ctx context.Context, config *Config) (*clientcmdapi.Config, error) {
+func (c *client) bootstrap(ctx context.Context, config *Config) (*api.Config, error) {
 	logger := log.MustGetLogger(ctx)
 
 	err := c.validateKubeConfig(ctx, config)
@@ -250,7 +250,7 @@ func (c *client) getCredential(ctx context.Context, serviceClient v1.SecureTLSBo
 	return certPEM, nil
 }
 
-func (c *client) generateKubeconfig(ctx context.Context, certPEM, keyPEM []byte, config *kubeconfig.Config) (*clientcmdapi.Config, error) {
+func (c *client) generateKubeconfig(ctx context.Context, certPEM, keyPEM []byte, config *kubeconfig.Config) (*api.Config, error) {
 	endSpan := telemetry.StartSpan(ctx, "GenerateKubeconfig")
 	defer endSpan()
 
