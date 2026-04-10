@@ -24,8 +24,7 @@ import (
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/testutil"
 	v1 "github.com/Azure/aks-secure-tls-bootstrap/service/pkg/gen/akssecuretlsbootstrap/v1"
 	v1mocks "github.com/Azure/aks-secure-tls-bootstrap/service/pkg/gen/mock/akssecuretlsbootstrap/v1"
-	"github.com/Azure/go-autorest/autorest/adal"
-	"github.com/Azure/go-autorest/autorest/azure"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc"
@@ -36,7 +35,7 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 	cases := []struct {
 		name                     string
 		setupMocks               func(config *Config, kubeconfigValidator *kubeconfigmocks.MockValidator, imdsClient *imdsmocks.MockClient, serviceClient *v1mocks.MockSecureTLSBootstrapServiceClient)
-		extractAccessTokenFunc   func(ctx context.Context, token *adal.ServicePrincipalToken, isMSI bool) (string, error)
+		extractAccessTokenFunc   func(ctx context.Context, credential azcore.TokenCredential, scope string) (string, error)
 		skipKubeconfigValidation bool
 		expectedError            *bootstrapError
 	}{
@@ -238,7 +237,7 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 				KubeconfigPath:          "path/to/kubeconfig",
 				CloudProviderConfigPath: filepath.Join(tempDir, "azure.json"),
 				CloudProviderConfig: &cloud.ProviderConfig{
-					CloudName:    azure.PublicCloud.Name,
+					CloudName:    azurePublicCloudName,
 					ClientID:     "service-principal-id",
 					ClientSecret: "service-principal-secret",
 					TenantID:     "tenantId",
@@ -260,9 +259,8 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 				},
 			}
 			if client.extractAccessTokenFunc == nil {
-				client.extractAccessTokenFunc = func(ctx context.Context, token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
-					assert.NotNil(t, token)
-					assert.False(t, isMSI)
+				client.extractAccessTokenFunc = func(ctx context.Context, credential azcore.TokenCredential, scope string) (string, error) {
+					assert.NotNil(t, credential)
 					return "token", nil
 				}
 			}

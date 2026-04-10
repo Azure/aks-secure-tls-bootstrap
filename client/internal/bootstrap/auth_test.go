@@ -16,9 +16,11 @@ import (
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/log"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/telemetry"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/testutil"
-	"github.com/Azure/go-autorest/autorest/adal"
-	"github.com/Azure/go-autorest/autorest/azure"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	azcloud "github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
 )
+
+const azurePublicCloudName = "AzurePublicCloud"
 
 func TestGetToken(t *testing.T) {
 	cases := []struct {
@@ -37,7 +39,7 @@ func TestGetToken(t *testing.T) {
 				config.ClientSecret = "secret"
 			},
 			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
-				return func(ctx context.Context, token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
+				return func(ctx context.Context, credential azcore.TokenCredential, scope string) (string, error) {
 					return "token", nil
 				}
 			},
@@ -47,12 +49,12 @@ func TestGetToken(t *testing.T) {
 		{
 			name: "error generating a service principal access token with client secret due to missing client secret",
 			setupCloudProviderConfig: func(t *testing.T, config *cloud.ProviderConfig) {
-				config.CloudName = azure.PublicCloud.Name
+				config.CloudName = azurePublicCloudName
 				config.ClientID = "service-principal-id"
 				config.ClientSecret = ""
 			},
 			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
-				return func(ctx context.Context, token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
+				return func(ctx context.Context, credential azcore.TokenCredential, scope string) (string, error) {
 					return "token", nil
 				}
 			},
@@ -62,12 +64,12 @@ func TestGetToken(t *testing.T) {
 		{
 			name: "error b64-decoding client secret certificate data",
 			setupCloudProviderConfig: func(t *testing.T, config *cloud.ProviderConfig) {
-				config.CloudName = azure.PublicCloud.Name
+				config.CloudName = azurePublicCloudName
 				config.ClientID = "service-principal-id"
 				config.ClientSecret = "certificate:YW55IGNhcm5hbCBwbGVhc3U======" // invalid b64-encoding
 			},
 			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
-				return func(ctx context.Context, token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
+				return func(ctx context.Context, credential azcore.TokenCredential, scope string) (string, error) {
 					return "token", nil
 				}
 			},
@@ -77,12 +79,12 @@ func TestGetToken(t *testing.T) {
 		{
 			name: "error pfx-decoding client secret certificate data",
 			setupCloudProviderConfig: func(t *testing.T, config *cloud.ProviderConfig) {
-				config.CloudName = azure.PublicCloud.Name
+				config.CloudName = azurePublicCloudName
 				config.ClientID = "service-principal-id"
 				config.ClientSecret = "certificate:dGVzdAo=" // b64-encoding of "test"
 			},
 			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
-				return func(ctx context.Context, token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
+				return func(ctx context.Context, credential azcore.TokenCredential, scope string) (string, error) {
 					return "token", nil
 				}
 			},
@@ -99,12 +101,12 @@ func TestGetToken(t *testing.T) {
 				})
 				assert.NoError(t, err)
 
-				config.CloudName = azure.PublicCloud.Name
+				config.CloudName = azurePublicCloudName
 				config.ClientID = "service-principal-id"
 				config.ClientSecret = "certificate:" + certData
 			},
 			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
-				return func(ctx context.Context, token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
+				return func(ctx context.Context, credential azcore.TokenCredential, scope string) (string, error) {
 					return "", errors.New("generating service principal access token with certificate")
 				}
 			},
@@ -118,8 +120,7 @@ func TestGetToken(t *testing.T) {
 				config.ClientID = clientIDForMSI
 			},
 			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
-				return func(ctx context.Context, token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
-					assert.Equal(t, maxMSIRefreshAttempts, token.MaxMSIRefreshAttempts)
+				return func(ctx context.Context, credential azcore.TokenCredential, scope string) (string, error) {
 					return "token", nil
 				}
 			},
@@ -133,7 +134,7 @@ func TestGetToken(t *testing.T) {
 				config.ClientID = clientIDForMSI
 			},
 			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
-				return func(ctx context.Context, token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
+				return func(ctx context.Context, credential azcore.TokenCredential, scope string) (string, error) {
 					return "token", nil
 				}
 			},
@@ -148,8 +149,7 @@ func TestGetToken(t *testing.T) {
 				config.ClientID = clientIDForMSI
 			},
 			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
-				return func(ctx context.Context, token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
-					assert.Equal(t, maxMSIRefreshAttempts, token.MaxMSIRefreshAttempts)
+				return func(ctx context.Context, credential azcore.TokenCredential, scope string) (string, error) {
 					return "token", nil
 				}
 			},
@@ -159,12 +159,12 @@ func TestGetToken(t *testing.T) {
 		{
 			name: "service principal client secret does not contain certificate data",
 			setupCloudProviderConfig: func(t *testing.T, config *cloud.ProviderConfig) {
-				config.CloudName = azure.PublicCloud.Name
+				config.CloudName = azurePublicCloudName
 				config.ClientID = "service-principal-id"
 				config.ClientSecret = "secret"
 			},
 			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
-				return func(ctx context.Context, token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
+				return func(ctx context.Context, credential azcore.TokenCredential, scope string) (string, error) {
 					return "token", nil
 				}
 			},
@@ -181,12 +181,12 @@ func TestGetToken(t *testing.T) {
 				})
 				assert.NoError(t, err)
 
-				config.CloudName = azure.PublicCloud.Name
+				config.CloudName = azurePublicCloudName
 				config.ClientID = "service-principal-id"
 				config.ClientSecret = "certificate:" + certData
 			},
 			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
-				return func(ctx context.Context, token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
+				return func(ctx context.Context, credential azcore.TokenCredential, scope string) (string, error) {
 					return "token", nil
 				}
 			},
@@ -203,12 +203,12 @@ func TestGetToken(t *testing.T) {
 				})
 				assert.NoError(t, err)
 
-				config.CloudName = azure.PublicCloud.Name
+				config.CloudName = azurePublicCloudName
 				config.ClientID = "service-principal-id"
 				config.ClientSecret = base64.StdEncoding.EncodeToString([]byte("certificate:" + certData))
 			},
 			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
-				return func(ctx context.Context, token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
+				return func(ctx context.Context, credential azcore.TokenCredential, scope string) (string, error) {
 					return "token", nil
 				}
 			},
@@ -244,6 +244,94 @@ func TestGetToken(t *testing.T) {
 				assert.NoError(t, err)
 				assert.Equal(t, c.expectedToken, token)
 			}
+		})
+	}
+}
+
+func TestCloudConfigFromName(t *testing.T) {
+	cases := []struct {
+		name          string
+		cloudName     string
+		expectedCloud azcloud.Configuration
+		expectedErr   error
+	}{
+		{
+			name:          "empty cloud name maps to AzurePublic",
+			cloudName:     "",
+			expectedCloud: azcloud.AzurePublic,
+		},
+		{
+			name:          "AzurePublicCloud maps to AzurePublic",
+			cloudName:     "AzurePublicCloud",
+			expectedCloud: azcloud.AzurePublic,
+		},
+		{
+			name:          "cloud name is case-insensitive",
+			cloudName:     "azurepubliccloud",
+			expectedCloud: azcloud.AzurePublic,
+		},
+		{
+			name:          "AzureUSGovernmentCloud maps to AzureGovernment",
+			cloudName:     "AzureUSGovernmentCloud",
+			expectedCloud: azcloud.AzureGovernment,
+		},
+		{
+			name:          "AzureChinaCloud maps to AzureChina",
+			cloudName:     "AzureChinaCloud",
+			expectedCloud: azcloud.AzureChina,
+		},
+		{
+			name:        "unsupported cloud name returns error",
+			cloudName:   "AzureGermanCloud",
+			expectedErr: errors.New(`unsupported cloud name: "AzureGermanCloud"`),
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			cloudConfig, err := cloudConfigFromName(c.cloudName)
+			if c.expectedErr != nil {
+				assert.ErrorContains(t, err, c.expectedErr.Error())
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, c.expectedCloud, cloudConfig)
+			}
+		})
+	}
+}
+
+func TestAADResourceToScope(t *testing.T) {
+	cases := []struct {
+		name          string
+		resource      string
+		expectedScope string
+	}{
+		{
+			name:          "resource without trailing slash gets /.default appended",
+			resource:      "https://management.azure.com",
+			expectedScope: "https://management.azure.com/.default",
+		},
+		{
+			name:          "resource with trailing slash gets /.default appended (slash removed first)",
+			resource:      "https://management.azure.com/",
+			expectedScope: "https://management.azure.com/.default",
+		},
+		{
+			name:          "resource already ending in /.default is unchanged",
+			resource:      "https://management.azure.com/.default",
+			expectedScope: "https://management.azure.com/.default",
+		},
+		{
+			name:          "simple resource string",
+			resource:      "resource",
+			expectedScope: "resource/.default",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			scope := aadResourceToScope(c.resource)
+			assert.Equal(t, c.expectedScope, scope)
 		})
 	}
 }

@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/cloud"
-	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 )
@@ -104,7 +103,7 @@ func TestConfigValidate(t *testing.T) {
 				cloudProviderConfig := cloud.ProviderConfig{
 					ClientID:               "msi",
 					UserAssignedIdentityID: "identityId",
-					CloudName:              azure.PublicCloud.Name,
+					CloudName:              azurePublicCloudName,
 				}
 				cloudProviderConfigBytes, err := json.Marshal(cloudProviderConfig)
 				assert.NoError(t, err)
@@ -125,7 +124,7 @@ func TestConfigValidate(t *testing.T) {
 				cloudProviderConfig := cloud.ProviderConfig{
 					ClientID:               "msi",
 					UserAssignedIdentityID: "identityId",
-					CloudName:              azure.PublicCloud.Name,
+					CloudName:              azurePublicCloudName,
 				}
 				cloudProviderConfigBytes, err := json.Marshal(cloudProviderConfig)
 				assert.NoError(t, err)
@@ -153,7 +152,7 @@ func TestConfigValidate(t *testing.T) {
 				cloudProviderConfig := cloud.ProviderConfig{
 					ClientID:               "msi",
 					UserAssignedIdentityID: "identityId",
-					CloudName:              azure.PublicCloud.Name,
+					CloudName:              azurePublicCloudName,
 				}
 				cloudProviderConfigBytes, err := json.Marshal(cloudProviderConfig)
 				assert.NoError(t, err)
@@ -171,7 +170,7 @@ func TestConfigValidate(t *testing.T) {
 				assert.Equal(t, &cloud.ProviderConfig{
 					ClientID:               "msi",
 					UserAssignedIdentityID: "identityId",
-					CloudName:              azure.PublicCloud.Name,
+					CloudName:              azurePublicCloudName,
 				}, c.CloudProviderConfig)
 				assert.True(t, strings.HasSuffix(c.ClusterCAFilePath, "ca.crt"))
 				assert.True(t, strings.HasSuffix(c.CloudProviderConfigPath, "azure.json"))
@@ -240,7 +239,7 @@ func TestLoadFromFile(t *testing.T) {
 				cloudProviderConfig := cloud.ProviderConfig{
 					ClientID:               "msi",
 					UserAssignedIdentityID: "identityId",
-					CloudName:              azure.PublicCloud.Name,
+					CloudName:              azurePublicCloudName,
 				}
 				cloudProviderConfigBytes, err := json.Marshal(cloudProviderConfig)
 				assert.NoError(t, err)

@@ -5,15 +5,20 @@ package bootstrap
 
 import (
 	"context"
+	"crypto"
+	"crypto/x509"
 	"encoding/base64"
 	"fmt"
 	"strings"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/cloud"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/log"
-	"github.com/Azure/go-autorest/autorest/adal"
-	"github.com/Azure/go-autorest/autorest/azure"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	azcloud "github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
+	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"go.uber.org/zap"
+	"software.sslmate.com/src/go-pkcs12"
 )
 
 const (
@@ -28,20 +33,17 @@ const (
 	clientIDForMSI = "msi"
 )
 
-const (
-	// to avoid falling too deep into exponential backoff implemented by adal, which follows the public retry guidance:
-	// https://learn.microsoft.com/en-us/entra/identity/managed-identities-azure-resources/how-to-use-vm-token#retry-guidance
-	maxMSIRefreshAttempts = 5
-)
+// extractAccessTokenFunc retrieves an OAuth access token from the specified credential, fake implementations given in unit tests.
+type extractAccessTokenFunc func(ctx context.Context, credential azcore.TokenCredential, scope string) (string, error)
 
-// extractAccessTokenFunc extracts an oauth access token from the specified service principal token after a refresh, fake implementations given in unit tests.
-type extractAccessTokenFunc func(ctx context.Context, token *adal.ServicePrincipalToken, isMSI bool) (string, error)
-
-func extractAccessToken(ctx context.Context, token *adal.ServicePrincipalToken, isMSI bool) (string, error) {
-	if err := token.RefreshWithContext(ctx); err != nil {
+func extractAccessToken(ctx context.Context, credential azcore.TokenCredential, scope string) (string, error) {
+	token, err := credential.GetToken(ctx, policy.TokenRequestOptions{
+		Scopes: []string{scope},
+	})
+	if err != nil {
 		return "", err
 	}
-	return token.OAuthToken(), nil
+	return token.Token, nil
 }
 
 func (c *client) getToken(ctx context.Context, config *Config) (string, error) {
@@ -52,51 +54,58 @@ func (c *client) getToken(ctx context.Context, config *Config) (string, error) {
 		userAssignedID = config.UserAssignedIdentityID
 	}
 
+	scope := aadResourceToScope(config.AADResource)
+
 	if userAssignedID != "" {
 		logger.Info("generating MSI access token", zap.String("clientId", userAssignedID))
-		msiToken, err := adal.NewServicePrincipalTokenFromManagedIdentity(config.AADResource, &adal.ManagedIdentityOptions{
-			ClientID: userAssignedID,
+		msiCredential, err := azidentity.NewManagedIdentityCredential(&azidentity.ManagedIdentityCredentialOptions{
+			ID: azidentity.ClientID(userAssignedID),
 		})
 		if err != nil {
 			return "", fmt.Errorf("generating MSI access token: %w", err)
 		}
-		msiToken.MaxMSIRefreshAttempts = maxMSIRefreshAttempts
-		return c.extractAccessTokenFunc(ctx, msiToken, true)
+		return c.extractAccessTokenFunc(ctx, msiCredential, scope)
 	}
 
 	if config.CloudProviderConfig.ClientID == clientIDForMSI {
 		return "", fmt.Errorf("client ID within cloud provider config indicates usage of a managed identity, though no user-assigned identity ID was provided")
 	}
 
-	servicePrincipalToken, err := getServicePrincipalToken(ctx, config.AADResource, config.CloudProviderConfig)
+	credential, err := getServicePrincipalCredential(ctx, config.CloudProviderConfig)
 	if err != nil {
 		return "", err
 	}
 
-	return c.extractAccessTokenFunc(ctx, servicePrincipalToken, false)
+	return c.extractAccessTokenFunc(ctx, credential, scope)
 }
 
-func getServicePrincipalToken(ctx context.Context, resource string, cloudProviderConfig *cloud.ProviderConfig) (*adal.ServicePrincipalToken, error) {
+func getServicePrincipalCredential(ctx context.Context, cloudProviderConfig *cloud.ProviderConfig) (azcore.TokenCredential, error) {
 	logger := log.MustGetLogger(ctx)
 
 	secret := maybeB64Decode(cloudProviderConfig.ClientSecret)
 
-	env, err := azure.EnvironmentFromName(cloudProviderConfig.CloudName)
+	cloudConfig, err := cloudConfigFromName(cloudProviderConfig.CloudName)
 	if err != nil {
 		return nil, fmt.Errorf("getting azure environment config for cloud %q: %w", cloudProviderConfig.CloudName, err)
-	}
-	oauthConfig, err := adal.NewOAuthConfig(env.ActiveDirectoryEndpoint, cloudProviderConfig.TenantID)
-	if err != nil {
-		return nil, fmt.Errorf("creating oauth config with azure environment: %w", err)
 	}
 
 	if !strings.HasPrefix(secret, certificateSecretPrefix) {
 		logger.Info("generating service principal access token with client secret", zap.String("clientId", cloudProviderConfig.ClientID))
-		token, err := adal.NewServicePrincipalToken(*oauthConfig, cloudProviderConfig.ClientID, secret, resource)
+		if secret == "" {
+			return nil, fmt.Errorf("generating service principal access token with client secret: client secret is empty")
+		}
+		credential, err := azidentity.NewClientSecretCredential(
+			cloudProviderConfig.TenantID,
+			cloudProviderConfig.ClientID,
+			secret,
+			&azidentity.ClientSecretCredentialOptions{
+				ClientOptions: azcore.ClientOptions{Cloud: cloudConfig},
+			},
+		)
 		if err != nil {
 			return nil, fmt.Errorf("generating service principal access token with client secret: %w", err)
 		}
-		return token, nil
+		return credential, nil
 	}
 
 	logger.Info("client secret contains certificate data, using certificate to generate service principal access token", zap.String("clientId", cloudProviderConfig.ClientID))
@@ -105,18 +114,58 @@ func getServicePrincipalToken(ctx context.Context, resource string, cloudProvide
 	if err != nil {
 		return nil, fmt.Errorf("b64-decoding certificate data in client secret: %w", err)
 	}
-	certificate, privateKey, err := adal.DecodePfxCertificateData(certData, "")
+	certs, key, err := decodePFXCertificateData(certData)
 	if err != nil {
 		return nil, fmt.Errorf("decoding pfx certificate data in client secret: %w", err)
 	}
 
 	logger.Info("generating service principal access token with certificate", zap.String("clientId", cloudProviderConfig.ClientID))
-	token, err := adal.NewServicePrincipalTokenFromCertificate(*oauthConfig, cloudProviderConfig.ClientID, certificate, privateKey, resource)
+	credential, err := azidentity.NewClientCertificateCredential(
+		cloudProviderConfig.TenantID,
+		cloudProviderConfig.ClientID,
+		certs,
+		key,
+		&azidentity.ClientCertificateCredentialOptions{
+			ClientOptions: azcore.ClientOptions{Cloud: cloudConfig},
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("generating service principal access token with certificate: %w", err)
 	}
 
-	return token, nil
+	return credential, nil
+}
+
+// cloudConfigFromName maps an Azure cloud name (as found in azure.json) to an azcore/cloud.Configuration.
+func cloudConfigFromName(name string) (azcloud.Configuration, error) {
+	switch strings.ToLower(name) {
+	case "", "azurepubliccloud":
+		return azcloud.AzurePublic, nil
+	case "azureusgovernmentcloud":
+		return azcloud.AzureGovernment, nil
+	case "azurechinacloud":
+		return azcloud.AzureChina, nil
+	default:
+		return azcloud.Configuration{}, fmt.Errorf("unsupported cloud name: %q", name)
+	}
+}
+
+// aadResourceToScope converts an AAD resource URI to an OAuth 2.0 scope, as required by the Track 2 SDK.
+func aadResourceToScope(resource string) string {
+	resource = strings.TrimSuffix(resource, "/")
+	if !strings.HasSuffix(resource, "/.default") {
+		resource += "/.default"
+	}
+	return resource
+}
+
+// decodePFXCertificateData decodes a PFX-encoded certificate and private key from the provided data.
+func decodePFXCertificateData(data []byte) ([]*x509.Certificate, crypto.PrivateKey, error) {
+	privateKey, certificate, err := pkcs12.Decode(data, "")
+	if err != nil {
+		return nil, nil, err
+	}
+	return []*x509.Certificate{certificate}, privateKey, nil
 }
 
 func maybeB64Decode(str string) string {
