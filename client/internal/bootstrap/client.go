@@ -36,7 +36,7 @@ func newClient(ctx context.Context) *client {
 func (c *client) bootstrap(ctx context.Context, config *Config) (*api.Config, error) {
 	logger := log.MustGetLogger(ctx)
 
-	err := c.validateKubeConfig(ctx, config)
+	err := c.validateKubeconfig(ctx, config)
 	if err == nil {
 		logger.Info("existing kubeconfig is valid, nothing to bootstrap", zap.String("kubeconfig", config.KubeconfigPath))
 		return nil, nil
@@ -142,7 +142,7 @@ func (c *client) bootstrap(ctx context.Context, config *Config) (*api.Config, er
 	return kubeconfigData, nil
 }
 
-func (c *client) validateKubeConfig(ctx context.Context, config *Config) error {
+func (c *client) validateKubeconfig(ctx context.Context, config *Config) error {
 	validateKubeconfigDeadline, cancel := context.WithTimeout(ctx, config.ValidateKubeconfigTimeout)
 	defer cancel()
 	endSpan := telemetry.StartSpan(ctx, "ValidateKubeconfig")
