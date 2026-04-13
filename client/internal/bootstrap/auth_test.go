@@ -17,6 +17,7 @@ import (
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/telemetry"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/testutil"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/fake"
 	azcloud "github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
 )
 
@@ -24,12 +25,15 @@ const azurePublicCloudName = "AzurePublicCloud"
 
 func TestGetToken(t *testing.T) {
 	cases := []struct {
-		name                        string
-		customClientID              string
-		setupCloudProviderConfig    func(t *testing.T, config *cloud.ProviderConfig)
-		setupExtractAccessTokenFunc func(t *testing.T) extractAccessTokenFunc
-		expectedToken               string
-		expectedErr                 error
+		name                    string
+		customClientID          string
+		setupCloudProviderConfig func(t *testing.T, config *cloud.ProviderConfig)
+		// credentialFactory overrides newCredentialFromConfig for cases that need to
+		// control GetToken behavior. When nil, newCredentialFromConfig is used (which
+		// exercises real credential-creation logic, including any error paths).
+		credentialFactory credentialFactoryFunc
+		expectedToken     string
+		expectedErr       error
 	}{
 		{
 			name: "error getting azure environment config for specified cloud",
@@ -38,11 +42,7 @@ func TestGetToken(t *testing.T) {
 				config.ClientID = "service-principal-id"
 				config.ClientSecret = "secret"
 			},
-			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
-				return func(ctx context.Context, credential azcore.TokenCredential, scope string) (string, error) {
-					return "token", nil
-				}
-			},
+			// nil credentialFactory → newCredentialFromConfig runs → error returned from cloudConfigFromName
 			expectedToken: "",
 			expectedErr:   errors.New(`getting azure environment config for cloud "invalid"`),
 		},
@@ -53,11 +53,7 @@ func TestGetToken(t *testing.T) {
 				config.ClientID = "service-principal-id"
 				config.ClientSecret = ""
 			},
-			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
-				return func(ctx context.Context, credential azcore.TokenCredential, scope string) (string, error) {
-					return "token", nil
-				}
-			},
+			// nil credentialFactory → newCredentialFromConfig runs → error returned from getServicePrincipalCredential
 			expectedToken: "",
 			expectedErr:   errors.New("generating service principal access token with client secret"),
 		},
@@ -68,11 +64,7 @@ func TestGetToken(t *testing.T) {
 				config.ClientID = "service-principal-id"
 				config.ClientSecret = "certificate:YW55IGNhcm5hbCBwbGVhc3U======" // invalid b64-encoding
 			},
-			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
-				return func(ctx context.Context, credential azcore.TokenCredential, scope string) (string, error) {
-					return "token", nil
-				}
-			},
+			// nil credentialFactory → newCredentialFromConfig runs → error returned from getServicePrincipalCredential
 			expectedToken: "",
 			expectedErr:   errors.New("b64-decoding certificate data in client secret"),
 		},
@@ -83,16 +75,12 @@ func TestGetToken(t *testing.T) {
 				config.ClientID = "service-principal-id"
 				config.ClientSecret = "certificate:dGVzdAo=" // b64-encoding of "test"
 			},
-			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
-				return func(ctx context.Context, credential azcore.TokenCredential, scope string) (string, error) {
-					return "token", nil
-				}
-			},
+			// nil credentialFactory → newCredentialFromConfig runs → error returned from getServicePrincipalCredential
 			expectedToken: "",
 			expectedErr:   errors.New("decoding pfx certificate data in client secret"),
 		},
 		{
-			name: "error generating service principal token with certificate data",
+			name: "error returned from GetToken",
 			setupCloudProviderConfig: func(t *testing.T, config *cloud.ProviderConfig) {
 				certData, err := testutil.GenerateCertAndKeyAsEncodedPFXData(testutil.CertTemplate{
 					CommonName:   "aad",
@@ -105,10 +93,10 @@ func TestGetToken(t *testing.T) {
 				config.ClientID = "service-principal-id"
 				config.ClientSecret = "certificate:" + certData
 			},
-			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
-				return func(ctx context.Context, credential azcore.TokenCredential, scope string) (string, error) {
-					return "", errors.New("generating service principal access token with certificate")
-				}
+			credentialFactory: func(_ context.Context, _ *Config) (azcore.TokenCredential, error) {
+				fakeCred := &fake.TokenCredential{}
+				fakeCred.SetError(errors.New("generating service principal access token with certificate"))
+				return fakeCred, nil
 			},
 			expectedToken: "",
 			expectedErr:   errors.New("generating service principal access token with certificate"),
@@ -119,12 +107,10 @@ func TestGetToken(t *testing.T) {
 				config.UserAssignedIdentityID = "kubelet-identity-id"
 				config.ClientID = clientIDForMSI
 			},
-			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
-				return func(ctx context.Context, credential azcore.TokenCredential, scope string) (string, error) {
-					return "token", nil
-				}
+			credentialFactory: func(_ context.Context, _ *Config) (azcore.TokenCredential, error) {
+				return &fake.TokenCredential{}, nil
 			},
-			expectedToken: "token",
+			expectedToken: "fake_token",
 			expectedErr:   nil,
 		},
 		{
@@ -133,11 +119,7 @@ func TestGetToken(t *testing.T) {
 				config.UserAssignedIdentityID = ""
 				config.ClientID = clientIDForMSI
 			},
-			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
-				return func(ctx context.Context, credential azcore.TokenCredential, scope string) (string, error) {
-					return "token", nil
-				}
-			},
+			// nil credentialFactory → newCredentialFromConfig runs → error returned for clientIDForMSI with no userAssignedID
 			expectedToken: "",
 			expectedErr:   errors.New("client ID within cloud provider config indicates usage of a managed identity, though no user-assigned identity ID was provided"),
 		},
@@ -148,12 +130,10 @@ func TestGetToken(t *testing.T) {
 				config.UserAssignedIdentityID = "kubelet-identity-id"
 				config.ClientID = clientIDForMSI
 			},
-			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
-				return func(ctx context.Context, credential azcore.TokenCredential, scope string) (string, error) {
-					return "token", nil
-				}
+			credentialFactory: func(_ context.Context, _ *Config) (azcore.TokenCredential, error) {
+				return &fake.TokenCredential{}, nil
 			},
-			expectedToken: "token",
+			expectedToken: "fake_token",
 			expectedErr:   nil,
 		},
 		{
@@ -163,12 +143,10 @@ func TestGetToken(t *testing.T) {
 				config.ClientID = "service-principal-id"
 				config.ClientSecret = "secret"
 			},
-			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
-				return func(ctx context.Context, credential azcore.TokenCredential, scope string) (string, error) {
-					return "token", nil
-				}
+			credentialFactory: func(_ context.Context, _ *Config) (azcore.TokenCredential, error) {
+				return &fake.TokenCredential{}, nil
 			},
-			expectedToken: "token",
+			expectedToken: "fake_token",
 			expectedErr:   nil,
 		},
 		{
@@ -185,12 +163,10 @@ func TestGetToken(t *testing.T) {
 				config.ClientID = "service-principal-id"
 				config.ClientSecret = "certificate:" + certData
 			},
-			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
-				return func(ctx context.Context, credential azcore.TokenCredential, scope string) (string, error) {
-					return "token", nil
-				}
+			credentialFactory: func(_ context.Context, _ *Config) (azcore.TokenCredential, error) {
+				return &fake.TokenCredential{}, nil
 			},
-			expectedToken: "token",
+			expectedToken: "fake_token",
 			expectedErr:   nil,
 		},
 		{
@@ -207,12 +183,10 @@ func TestGetToken(t *testing.T) {
 				config.ClientID = "service-principal-id"
 				config.ClientSecret = base64.StdEncoding.EncodeToString([]byte("certificate:" + certData))
 			},
-			setupExtractAccessTokenFunc: func(t *testing.T) extractAccessTokenFunc {
-				return func(ctx context.Context, credential azcore.TokenCredential, scope string) (string, error) {
-					return "token", nil
-				}
+			credentialFactory: func(_ context.Context, _ *Config) (azcore.TokenCredential, error) {
+				return &fake.TokenCredential{}, nil
 			},
-			expectedToken: "token",
+			expectedToken: "fake_token",
 			expectedErr:   nil,
 		},
 	}
@@ -223,8 +197,13 @@ func TestGetToken(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			ctx := telemetry.WithTracing(log.NewTestContext())
+
+			credentialFactory := c.credentialFactory
+			if credentialFactory == nil {
+				credentialFactory = newCredentialFromConfig
+			}
 			client := &client{
-				extractAccessTokenFunc: c.setupExtractAccessTokenFunc(t),
+				credentialFactory: credentialFactory,
 			}
 			cloudProviderConfig := &cloud.ProviderConfig{
 				TenantID: testTenantID,
@@ -335,3 +314,4 @@ func TestAADResourceToScope(t *testing.T) {
 		})
 	}
 }
+

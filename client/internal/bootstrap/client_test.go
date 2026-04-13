@@ -25,6 +25,7 @@ import (
 	v1 "github.com/Azure/aks-secure-tls-bootstrap/service/pkg/gen/akssecuretlsbootstrap/v1"
 	v1mocks "github.com/Azure/aks-secure-tls-bootstrap/service/pkg/gen/mock/akssecuretlsbootstrap/v1"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/fake"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc"
@@ -35,7 +36,9 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 	cases := []struct {
 		name                     string
 		setupMocks               func(config *Config, kubeconfigValidator *kubeconfigmocks.MockValidator, imdsClient *imdsmocks.MockClient, serviceClient *v1mocks.MockSecureTLSBootstrapServiceClient)
-		extractAccessTokenFunc   func(ctx context.Context, credential azcore.TokenCredential, scope string) (string, error)
+		// credentialFactory overrides newCredentialFromConfig. When nil, newCredentialFromConfig is used,
+		// which exercises the real credential-creation path (including any error cases).
+		credentialFactory        credentialFactoryFunc
 		skipKubeconfigValidation bool
 		expectedError            *bootstrapError
 	}{
@@ -57,6 +60,8 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 				config.EnsureAuthorizedClient = true
 				kubeconfigValidator.EXPECT().Validate(gomock.Any(), "path/to/kubeconfig", true).Return(errors.New("kubeconfig is invalid")).Times(1)
 			},
+			// use real newCredentialFromConfig so that the empty client secret triggers a credential-creation error
+			credentialFactory: newCredentialFromConfig,
 			expectedError: &bootstrapError{
 				errorType: ErrorTypeGetAccessTokenFailure,
 				inner:     fmt.Errorf("generating service principal access token with client secret"),
@@ -250,19 +255,19 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 			}
 			c.setupMocks(config, kubeconfigValidator, imdsClient, serviceClient)
 
+			credentialFactory := c.credentialFactory
+			if credentialFactory == nil {
+				credentialFactory = func(_ context.Context, _ *Config) (azcore.TokenCredential, error) {
+					return &fake.TokenCredential{}, nil
+				}
+			}
 			client := &client{
-				kubeconfigValidator:    kubeconfigValidator,
-				imdsClient:             imdsClient,
-				extractAccessTokenFunc: c.extractAccessTokenFunc,
+				kubeconfigValidator:  kubeconfigValidator,
+				imdsClient:           imdsClient,
+				credentialFactory:    credentialFactory,
 				getServiceClientFunc: func(_ string, _ *Config) (v1.SecureTLSBootstrapServiceClient, closeFunc, error) {
 					return serviceClient, func() error { return nil }, nil
 				},
-			}
-			if client.extractAccessTokenFunc == nil {
-				client.extractAccessTokenFunc = func(ctx context.Context, credential azcore.TokenCredential, scope string) (string, error) {
-					assert.NotNil(t, credential)
-					return "token", nil
-				}
 			}
 
 			kubeconfigData, err := client.bootstrap(telemetry.WithTracing(log.NewTestContext()), config)

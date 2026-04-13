@@ -33,10 +33,17 @@ const (
 	clientIDForMSI = "msi"
 )
 
-// extractAccessTokenFunc retrieves an OAuth access token from the specified credential, fake implementations given in unit tests.
-type extractAccessTokenFunc func(ctx context.Context, credential azcore.TokenCredential, scope string) (string, error)
+// credentialFactoryFunc creates an azcore.TokenCredential based on the provided bootstrap configuration.
+type credentialFactoryFunc func(ctx context.Context, config *Config) (azcore.TokenCredential, error)
 
-func extractAccessToken(ctx context.Context, credential azcore.TokenCredential, scope string) (string, error) {
+func (c *client) getToken(ctx context.Context, config *Config) (string, error) {
+	scope := aadResourceToScope(config.AADResource)
+
+	credential, err := c.credentialFactory(ctx, config)
+	if err != nil {
+		return "", err
+	}
+
 	token, err := credential.GetToken(ctx, policy.TokenRequestOptions{
 		Scopes: []string{scope},
 	})
@@ -46,7 +53,9 @@ func extractAccessToken(ctx context.Context, credential azcore.TokenCredential, 
 	return token.Token, nil
 }
 
-func (c *client) getToken(ctx context.Context, config *Config) (string, error) {
+// newCredentialFromConfig builds an azcore.TokenCredential from the provided bootstrap configuration,
+// selecting between managed identity and service principal credential types as appropriate.
+func newCredentialFromConfig(ctx context.Context, config *Config) (azcore.TokenCredential, error) {
 	logger := log.MustGetLogger(ctx)
 
 	userAssignedID := config.CloudProviderConfig.UserAssignedIdentityID
@@ -54,29 +63,22 @@ func (c *client) getToken(ctx context.Context, config *Config) (string, error) {
 		userAssignedID = config.UserAssignedIdentityID
 	}
 
-	scope := aadResourceToScope(config.AADResource)
-
 	if userAssignedID != "" {
 		logger.Info("generating MSI access token", zap.String("clientId", userAssignedID))
-		msiCredential, err := azidentity.NewManagedIdentityCredential(&azidentity.ManagedIdentityCredentialOptions{
+		cred, err := azidentity.NewManagedIdentityCredential(&azidentity.ManagedIdentityCredentialOptions{
 			ID: azidentity.ClientID(userAssignedID),
 		})
 		if err != nil {
-			return "", fmt.Errorf("generating MSI access token: %w", err)
+			return nil, fmt.Errorf("generating MSI access token: %w", err)
 		}
-		return c.extractAccessTokenFunc(ctx, msiCredential, scope)
+		return cred, nil
 	}
 
 	if config.CloudProviderConfig.ClientID == clientIDForMSI {
-		return "", fmt.Errorf("client ID within cloud provider config indicates usage of a managed identity, though no user-assigned identity ID was provided")
+		return nil, fmt.Errorf("client ID within cloud provider config indicates usage of a managed identity, though no user-assigned identity ID was provided")
 	}
 
-	credential, err := getServicePrincipalCredential(ctx, config.CloudProviderConfig)
-	if err != nil {
-		return "", err
-	}
-
-	return c.extractAccessTokenFunc(ctx, credential, scope)
+	return getServicePrincipalCredential(ctx, config.CloudProviderConfig)
 }
 
 func getServicePrincipalCredential(ctx context.Context, cloudProviderConfig *cloud.ProviderConfig) (azcore.TokenCredential, error) {
