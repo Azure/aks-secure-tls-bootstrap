@@ -114,7 +114,7 @@ func (e *Event) write() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("marshalling bootstrap event data: %w", err)
 	}
-	if err := os.WriteFile(eventFilePath, eventBytes, os.ModePerm); err != nil {
+	if err := os.WriteFile(eventFilePath, eventBytes, 0600); err != nil {
 		return "", fmt.Errorf("writing bootstrap event data to disk: %w", err)
 	}
 	return eventFilePath, nil
