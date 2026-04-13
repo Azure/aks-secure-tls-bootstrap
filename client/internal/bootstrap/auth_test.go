@@ -21,7 +21,10 @@ import (
 	azcloud "github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
 )
 
-const azurePublicCloudName = "AzurePublicCloud"
+const (
+	// testCloudNamePublic is the mixed-case cloud name as would appear in azure.json, used to drive tests.
+	testCloudNamePublic = "AzurePublicCloud"
+)
 
 func TestGetToken(t *testing.T) {
 	cases := []struct {
@@ -49,7 +52,7 @@ func TestGetToken(t *testing.T) {
 		{
 			name: "error generating a service principal access token with client secret due to missing client secret",
 			setupCloudProviderConfig: func(t *testing.T, config *cloud.ProviderConfig) {
-				config.CloudName = azurePublicCloudName
+				config.CloudName = testCloudNamePublic
 				config.ClientID = "service-principal-id"
 				config.ClientSecret = ""
 			},
@@ -60,7 +63,7 @@ func TestGetToken(t *testing.T) {
 		{
 			name: "error b64-decoding client secret certificate data",
 			setupCloudProviderConfig: func(t *testing.T, config *cloud.ProviderConfig) {
-				config.CloudName = azurePublicCloudName
+				config.CloudName = testCloudNamePublic
 				config.ClientID = "service-principal-id"
 				config.ClientSecret = "certificate:YW55IGNhcm5hbCBwbGVhc3U======" // invalid b64-encoding
 			},
@@ -71,7 +74,7 @@ func TestGetToken(t *testing.T) {
 		{
 			name: "error pfx-decoding client secret certificate data",
 			setupCloudProviderConfig: func(t *testing.T, config *cloud.ProviderConfig) {
-				config.CloudName = azurePublicCloudName
+				config.CloudName = testCloudNamePublic
 				config.ClientID = "service-principal-id"
 				config.ClientSecret = "certificate:dGVzdAo=" // b64-encoding of "test"
 			},
@@ -89,7 +92,7 @@ func TestGetToken(t *testing.T) {
 				})
 				assert.NoError(t, err)
 
-				config.CloudName = azurePublicCloudName
+				config.CloudName = testCloudNamePublic
 				config.ClientID = "service-principal-id"
 				config.ClientSecret = "certificate:" + certData
 			},
@@ -139,7 +142,7 @@ func TestGetToken(t *testing.T) {
 		{
 			name: "service principal client secret does not contain certificate data",
 			setupCloudProviderConfig: func(t *testing.T, config *cloud.ProviderConfig) {
-				config.CloudName = azurePublicCloudName
+				config.CloudName = testCloudNamePublic
 				config.ClientID = "service-principal-id"
 				config.ClientSecret = "secret"
 			},
@@ -159,7 +162,7 @@ func TestGetToken(t *testing.T) {
 				})
 				assert.NoError(t, err)
 
-				config.CloudName = azurePublicCloudName
+				config.CloudName = testCloudNamePublic
 				config.ClientID = "service-principal-id"
 				config.ClientSecret = "certificate:" + certData
 			},
@@ -179,7 +182,7 @@ func TestGetToken(t *testing.T) {
 				})
 				assert.NoError(t, err)
 
-				config.CloudName = azurePublicCloudName
+				config.CloudName = testCloudNamePublic
 				config.ClientID = "service-principal-id"
 				config.ClientSecret = base64.StdEncoding.EncodeToString([]byte("certificate:" + certData))
 			},
@@ -235,9 +238,9 @@ func TestCloudConfigFromName(t *testing.T) {
 		expectedErr   error
 	}{
 		{
-			name:          "empty cloud name maps to AzurePublic",
-			cloudName:     "",
-			expectedCloud: azcloud.AzurePublic,
+			name:        "empty cloud name returns error",
+			cloudName:   "",
+			expectedErr: errors.New(`unsupported cloud name: ""`),
 		},
 		{
 			name:          "AzurePublicCloud maps to AzurePublic",

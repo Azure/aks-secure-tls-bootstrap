@@ -18,7 +18,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"go.uber.org/zap"
-	"software.sslmate.com/src/go-pkcs12"
+	"golang.org/x/crypto/pkcs12"
 )
 
 const (
@@ -31,6 +31,13 @@ const (
 	// this will be the exact value of the "userAssignedIdentityID" field of the cloud provider config (azure.json)
 	// when the node is using a (user-assigned) managed identity, rather than a service principal
 	clientIDForMSI = "msi"
+)
+
+// lowercase cloud names as defined by the azure environment (e.g. strings.ToLower(azure.PublicCloud.Name))
+const (
+	azurePublicCloudName      = "azurepubliccloud"
+	azureUSGovernmentCloudName = "azureusgovernmentcloud"
+	azureChinaCloudName       = "azurechinacloud"
 )
 
 // credentialFactoryFunc creates an azcore.TokenCredential based on the provided bootstrap configuration.
@@ -141,11 +148,11 @@ func getServicePrincipalCredential(ctx context.Context, cloudProviderConfig *clo
 // cloudConfigFromName maps an Azure cloud name (as found in azure.json) to an azcore/cloud.Configuration.
 func cloudConfigFromName(name string) (azcloud.Configuration, error) {
 	switch strings.ToLower(name) {
-	case "", "azurepubliccloud":
+	case azurePublicCloudName:
 		return azcloud.AzurePublic, nil
-	case "azureusgovernmentcloud":
+	case azureUSGovernmentCloudName:
 		return azcloud.AzureGovernment, nil
-	case "azurechinacloud":
+	case azureChinaCloudName:
 		return azcloud.AzureChina, nil
 	default:
 		return azcloud.Configuration{}, fmt.Errorf("unsupported cloud name: %q", name)
@@ -176,3 +183,4 @@ func maybeB64Decode(str string) string {
 	}
 	return str
 }
+
