@@ -33,9 +33,8 @@ type Config struct {
 	ClusterCAFilePath         string        `json:"clusterCaFilePath"`
 	KubeconfigPath            string        `json:"kubeconfigPath"`
 	CertDir                   string        `json:"certDir"`
-	TLSMinVersion             string        `json:"tlsMinVersion"`
-	InsecureSkipTLSVerify     bool          `json:"insecureSkipTlsVerify"`
-	EnsureAuthorizedClient    bool          `json:"ensureAuthorizedClient"`
+	TLSMinVersion          string        `json:"tlsMinVersion"`
+	EnsureAuthorizedClient bool          `json:"ensureAuthorizedClient"`
 	ValidateKubeconfigTimeout time.Duration `json:"validateKubeconfigTimeout"`
 	GetAccessTokenTimeout     time.Duration `json:"getAccessTokenTimeout"`
 	GetInstanceDataTimeout    time.Duration `json:"getInstanceDataTimeout"`
@@ -75,7 +74,6 @@ func (c *Config) ToZapFields() []zap.Field {
 		zap.String("kubeconfigPath", c.KubeconfigPath),
 		zap.String("certDir", c.CertDir),
 		zap.String("tlsMinVersion", c.TLSMinVersion),
-		zap.Bool("insecureSkipTlsVerify", c.InsecureSkipTLSVerify),
 		zap.Bool("ensureAuthorizedClient", c.EnsureAuthorizedClient),
 		zap.Int64("validateKubeconfigTimeoutMilliseconds", c.ValidateKubeconfigTimeout.Milliseconds()),
 		zap.Int64("getAccessTokenTimeoutMilliseconds", c.GetAccessTokenTimeout.Milliseconds()),
