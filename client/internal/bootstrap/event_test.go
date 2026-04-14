@@ -46,6 +46,10 @@ func TestLinuxEvent(t *testing.T) {
 	eventEntry := entries[0]
 	assert.Equal(t, fmt.Sprintf("%d.json", now.UnixNano()), eventEntry.Name())
 
+	info, err := eventEntry.Info()
+	assert.NoError(t, err)
+	assert.Equal(t, os.FileMode(0600), info.Mode().Perm())
+
 	content, err := os.ReadFile(filepath.Join(guestAgentEventsPathLinux, eventEntry.Name()))
 	assert.NoError(t, err)
 
@@ -142,6 +146,10 @@ func TestWriteWithResult(t *testing.T) {
 	path, err := e.WriteWithResult(result)
 	assert.NoError(t, err)
 	assert.Equal(t, filepath.Dir(path), guestAgentEventsPathLinux)
+
+	info, err := os.Stat(path)
+	assert.NoError(t, err)
+	assert.Equal(t, os.FileMode(0600), info.Mode().Perm())
 
 	eventBytes, err := os.ReadFile(path)
 	assert.NoError(t, err)
