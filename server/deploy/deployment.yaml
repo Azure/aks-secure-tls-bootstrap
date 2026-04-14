@@ -1,0 +1,48 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aks-secure-tls-bootstrap-server
+  namespace: kube-system
+  labels:
+    app: aks-secure-tls-bootstrap-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: aks-secure-tls-bootstrap-server
+  template:
+    metadata:
+      labels:
+        app: aks-secure-tls-bootstrap-server
+    spec:
+      containers:
+        - name: aks-secure-tls-bootstrap-server
+          image: mcr.microsoft.com/aks/aks-secure-tls-bootstrap-server:latest
+          ports:
+            - containerPort: 8080
+              name: grpc
+              protocol: TCP
+          livenessProbe:
+            grpc:
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            grpc:
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
