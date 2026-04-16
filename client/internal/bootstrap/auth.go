@@ -5,20 +5,17 @@ package bootstrap
 
 import (
 	"context"
-	"crypto"
-	"crypto/x509"
 	"encoding/base64"
 	"fmt"
 	"strings"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/cloud"
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/http"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/log"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
-	azcloud "github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"go.uber.org/zap"
-	"golang.org/x/crypto/pkcs12"
 )
 
 const (
@@ -28,31 +25,21 @@ const (
 )
 
 const (
-	// this will be the exact value of the "userAssignedIdentityID" field of the cloud provider config (azure.json)
+	// this will be the exact value of the "userAssignedIdentityID" field of the cloud provider config
 	// when the node is using a (user-assigned) managed identity, rather than a service principal
 	clientIDForMSI = "msi"
 )
 
-// lowercase cloud names as defined by the azure environment (e.g. strings.ToLower(azure.PublicCloud.Name))
-const (
-	azurePublicCloudName      = "azurepubliccloud"
-	azureUSGovernmentCloudName = "azureusgovernmentcloud"
-	azureChinaCloudName       = "azurechinacloud"
-)
-
-// credentialFactoryFunc creates an azcore.TokenCredential based on the provided bootstrap configuration.
-type credentialFactoryFunc func(ctx context.Context, config *Config) (azcore.TokenCredential, error)
+// getTokenCredentialFunc creates an azcore.TokenCredential based on the provided bootstrap configuration.
+type getTokenCredentialFunc func(ctx context.Context, config *Config) (azcore.TokenCredential, error)
 
 func (c *client) getToken(ctx context.Context, config *Config) (string, error) {
-	scope := aadResourceToScope(config.AADResource)
-
-	credential, err := c.credentialFactory(ctx, config)
+	credential, err := c.getTokenCredentialFunc(ctx, config)
 	if err != nil {
 		return "", err
 	}
-
 	token, err := credential.GetToken(ctx, policy.TokenRequestOptions{
-		Scopes: []string{scope},
+		Scopes: []string{config.AADResource},
 	})
 	if err != nil {
 		return "", err
@@ -60,9 +47,9 @@ func (c *client) getToken(ctx context.Context, config *Config) (string, error) {
 	return token.Token, nil
 }
 
-// newCredentialFromConfig builds an azcore.TokenCredential from the provided bootstrap configuration,
+// getTokenCredential builds an azcore.TokenCredential from the provided bootstrap configuration,
 // selecting between managed identity and service principal credential types as appropriate.
-func newCredentialFromConfig(ctx context.Context, config *Config) (azcore.TokenCredential, error) {
+func getTokenCredential(ctx context.Context, config *Config) (azcore.TokenCredential, error) {
 	logger := log.MustGetLogger(ctx)
 
 	userAssignedID := config.CloudProviderConfig.UserAssignedIdentityID
@@ -73,7 +60,8 @@ func newCredentialFromConfig(ctx context.Context, config *Config) (azcore.TokenC
 	if userAssignedID != "" {
 		logger.Info("generating MSI access token", zap.String("clientId", userAssignedID))
 		cred, err := azidentity.NewManagedIdentityCredential(&azidentity.ManagedIdentityCredentialOptions{
-			ID: azidentity.ClientID(userAssignedID),
+			ID:            azidentity.ClientID(userAssignedID),
+			ClientOptions: http.GetDefaultAzureClientOpts(),
 		})
 		if err != nil {
 			return nil, fmt.Errorf("generating MSI access token: %w", err)
@@ -93,7 +81,7 @@ func getServicePrincipalCredential(ctx context.Context, cloudProviderConfig *clo
 
 	secret := maybeB64Decode(cloudProviderConfig.ClientSecret)
 
-	cloudConfig, err := cloudConfigFromName(cloudProviderConfig.CloudName)
+	cloudConfig, err := cloud.GetCloudConfig(cloudProviderConfig.CloudName)
 	if err != nil {
 		return nil, fmt.Errorf("getting azure environment config for cloud %q: %w", cloudProviderConfig.CloudName, err)
 	}
@@ -103,12 +91,9 @@ func getServicePrincipalCredential(ctx context.Context, cloudProviderConfig *clo
 		if secret == "" {
 			return nil, fmt.Errorf("generating service principal access token with client secret: client secret is empty")
 		}
-		credential, err := azidentity.NewClientSecretCredential(
-			cloudProviderConfig.TenantID,
-			cloudProviderConfig.ClientID,
-			secret,
+		credential, err := azidentity.NewClientSecretCredential(cloudProviderConfig.TenantID, cloudProviderConfig.ClientID, secret,
 			&azidentity.ClientSecretCredentialOptions{
-				ClientOptions: azcore.ClientOptions{Cloud: cloudConfig},
+				ClientOptions: http.GetDefaultAzureClientOptsWithCloud(cloudConfig),
 			},
 		)
 		if err != nil {
@@ -123,19 +108,15 @@ func getServicePrincipalCredential(ctx context.Context, cloudProviderConfig *clo
 	if err != nil {
 		return nil, fmt.Errorf("b64-decoding certificate data in client secret: %w", err)
 	}
-	certs, key, err := decodePFXCertificateData(certData)
+	certs, key, err := azidentity.ParseCertificates(certData, nil)
 	if err != nil {
 		return nil, fmt.Errorf("decoding pfx certificate data in client secret: %w", err)
 	}
 
 	logger.Info("generating service principal access token with certificate", zap.String("clientId", cloudProviderConfig.ClientID))
-	credential, err := azidentity.NewClientCertificateCredential(
-		cloudProviderConfig.TenantID,
-		cloudProviderConfig.ClientID,
-		certs,
-		key,
+	credential, err := azidentity.NewClientCertificateCredential(cloudProviderConfig.TenantID, cloudProviderConfig.ClientID, certs, key,
 		&azidentity.ClientCertificateCredentialOptions{
-			ClientOptions: azcore.ClientOptions{Cloud: cloudConfig},
+			ClientOptions: http.GetDefaultAzureClientOptsWithCloud(cloudConfig),
 		},
 	)
 	if err != nil {
@@ -145,42 +126,9 @@ func getServicePrincipalCredential(ctx context.Context, cloudProviderConfig *clo
 	return credential, nil
 }
 
-// cloudConfigFromName maps an Azure cloud name (as found in azure.json) to an azcore/cloud.Configuration.
-func cloudConfigFromName(name string) (azcloud.Configuration, error) {
-	switch strings.ToLower(name) {
-	case azurePublicCloudName:
-		return azcloud.AzurePublic, nil
-	case azureUSGovernmentCloudName:
-		return azcloud.AzureGovernment, nil
-	case azureChinaCloudName:
-		return azcloud.AzureChina, nil
-	default:
-		return azcloud.Configuration{}, fmt.Errorf("unsupported cloud name: %q", name)
-	}
-}
-
-// aadResourceToScope converts an AAD resource URI to an OAuth 2.0 scope, as required by the Track 2 SDK.
-func aadResourceToScope(resource string) string {
-	resource = strings.TrimSuffix(resource, "/")
-	if !strings.HasSuffix(resource, "/.default") {
-		resource += "/.default"
-	}
-	return resource
-}
-
-// decodePFXCertificateData decodes a PFX-encoded certificate and private key from the provided data.
-func decodePFXCertificateData(data []byte) ([]*x509.Certificate, crypto.PrivateKey, error) {
-	privateKey, certificate, err := pkcs12.Decode(data, "")
-	if err != nil {
-		return nil, nil, err
-	}
-	return []*x509.Certificate{certificate}, privateKey, nil
-}
-
 func maybeB64Decode(str string) string {
 	if decoded, err := base64.StdEncoding.DecodeString(str); err == nil {
 		return string(decoded)
 	}
 	return str
 }
-

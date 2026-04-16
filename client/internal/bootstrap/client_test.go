@@ -26,6 +26,7 @@ import (
 	v1mocks "github.com/Azure/aks-secure-tls-bootstrap/service/pkg/gen/mock/akssecuretlsbootstrap/v1"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/fake"
+	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc"
@@ -34,11 +35,11 @@ import (
 
 func TestBootstrapKubeletClientCredential(t *testing.T) {
 	cases := []struct {
-		name                     string
-		setupMocks               func(config *Config, kubeconfigValidator *kubeconfigmocks.MockValidator, imdsClient *imdsmocks.MockClient, serviceClient *v1mocks.MockSecureTLSBootstrapServiceClient)
-		// credentialFactory overrides newCredentialFromConfig. When nil, newCredentialFromConfig is used,
+		name       string
+		setupMocks func(config *Config, kubeconfigValidator *kubeconfigmocks.MockValidator, imdsClient *imdsmocks.MockClient, serviceClient *v1mocks.MockSecureTLSBootstrapServiceClient)
+		// getTokenCredentialFunc overrides newCredentialFromConfig. When nil, newCredentialFromConfig is used,
 		// which exercises the real credential-creation path (including any error cases).
-		credentialFactory        credentialFactoryFunc
+		getTokenCredentialFunc   getTokenCredentialFunc
 		skipKubeconfigValidation bool
 		expectedError            *bootstrapError
 	}{
@@ -61,7 +62,7 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 				kubeconfigValidator.EXPECT().Validate(gomock.Any(), "path/to/kubeconfig", true).Return(errors.New("kubeconfig is invalid")).Times(1)
 			},
 			// use real newCredentialFromConfig so that the empty client secret triggers a credential-creation error
-			credentialFactory: newCredentialFromConfig,
+			getTokenCredentialFunc: getTokenCredential,
 			expectedError: &bootstrapError{
 				errorType: ErrorTypeGetAccessTokenFailure,
 				inner:     fmt.Errorf("generating service principal access token with client secret"),
@@ -242,7 +243,7 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 				KubeconfigPath:          "path/to/kubeconfig",
 				CloudProviderConfigPath: filepath.Join(tempDir, "azure.json"),
 				CloudProviderConfig: &cloud.ProviderConfig{
-					CloudName:    azurePublicCloudName,
+					CloudName:    azure.PublicCloud.Name,
 					ClientID:     "service-principal-id",
 					ClientSecret: "service-principal-secret",
 					TenantID:     "tenantId",
@@ -255,16 +256,16 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 			}
 			c.setupMocks(config, kubeconfigValidator, imdsClient, serviceClient)
 
-			credentialFactory := c.credentialFactory
+			credentialFactory := c.getTokenCredentialFunc
 			if credentialFactory == nil {
 				credentialFactory = func(_ context.Context, _ *Config) (azcore.TokenCredential, error) {
 					return &fake.TokenCredential{}, nil
 				}
 			}
 			client := &client{
-				kubeconfigValidator:  kubeconfigValidator,
-				imdsClient:           imdsClient,
-				credentialFactory:    credentialFactory,
+				kubeconfigValidator:    kubeconfigValidator,
+				imdsClient:             imdsClient,
+				getTokenCredentialFunc: credentialFactory,
 				getServiceClientFunc: func(_ string, _ *Config) (v1.SecureTLSBootstrapServiceClient, closeFunc, error) {
 					return serviceClient, func() error { return nil }, nil
 				},

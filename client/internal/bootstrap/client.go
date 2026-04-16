@@ -18,18 +18,18 @@ import (
 )
 
 type client struct {
-	kubeconfigValidator  kubeconfig.Validator
-	imdsClient           imds.Client
-	getServiceClientFunc getServiceClientFunc
-	credentialFactory    credentialFactoryFunc
+	kubeconfigValidator    kubeconfig.Validator
+	imdsClient             imds.Client
+	getServiceClientFunc   getServiceClientFunc
+	getTokenCredentialFunc getTokenCredentialFunc
 }
 
 func newClient(ctx context.Context) *client {
 	return &client{
-		kubeconfigValidator:  kubeconfig.NewValidator(),
-		imdsClient:           imds.NewClient(ctx),
-		getServiceClientFunc: getServiceClient,
-		credentialFactory:    newCredentialFromConfig,
+		kubeconfigValidator:    kubeconfig.NewValidator(),
+		imdsClient:             imds.NewClient(ctx),
+		getServiceClientFunc:   getServiceClient,
+		getTokenCredentialFunc: getTokenCredential,
 	}
 }
 
