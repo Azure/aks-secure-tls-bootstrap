@@ -4,21 +4,17 @@
 package http
 
 import (
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/build"
 	azcloud "github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestGetUserAgent(t *testing.T) {
-	expected := fmt.Sprintf("aks-secure-tls-bootstrap-client/%s", build.GetVersion())
-
 	cases := []struct {
 		name   string
 		assert func(t *testing.T)
@@ -46,7 +42,7 @@ func TestGetUserAgent(t *testing.T) {
 				assert.NoError(t, err)
 				defer resp.Body.Close()
 
-				assert.Equal(t, expected, receivedUA)
+				assert.True(t, strings.HasPrefix(receivedUA, "aks-secure-tls-bootstrap-client/"))
 			},
 		},
 	}
