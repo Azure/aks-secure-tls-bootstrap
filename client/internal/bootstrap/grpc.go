@@ -41,7 +41,7 @@ func getServiceClient(token string, cfg *Config) (v1.SecureTLSBootstrapServiceCl
 		return nil, nil, fmt.Errorf("reading cluster CA data from %s: %w", cfg.ClusterCAFilePath, err)
 	}
 
-	tlsConfig, err := getTLSConfig(clusterCAData, cfg.NextProto, cfg.InsecureSkipTLSVerify, getTLSMinVersion(cfg))
+	tlsConfig, err := getTLSConfig(clusterCAData, cfg.NextProto, getTLSMinVersion(cfg))
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get TLS config: %w", err)
 	}
@@ -98,16 +98,15 @@ func withLastGRPCRetryErrorIfDeadlineExceeded(err error) error {
 	return fmt.Errorf("%w: last error: %s", err, lastGRPCRetryError)
 }
 
-func getTLSConfig(caPEM []byte, nextProto string, insecureSkipVerify bool, tlsMinVersion uint16) (*tls.Config, error) {
+func getTLSConfig(caPEM []byte, nextProto string, tlsMinVersion uint16) (*tls.Config, error) {
 	roots := x509.NewCertPool()
 	if ok := roots.AppendCertsFromPEM(caPEM); !ok {
 		return nil, fmt.Errorf("unable to construct new cert pool using cluster CA data")
 	}
 
 	tlsConfig := &tls.Config{
-		MinVersion:         tlsMinVersion,
-		RootCAs:            roots,
-		InsecureSkipVerify: insecureSkipVerify,
+		MinVersion: tlsMinVersion,
+		RootCAs:    roots,
 	}
 	if nextProto != "" {
 		tlsConfig.NextProtos = []string{nextProto, "h2"}

@@ -126,41 +126,26 @@ func TestGetTLSConfig(t *testing.T) {
 	cases := []struct {
 		name               string
 		nextProto          string
-		insecureSkipVerify bool
 		expectedNextProtos []string
 	}{
 		{
 			name:               "without nextProto",
 			nextProto:          "",
-			insecureSkipVerify: false,
 			expectedNextProtos: nil,
 		},
 		{
 			name:               "with nextProto",
 			nextProto:          "bootstrap",
-			insecureSkipVerify: false,
 			expectedNextProtos: []string{"bootstrap", "h2"},
-		},
-		{
-			name:               "insecureSkipVerify false",
-			nextProto:          "nextProto",
-			insecureSkipVerify: false,
-			expectedNextProtos: []string{"nextProto", "h2"},
-		},
-		{
-			name:               "insecureSkipVerify true",
-			nextProto:          "nextProto",
-			insecureSkipVerify: true,
-			expectedNextProtos: []string{"nextProto", "h2"},
 		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			config, err := getTLSConfig(clusterCACertPEM, c.nextProto, c.insecureSkipVerify, tls.VersionTLS13)
+			config, err := getTLSConfig(clusterCACertPEM, c.nextProto, tls.VersionTLS13)
 			assert.NoError(t, err)
 			assert.NotNil(t, config)
 			assert.Equal(t, c.expectedNextProtos, config.NextProtos)
-			assert.Equal(t, c.insecureSkipVerify, config.InsecureSkipVerify)
+			assert.False(t, config.InsecureSkipVerify)
 			assert.Equal(t, uint16(tls.VersionTLS13), config.MinVersion)
 			assert.True(t, config.RootCAs.Equal(rootPool))
 		})
