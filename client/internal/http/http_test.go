@@ -15,119 +15,42 @@ import (
 )
 
 func TestGetUserAgent(t *testing.T) {
-	cases := []struct {
-		name   string
-		assert func(t *testing.T)
-	}{
-		{
-			name: "returns expected user agent string",
-			assert: func(t *testing.T) {
-				assert.True(t, strings.HasPrefix(GetUserAgent(), "aks-secure-tls-bootstrap-client/"))
-			},
-		},
-		{
-			name: "User-Agent header is set on outgoing requests via customTransport",
-			assert: func(t *testing.T) {
-				var receivedUA string
-				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					receivedUA = r.Header.Get("User-Agent")
-					w.WriteHeader(http.StatusOK)
-				}))
-				defer server.Close()
+	userAgent := GetUserAgent()
+	assert.True(t, strings.HasPrefix(userAgent, "aks-secure-tls-bootstrap-client/"))
+}
 
-				transport := &customTransport{base: http.DefaultTransport}
-				client := &http.Client{Transport: transport}
+func TestCustomTransport(t *testing.T) {
+	var userAgent string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		userAgent = r.Header.Get("User-Agent")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
 
-				resp, err := client.Get(server.URL)
-				assert.NoError(t, err)
-				defer func() {
-					assert.NoError(t, resp.Body.Close())
-				}()
+	transport := &customTransport{base: http.DefaultTransport}
+	client := &http.Client{Transport: transport}
 
-				assert.True(t, strings.HasPrefix(receivedUA, "aks-secure-tls-bootstrap-client/"))
-			},
-		},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			c.assert(t)
-		})
-	}
+	resp, err := client.Get(server.URL)
+	assert.NoError(t, err)
+	defer func() {
+		assert.NoError(t, resp.Body.Close())
+	}()
+
+	assert.True(t, strings.HasPrefix(userAgent, "aks-secure-tls-bootstrap-client/"))
 }
 
 func TestGetDefaultAzureClientOpts(t *testing.T) {
-	cases := []struct {
-		name   string
-		assert func(t *testing.T)
-	}{
-		{
-			name: "MaxRetries is 10",
-			assert: func(t *testing.T) {
-				opts := GetDefaultAzureClientOpts()
-				assert.Equal(t, int32(10), opts.Retry.MaxRetries)
-			},
-		},
-		{
-			name: "RetryDelay is 800ms",
-			assert: func(t *testing.T) {
-				opts := GetDefaultAzureClientOpts()
-				assert.Equal(t, 800*time.Millisecond, opts.Retry.RetryDelay)
-			},
-		},
-		{
-			name: "MaxRetryDelay is 5s",
-			assert: func(t *testing.T) {
-				opts := GetDefaultAzureClientOpts()
-				assert.Equal(t, 5*time.Second, opts.Retry.MaxRetryDelay)
-			},
-		},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			c.assert(t)
-		})
-	}
+	opts := GetDefaultAzureClientOpts()
+	assert.Equal(t, int32(10), opts.Retry.MaxRetries)
+	assert.Equal(t, 800*time.Millisecond, opts.Retry.RetryDelay)
+	assert.Equal(t, 5*time.Second, opts.Retry.MaxRetryDelay)
 }
 
 func TestGetDefaultAzureClientOptsWithCloud(t *testing.T) {
-	cases := []struct {
-		name        string
-		cloudConfig azcloud.Configuration
-		assert      func(t *testing.T, cloudConfig azcloud.Configuration)
-	}{
-		{
-			name: "cloud config is set on returned options",
-			cloudConfig: azcloud.Configuration{
-				ActiveDirectoryAuthorityHost: "https://login.microsoftonline.com/",
-				Services: map[azcloud.ServiceName]azcloud.ServiceConfiguration{
-					azcloud.ResourceManager: {
-						Audience: "https://management.azure.com/",
-						Endpoint: "https://management.azure.com",
-					},
-				},
-			},
-			assert: func(t *testing.T, cloudConfig azcloud.Configuration) {
-				opts := GetDefaultAzureClientOptsWithCloud(cloudConfig)
-				assert.Equal(t, cloudConfig.ActiveDirectoryAuthorityHost, opts.Cloud.ActiveDirectoryAuthorityHost)
-				assert.Equal(t, cloudConfig.Services, opts.Cloud.Services)
-			},
-		},
-		{
-			name: "default retry options are preserved with cloud config",
-			cloudConfig: azcloud.Configuration{
-				ActiveDirectoryAuthorityHost: "https://login.chinacloudapi.cn/",
-			},
-			assert: func(t *testing.T, cloudConfig azcloud.Configuration) {
-				opts := GetDefaultAzureClientOptsWithCloud(cloudConfig)
-				assert.Equal(t, int32(10), opts.Retry.MaxRetries)
-				assert.Equal(t, 800*time.Millisecond, opts.Retry.RetryDelay)
-				assert.Equal(t, 5*time.Second, opts.Retry.MaxRetryDelay)
-			},
-		},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			c.assert(t, c.cloudConfig)
-		})
-	}
+	cloudConfig := azcloud.AzurePublic
+	opts := GetDefaultAzureClientOptsWithCloud(cloudConfig)
+	assert.Equal(t, cloudConfig, opts.Cloud)
+	assert.Equal(t, int32(10), opts.Retry.MaxRetries)
+	assert.Equal(t, 800*time.Millisecond, opts.Retry.RetryDelay)
+	assert.Equal(t, 5*time.Second, opts.Retry.MaxRetryDelay)
 }

@@ -37,7 +37,7 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 	cases := []struct {
 		name       string
 		setupMocks func(config *Config, kubeconfigValidator *kubeconfigmocks.MockValidator, imdsClient *imdsmocks.MockClient, serviceClient *v1mocks.MockSecureTLSBootstrapServiceClient)
-		// getTokenCredentialFunc overrides newCredentialFromConfig. When nil, newCredentialFromConfig is used,
+		// getTokenCredentialFunc overrides getTokenCredential. When nil, getTokenCredential is used,
 		// which exercises the real credential-creation path (including any error cases).
 		getTokenCredentialFunc   getTokenCredentialFunc
 		skipKubeconfigValidation bool
@@ -61,7 +61,7 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 				config.EnsureAuthorizedClient = true
 				kubeconfigValidator.EXPECT().Validate(gomock.Any(), "path/to/kubeconfig", true).Return(errors.New("kubeconfig is invalid")).Times(1)
 			},
-			// use real newCredentialFromConfig so that the empty client secret triggers a credential-creation error
+			// use real getTokenCredential so that the empty client secret triggers a credential-creation error
 			getTokenCredentialFunc: getTokenCredential,
 			expectedError: &bootstrapError{
 				errorType: ErrorTypeGetAccessTokenFailure,
