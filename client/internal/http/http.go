@@ -11,6 +11,9 @@ import (
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/build"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/log"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	azcloud "github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/hashicorp/go-retryablehttp"
 )
 
@@ -18,9 +21,19 @@ const (
 	userAgentHeaderKey = "User-Agent"
 )
 
-// UserAgent returns the common User-Agent header value used in all RPCs and HTTP calls.
-func UserAgent() string {
+// GetUserAgent returns the common User-Agent header value used in all RPCs and HTTP calls.
+func GetUserAgent() string {
 	return fmt.Sprintf("aks-secure-tls-bootstrap-client/%s", build.GetVersion())
+}
+
+func GetDefaultAzureClientOpts() azcore.ClientOptions {
+	return defaultAzureClientOpts()
+}
+
+func GetDefaultAzureClientOptsWithCloud(cloudConfig azcloud.Configuration) azcore.ClientOptions {
+	opts := defaultAzureClientOpts()
+	opts.Cloud = cloudConfig
+	return opts
 }
 
 // NewRetryableClient returns a *retryablehttp.Client with a custom transport.
@@ -52,11 +65,28 @@ func configureTransport(client *retryablehttp.Client) {
 	}
 }
 
+func defaultAzureClientOpts() azcore.ClientOptions {
+	return azcore.ClientOptions{
+		// Retry allows us to override exponential backoff parameters for talking to
+		// Azure services using a track2 SDK client, such as Entra ID.
+		// All options not overriden will be defaulted accordingly at request time.
+		// We only override a minimal set of fields to allow track2 clients to intelligently
+		// determinie the best retry configuration based on the scenario (such as IMDS vs. Entra ID, etc.)
+		Retry: policy.RetryOptions{
+			MaxRetries: 10,
+			RetryDelay: 800 * time.Millisecond,
+			// this is primarily to prevent deep exponential backoff loops
+			// from causing too much delay (we take a more "aggressive" retry strategy to minimze bootstrap latency)
+			MaxRetryDelay: 5 * time.Second,
+		},
+	}
+}
+
 type customTransport struct {
 	base http.RoundTripper
 }
 
 func (t *customTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	req.Header.Set(userAgentHeaderKey, UserAgent())
+	req.Header.Set(userAgentHeaderKey, GetUserAgent())
 	return t.base.RoundTrip(req)
 }
