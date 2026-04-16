@@ -40,7 +40,9 @@ func TestGetUserAgent(t *testing.T) {
 
 				resp, err := client.Get(server.URL)
 				assert.NoError(t, err)
-				defer resp.Body.Close()
+				defer func() {
+					assert.NoError(t, resp.Body.Close())
+				}()
 
 				assert.True(t, strings.HasPrefix(receivedUA, "aks-secure-tls-bootstrap-client/"))
 			},
