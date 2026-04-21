@@ -48,7 +48,7 @@ func getServiceClient(token string, cfg *Config) (v1.SecureTLSBootstrapServiceCl
 
 	conn, err := grpc.NewClient(
 		fmt.Sprintf("%s:443", cfg.APIServerFQDN),
-		grpc.WithUserAgent(internalhttp.UserAgent()),
+		grpc.WithUserAgent(internalhttp.GetUserAgent()),
 		grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)),
 		grpc.WithPerRPCCredentials(oauth.TokenSource{
 			TokenSource: oauth2.StaticTokenSource(&oauth2.Token{
