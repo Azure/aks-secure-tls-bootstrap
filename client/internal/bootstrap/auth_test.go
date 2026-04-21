@@ -217,3 +217,39 @@ func TestGetToken(t *testing.T) {
 		})
 	}
 }
+
+func TestAADResourceToScope(t *testing.T) {
+	cases := []struct {
+		name          string
+		resource      string
+		expectedScope string
+	}{
+		{
+			name:          "resource without trailing slash gets /.default appended",
+			resource:      "https://management.azure.com",
+			expectedScope: "https://management.azure.com/.default",
+		},
+		{
+			name:          "resource with trailing slash gets /.default appended (slash removed first)",
+			resource:      "https://management.azure.com/",
+			expectedScope: "https://management.azure.com/.default",
+		},
+		{
+			name:          "resource already ending in /.default is unchanged",
+			resource:      "https://management.azure.com/.default",
+			expectedScope: "https://management.azure.com/.default",
+		},
+		{
+			name:          "simple resource string",
+			resource:      "resource",
+			expectedScope: "resource/.default",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			scope := aadResourceToScope(c.resource)
+			assert.Equal(t, c.expectedScope, scope)
+		})
+	}
+}

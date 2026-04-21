@@ -39,7 +39,7 @@ func (c *client) getToken(ctx context.Context, config *Config) (string, error) {
 		return "", err
 	}
 	token, err := credential.GetToken(ctx, policy.TokenRequestOptions{
-		Scopes: []string{config.AADResource},
+		Scopes: []string{aadResourceToScope(config.AADResource)},
 	})
 	if err != nil {
 		return "", err
@@ -124,6 +124,14 @@ func getServicePrincipalCredential(ctx context.Context, cloudProviderConfig *clo
 	}
 
 	return credential, nil
+}
+
+func aadResourceToScope(resource string) string {
+	resource = strings.TrimSuffix(resource, "/")
+	if !strings.HasSuffix(resource, "/.default") {
+		resource += "/.default"
+	}
+	return resource
 }
 
 func maybeB64Decode(str string) string {
