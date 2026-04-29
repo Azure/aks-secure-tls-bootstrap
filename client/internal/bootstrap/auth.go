@@ -6,7 +6,9 @@ package bootstrap
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/cloud"
@@ -47,10 +49,7 @@ func extractAccessToken(ctx context.Context, token *adal.ServicePrincipalToken, 
 func (c *client) getToken(ctx context.Context, config *Config) (string, error) {
 	logger := log.MustGetLogger(ctx)
 
-	userAssignedID := config.CloudProviderConfig.UserAssignedIdentityID
-	if config.UserAssignedIdentityID != "" {
-		userAssignedID = config.UserAssignedIdentityID
-	}
+	userAssignedID := getUserAssignedIdentityID(config)
 
 	if userAssignedID != "" {
 		logger.Info("generating MSI access token", zap.String("clientId", userAssignedID))
@@ -74,6 +73,60 @@ func (c *client) getToken(ctx context.Context, config *Config) (string, error) {
 	}
 
 	return c.extractAccessTokenFunc(ctx, servicePrincipalToken, false)
+}
+
+func getUserAssignedIdentityID(config *Config) string {
+	if config == nil {
+		return ""
+	}
+	if config.UserAssignedIdentityID != "" {
+		return config.UserAssignedIdentityID
+	}
+	if config.CloudProviderConfig == nil {
+		return ""
+	}
+	return config.CloudProviderConfig.UserAssignedIdentityID
+}
+
+func isManagedIdentityTokenRequest(config *Config) bool {
+	if getUserAssignedIdentityID(config) != "" {
+		return true
+	}
+	return config != nil && config.CloudProviderConfig != nil && config.CloudProviderConfig.ClientID == clientIDForMSI
+}
+
+func isTerminalGetTokenError(err error, config *Config) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+
+	var tokenRefreshErr adal.TokenRefreshError
+	if !errors.As(err, &tokenRefreshErr) {
+		return true
+	}
+
+	resp := tokenRefreshErr.Response()
+	if resp == nil {
+		return false
+	}
+
+	switch resp.StatusCode {
+	case http.StatusTooManyRequests, http.StatusRequestTimeout:
+		return false
+	case http.StatusNotFound, http.StatusGone:
+		return !isManagedIdentityTokenRequest(config)
+	case http.StatusBadRequest:
+		return !isRetryableManagedIdentityNotFoundError(err, config)
+	default:
+		return resp.StatusCode >= http.StatusBadRequest && resp.StatusCode < http.StatusInternalServerError
+	}
+}
+
+func isRetryableManagedIdentityNotFoundError(err error, config *Config) bool {
+	return isManagedIdentityTokenRequest(config) && strings.Contains(strings.ToLower(err.Error()), "identity not found")
 }
 
 func getServicePrincipalToken(ctx context.Context, resource string, cloudProviderConfig *cloud.ProviderConfig) (*adal.ServicePrincipalToken, error) {

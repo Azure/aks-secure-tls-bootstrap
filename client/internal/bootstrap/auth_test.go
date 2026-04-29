@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"net/http"
 	"testing"
 	"time"
 
@@ -246,4 +247,151 @@ func TestGetToken(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestIsTerminalGetTokenError(t *testing.T) {
+	cases := []struct {
+		name     string
+		config   *Config
+		err      error
+		expected bool
+	}{
+		{
+			name:     "context deadline exceeded is terminal",
+			config:   &Config{},
+			err:      context.DeadlineExceeded,
+			expected: true,
+		},
+		{
+			name:     "non token refresh error is terminal",
+			config:   &Config{},
+			err:      errors.New("invalid cloud config"),
+			expected: true,
+		},
+		{
+			name: "service principal bad request is terminal",
+			config: &Config{
+				CloudProviderConfig: &cloud.ProviderConfig{
+					ClientID: "service-principal-id",
+				},
+			},
+			err: &fakeTokenRefreshError{
+				resp: &http.Response{StatusCode: http.StatusBadRequest},
+				err:  errors.New(`adal: Refresh request failed. Status Code = '400'. Response body: {"error":"invalid_client"}`),
+			},
+			expected: true,
+		},
+		{
+			name: "managed identity identity not found is retryable",
+			config: &Config{
+				CloudProviderConfig: &cloud.ProviderConfig{
+					ClientID:               clientIDForMSI,
+					UserAssignedIdentityID: "identity-id",
+				},
+			},
+			err: &fakeTokenRefreshError{
+				resp: &http.Response{StatusCode: http.StatusBadRequest},
+				err:  errors.New(`adal: Refresh request failed. Status Code = '400'. Response body: {"error":"invalid_request","error_description":"Identity not found"}`),
+			},
+			expected: false,
+		},
+		{
+			name: "managed identity not found response is retryable",
+			config: &Config{
+				UserAssignedIdentityID: "identity-id",
+			},
+			err: &fakeTokenRefreshError{
+				resp: &http.Response{StatusCode: http.StatusNotFound},
+				err:  errors.New("adal: retryable IMDS status"),
+			},
+			expected: false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			assert.Equal(t, c.expected, isTerminalGetTokenError(c.err, c.config))
+		})
+	}
+}
+
+func TestGetAccessToken(t *testing.T) {
+	t.Run("retries managed identity identity not found errors", func(t *testing.T) {
+		attempts := 0
+		sleeps := 0
+		client := &client{
+			getTokenFunc: func(ctx context.Context, config *Config) (string, error) {
+				attempts++
+				if attempts < 3 {
+					return "", &fakeTokenRefreshError{
+						resp: &http.Response{StatusCode: http.StatusBadRequest},
+						err:  errors.New(`adal: Refresh request failed. Status Code = '400'. Response body: {"error":"invalid_request","error_description":"Identity not found"}`),
+					}
+				}
+				return "token", nil
+			},
+			sleepFunc: func(ctx context.Context, duration time.Duration) error {
+				sleeps++
+				assert.Equal(t, getAccessTokenRetryInterval, duration)
+				return nil
+			},
+		}
+
+		token, err := client.getAccessToken(telemetry.WithTracing(log.NewTestContext()), &Config{
+			GetAccessTokenTimeout: time.Minute,
+			CloudProviderConfig: &cloud.ProviderConfig{
+				ClientID:               clientIDForMSI,
+				UserAssignedIdentityID: "identity-id",
+			},
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, "token", token)
+		assert.Equal(t, 3, attempts)
+		assert.Equal(t, 2, sleeps)
+	})
+
+	t.Run("does not retry terminal errors", func(t *testing.T) {
+		attempts := 0
+		client := &client{
+			getTokenFunc: func(ctx context.Context, config *Config) (string, error) {
+				attempts++
+				return "", errors.New("invalid cloud config")
+			},
+			sleepFunc: func(ctx context.Context, duration time.Duration) error {
+				t.Fatalf("sleep should not be called for terminal errors")
+				return nil
+			},
+		}
+
+		token, err := client.getAccessToken(telemetry.WithTracing(log.NewTestContext()), &Config{
+			GetAccessTokenTimeout: time.Minute,
+		})
+		assert.Empty(t, token)
+		assert.EqualError(t, err, "invalid cloud config")
+		assert.Equal(t, 1, attempts)
+	})
+
+	t.Run("stops retrying when context deadline is exceeded", func(t *testing.T) {
+		attempts := 0
+		client := &client{
+			getTokenFunc: func(ctx context.Context, config *Config) (string, error) {
+				attempts++
+				return "", &fakeTokenRefreshError{
+					resp: &http.Response{StatusCode: http.StatusInternalServerError},
+					err:  errors.New("temporary token service failure"),
+				}
+			},
+			sleepFunc: func(ctx context.Context, duration time.Duration) error {
+				<-ctx.Done()
+				return ctx.Err()
+			},
+		}
+
+		token, err := client.getAccessToken(telemetry.WithTracing(log.NewTestContext()), &Config{
+			GetAccessTokenTimeout: 10 * time.Millisecond,
+		})
+		assert.Empty(t, token)
+		assert.ErrorIs(t, err, context.DeadlineExceeded)
+		assert.Equal(t, 1, attempts)
+	})
 }

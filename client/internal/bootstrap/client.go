@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"time"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/imds"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/kubeconfig"
@@ -22,7 +23,14 @@ type client struct {
 	imdsClient             imds.Client
 	getServiceClientFunc   getServiceClientFunc
 	extractAccessTokenFunc extractAccessTokenFunc
+	getTokenFunc           func(ctx context.Context, config *Config) (string, error)
+	sleepFunc              func(ctx context.Context, duration time.Duration) error
 }
+
+const (
+	getAccessTokenRetryInterval    = time.Second
+	getAccessTokenRetryMaxAttempts = 30
+)
 
 func newClient(ctx context.Context) *client {
 	return &client{
@@ -30,6 +38,7 @@ func newClient(ctx context.Context) *client {
 		imdsClient:             imds.NewClient(ctx),
 		getServiceClientFunc:   getServiceClient,
 		extractAccessTokenFunc: extractAccessToken,
+		sleepFunc:              sleepWithContext,
 	}
 }
 
@@ -157,11 +166,38 @@ func (c *client) getAccessToken(ctx context.Context, config *Config) (string, er
 	endSpan := telemetry.StartSpan(ctx, "GetAccessToken")
 	defer endSpan()
 
-	token, err := c.getToken(getAccessTokenCtx, config)
-	if err != nil {
-		return "", err
+	logger := log.MustGetLogger(getAccessTokenCtx)
+
+	getTokenFunc := c.getTokenFunc
+	if getTokenFunc == nil {
+		getTokenFunc = c.getToken
 	}
-	return token, nil
+	sleepFunc := c.sleepFunc
+	if sleepFunc == nil {
+		sleepFunc = sleepWithContext
+	}
+
+	for attempt := 1; attempt <= getAccessTokenRetryMaxAttempts; attempt++ {
+		token, err := getTokenFunc(getAccessTokenCtx, config)
+		if err == nil {
+			return token, nil
+		}
+		if isTerminalGetTokenError(err, config) || attempt == getAccessTokenRetryMaxAttempts {
+			return "", err
+		}
+
+		logger.Warn("failed to generate access token, retrying",
+			zap.Int("attempt", attempt),
+			zap.Int("maxAttempts", getAccessTokenRetryMaxAttempts),
+			zap.Duration("retryInterval", getAccessTokenRetryInterval),
+			zap.Error(err),
+		)
+		if err := sleepFunc(getAccessTokenCtx, getAccessTokenRetryInterval); err != nil {
+			return "", err
+		}
+	}
+
+	return "", fmt.Errorf("failed to generate access token after exhausting retries")
 }
 
 func (c *client) getServiceClient(ctx context.Context, token string, cfg *Config) (v1.SecureTLSBootstrapServiceClient, closeFunc, error) {
@@ -248,6 +284,27 @@ func (c *client) getCredential(ctx context.Context, serviceClient v1.SecureTLSBo
 		return nil, fmt.Errorf("failed to decode cert data from bootstrap server: %w", err)
 	}
 	return certPEM, nil
+}
+
+func sleepWithContext(ctx context.Context, duration time.Duration) error {
+	if duration <= 0 {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			return nil
+		}
+	}
+
+	timer := time.NewTimer(duration)
+	defer timer.Stop()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }
 
 func (c *client) generateKubeconfig(ctx context.Context, certPEM, keyPEM []byte, config *kubeconfig.Config) (*api.Config, error) {
