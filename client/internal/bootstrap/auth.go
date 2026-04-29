@@ -61,7 +61,7 @@ func getTokenCredential(ctx context.Context, config *Config) (azcore.TokenCreden
 		logger.Info("generating MSI access token", zap.String("clientId", userAssignedID))
 		cred, err := azidentity.NewManagedIdentityCredential(&azidentity.ManagedIdentityCredentialOptions{
 			ID:            azidentity.ClientID(userAssignedID),
-			ClientOptions: http.GetDefaultAzureClientOpts(),
+			ClientOptions: http.GetManagedIdentityClientOpts(),
 		})
 		if err != nil {
 			return nil, fmt.Errorf("generating MSI access token: %w", err)
@@ -94,6 +94,8 @@ func getServicePrincipalCredential(ctx context.Context, cloudProviderConfig *clo
 		credential, err := azidentity.NewClientSecretCredential(cloudProviderConfig.TenantID, cloudProviderConfig.ClientID, secret,
 			&azidentity.ClientSecretCredentialOptions{
 				ClientOptions: http.GetDefaultAzureClientOptsWithCloud(cloudConfig),
+				// required since we'll be running in stack/custom clouds
+				DisableInstanceDiscovery: true,
 			},
 		)
 		if err != nil {
@@ -117,6 +119,10 @@ func getServicePrincipalCredential(ctx context.Context, cloudProviderConfig *clo
 	credential, err := azidentity.NewClientCertificateCredential(cloudProviderConfig.TenantID, cloudProviderConfig.ClientID, certs, key,
 		&azidentity.ClientCertificateCredentialOptions{
 			ClientOptions: http.GetDefaultAzureClientOptsWithCloud(cloudConfig),
+			// required for SNI-based authentication
+			SendCertificateChain: true,
+			// required since we'll be running in stack/custom clouds
+			DisableInstanceDiscovery: true,
 		},
 	)
 	if err != nil {

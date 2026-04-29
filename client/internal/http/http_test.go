@@ -39,18 +39,38 @@ func TestCustomTransport(t *testing.T) {
 	assert.True(t, strings.HasPrefix(userAgent, "aks-secure-tls-bootstrap-client/"))
 }
 
-func TestGetDefaultAzureClientOpts(t *testing.T) {
-	opts := GetDefaultAzureClientOpts()
-	assert.Equal(t, int32(10), opts.Retry.MaxRetries)
-	assert.Equal(t, 800*time.Millisecond, opts.Retry.RetryDelay)
-	assert.Equal(t, 5*time.Second, opts.Retry.MaxRetryDelay)
-}
-
 func TestGetDefaultAzureClientOptsWithCloud(t *testing.T) {
 	cloudConfig := azcloud.AzurePublic
 	opts := GetDefaultAzureClientOptsWithCloud(cloudConfig)
 	assert.Equal(t, cloudConfig, opts.Cloud)
-	assert.Equal(t, int32(10), opts.Retry.MaxRetries)
+	assert.Equal(t, int32(15), opts.Retry.MaxRetries)
 	assert.Equal(t, 800*time.Millisecond, opts.Retry.RetryDelay)
 	assert.Equal(t, 5*time.Second, opts.Retry.MaxRetryDelay)
+}
+
+func TestGetManagedIdentityClientOpts(t *testing.T) {
+	opts := GetManagedIdentityClientOpts()
+
+	assert.Equal(t, int32(15), opts.Retry.MaxRetries)
+	assert.Equal(t, 800*time.Millisecond, opts.Retry.RetryDelay)
+	assert.Equal(t, 5*time.Second, opts.Retry.MaxRetryDelay)
+
+	expectedStatusCodes := []int{
+		http.StatusBadRequest,                    // 400
+		http.StatusNotFound,                      // 404
+		http.StatusGone,                          // 410
+		http.StatusTooManyRequests,               // 429
+		http.StatusInternalServerError,           // 500
+		http.StatusNotImplemented,                // 501
+		http.StatusBadGateway,                    // 502
+		http.StatusServiceUnavailable,            // 503
+		http.StatusGatewayTimeout,                // 504
+		http.StatusHTTPVersionNotSupported,       // 505
+		http.StatusVariantAlsoNegotiates,         // 506
+		http.StatusInsufficientStorage,           // 507
+		http.StatusLoopDetected,                  // 508
+		http.StatusNotExtended,                   // 510
+		http.StatusNetworkAuthenticationRequired, // 511
+	}
+	assert.Equal(t, expectedStatusCodes, opts.Retry.StatusCodes)
 }

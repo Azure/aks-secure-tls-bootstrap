@@ -51,6 +51,8 @@ type Result struct {
 	FinalErrorType ErrorType `json:"FinalErrorType,omitempty"`
 	// FinalError stores the last encountered error before the bootstrapping event entered a failed terminal state.
 	FinalError string `json:"FinalError,omitempty"`
+	// ClientVersion stores the client version string.
+	ClientVersion string `json:"ClientVersion,omitempty"`
 }
 
 type Event struct {

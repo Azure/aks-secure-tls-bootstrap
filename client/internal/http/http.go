@@ -26,8 +26,34 @@ func GetUserAgent() string {
 	return fmt.Sprintf("aks-secure-tls-bootstrap-client/%s", build.GetVersion())
 }
 
-func GetDefaultAzureClientOpts() azcore.ClientOptions {
-	return defaultAzureClientOpts()
+func GetManagedIdentityClientOpts() azcore.ClientOptions {
+	opts := defaultAzureClientOpts()
+	opts.Retry.StatusCodes = []int{
+		// We allow retrying on StatusBadRequest since this will be the returned status code when IMDS dsoesn't yet recognize
+		// that the identity we request a token for has been attached to the underlying VM - there can seemingly be a delay
+		// in propagation from Entra ID to IMDS with respect to identity attachment. This is outside of the official IMDS
+		// retry guidance, but something we need to explicitly handle for
+		http.StatusBadRequest, // 400
+
+		// IMDS docs recommend retrying 404, 410, 429 and 5xx
+		// https://learn.microsoft.com/entra/identity/managed-identities-azure-resources/how-to-use-vm-token#error-handling
+		// taken from track2 managed identity client implementation: https://github.com/Azure/azure-sdk-for-go/blob/50d3c2154b3415f02ad311b89ea86d926c3399d9/sdk/azidentity/managed_identity_client.go#L61
+		http.StatusNotFound,                      // 404
+		http.StatusGone,                          // 410
+		http.StatusTooManyRequests,               // 429
+		http.StatusInternalServerError,           // 500
+		http.StatusNotImplemented,                // 501
+		http.StatusBadGateway,                    // 502
+		http.StatusServiceUnavailable,            // 503
+		http.StatusGatewayTimeout,                // 504
+		http.StatusHTTPVersionNotSupported,       // 505
+		http.StatusVariantAlsoNegotiates,         // 506
+		http.StatusInsufficientStorage,           // 507
+		http.StatusLoopDetected,                  // 508
+		http.StatusNotExtended,                   // 510
+		http.StatusNetworkAuthenticationRequired, // 511
+	}
+	return opts
 }
 
 func GetDefaultAzureClientOptsWithCloud(cloudConfig azcloud.Configuration) azcore.ClientOptions {
@@ -73,7 +99,7 @@ func defaultAzureClientOpts() azcore.ClientOptions {
 		// We only override a minimal set of fields to allow track2 clients to intelligently
 		// determinie the best retry configuration based on the scenario (such as IMDS vs. Entra ID, etc.)
 		Retry: policy.RetryOptions{
-			MaxRetries: 10,
+			MaxRetries: 15,
 			RetryDelay: 800 * time.Millisecond,
 			// this is primarily to prevent deep exponential backoff loops
 			// from causing too much delay (we take a more "aggressive" retry strategy to minimze bootstrap latency)
