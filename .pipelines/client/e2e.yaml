@@ -41,12 +41,13 @@ stages:
             echo "##vso[task.setvariable variable=CLIENT_VERSION]${version}"
               
             web_endpoint=$(az storage account show -g $STORAGE_ACCOUNT_RESOURCE_GROUP -n $STORAGE_ACCOUNT_NAME --subscription $STORAGE_ACCOUNT_SUBSCRIPTION --query primaryEndpoints.web | tr -d \")
-            linux_url="${web_endpoint}client/linux/amd64/${version}.tar.gz"
+            linux_amd64_url="${web_endpoint}client/linux/amd64/${version}.tar.gz"
+            linux_arm64_url="${web_endpoint}client/linux/arm64/${version}.tar.gz"
             windows_url="${web_endpoint}client/windows/amd64/${version}.zip"
             echo "Generated linux client URL = ${linux_url}"
             echo "Generated windows client URL = ${windows_url}"
 
-            toggle_overrides="custom-secure-tls-bootstrap-client-linux-binary-url=${linux_url},custom-secure-tls-bootstrap-client-windows-binary-url=${windows_url}"
+            toggle_overrides="custom-secure-tls-bootstrap-client-linux-amd64-binary-url=${linux_amd64_url},custom-secure-tls-bootstrap-client-linux-arm64-binary-url=${linux_arm64_url},custom-secure-tls-bootstrap-client-windows-binary-url=${windows_url}"
             echo "Generated toggle override string = ${toggle_overrides}"
             echo "##vso[task.setvariable variable=TOGGLE_OVERRIDES]${toggle_overrides}"
         env:
@@ -65,13 +66,13 @@ stages:
             set -euxo pipefail
             cd ./client/ && ./hack/upload.sh
         env:
-          OS: all # build linux + windows binaries
+          OS: all # build all supported linux + windows binaries
           VERSION: $(CLIENT_VERSION)
           STORAGE_ACCOUNT_SUBSCRIPTION: $(STORAGE_ACCOUNT_SUBSCRIPTION)
           STORAGE_ACCOUNT_RESOURCE_GROUP: $(STORAGE_ACCOUNT_RESOURCE_GROUP)
           STORAGE_ACCOUNT_NAME: $(STORAGE_ACCOUNT_NAME)
         condition: succeeded()
-        displayName: Build and Upload x86_64 Linux and Windows Binaries
+        displayName: Build and upload Windows and Linux binaries
 
       - bash: |
           set -euo pipefail
