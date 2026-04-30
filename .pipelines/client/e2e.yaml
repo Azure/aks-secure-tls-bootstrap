@@ -56,7 +56,7 @@ stages:
           STORAGE_ACCOUNT_RESOURCE_GROUP: $(STORAGE_ACCOUNT_RESOURCE_GROUP)
           STORAGE_ACCOUNT_NAME: $(STORAGE_ACCOUNT_NAME)
         condition: succeeded()
-        displayName: Generate Client Version String and Toggle Overrides
+        displayName: Generate client version string and toggle overrides
 
       - task: AzureCLI@2
         inputs:
@@ -85,7 +85,7 @@ stages:
           ORGANIZATION: $(ORGANIZATION)
           PROJECT: $(PROJECT)
         condition: and(succeeded(), ne(variables.SKIP_E2E, 'True'))
-        displayName: ADO Login
+        displayName: ADO login
 
       - bash: /bin/bash .pipelines/client/scripts/run-pipeline.sh
         env:
