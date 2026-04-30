@@ -44,7 +44,8 @@ stages:
             linux_amd64_url="${web_endpoint}client/linux/amd64/${version}.tar.gz"
             linux_arm64_url="${web_endpoint}client/linux/arm64/${version}.tar.gz"
             windows_url="${web_endpoint}client/windows/amd64/${version}.zip"
-            echo "Generated linux client URL = ${linux_url}"
+            echo "Generated linux amd64 client URL = ${linux_amd64_url}"
+            echo "Generated linux arm64 client URL = ${linux_arm64_url}"
             echo "Generated windows client URL = ${windows_url}"
 
             toggle_overrides="custom-secure-tls-bootstrap-client-linux-amd64-binary-url=${linux_amd64_url},custom-secure-tls-bootstrap-client-linux-arm64-binary-url=${linux_arm64_url},custom-secure-tls-bootstrap-client-windows-binary-url=${windows_url}"
