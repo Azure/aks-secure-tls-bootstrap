@@ -45,7 +45,7 @@ func TestGetDefaultAzureClientOptsWithCloud(t *testing.T) {
 	assert.Equal(t, cloudConfig, opts.Cloud)
 	assert.Equal(t, int32(15), opts.Retry.MaxRetries)
 	assert.Equal(t, 800*time.Millisecond, opts.Retry.RetryDelay)
-	assert.Equal(t, 5*time.Second, opts.Retry.MaxRetryDelay)
+	assert.Equal(t, 4*time.Second, opts.Retry.MaxRetryDelay)
 }
 
 func TestGetManagedIdentityClientOpts(t *testing.T) {
@@ -53,7 +53,7 @@ func TestGetManagedIdentityClientOpts(t *testing.T) {
 
 	assert.Equal(t, int32(15), opts.Retry.MaxRetries)
 	assert.Equal(t, 800*time.Millisecond, opts.Retry.RetryDelay)
-	assert.Equal(t, 5*time.Second, opts.Retry.MaxRetryDelay)
+	assert.Equal(t, 4*time.Second, opts.Retry.MaxRetryDelay)
 
 	expectedStatusCodes := []int{
 		http.StatusBadRequest,                    // 400
