@@ -92,7 +92,8 @@ func run(ctx context.Context) int {
 	var bootstrapErr error
 	var startTime, endTime time.Time
 	result := &bootstrap.Result{
-		Status: bootstrap.StatusSuccess,
+		Status:        bootstrap.StatusSuccess,
+		ClientVersion: build.GetVersion(),
 	}
 	defer func() {
 		if bootstrapErr != nil {

@@ -131,6 +131,7 @@ func TestWriteWithResult(t *testing.T) {
 	result := &Result{
 		Status:              StatusFailure,
 		ElapsedMilliseconds: (3700 * time.Millisecond).Milliseconds(),
+		ClientVersion:       "v1.2.3",
 		Trace: telemetry.Trace{
 			"GetAccessToken":     100 * time.Millisecond,
 			"GetServiceClient":   200 * time.Millisecond,
@@ -178,4 +179,5 @@ func TestWriteWithResult(t *testing.T) {
 
 	assert.Equal(t, StatusFailure, loadedResult.Status)
 	assert.Equal(t, (3700 * time.Millisecond).Milliseconds(), loadedResult.ElapsedMilliseconds)
+	assert.Equal(t, "v1.2.3", loadedResult.ClientVersion)
 }

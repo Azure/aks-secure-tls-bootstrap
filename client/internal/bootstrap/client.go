@@ -21,7 +21,7 @@ type client struct {
 	kubeconfigValidator    kubeconfig.Validator
 	imdsClient             imds.Client
 	getServiceClientFunc   getServiceClientFunc
-	extractAccessTokenFunc extractAccessTokenFunc
+	getTokenCredentialFunc getTokenCredentialFunc
 }
 
 func newClient(ctx context.Context) *client {
@@ -29,7 +29,7 @@ func newClient(ctx context.Context) *client {
 		kubeconfigValidator:    kubeconfig.NewValidator(),
 		imdsClient:             imds.NewClient(ctx),
 		getServiceClientFunc:   getServiceClient,
-		extractAccessTokenFunc: extractAccessToken,
+		getTokenCredentialFunc: getTokenCredential,
 	}
 }
 
