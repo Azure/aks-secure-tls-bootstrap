@@ -256,16 +256,16 @@ func TestBootstrapKubeletClientCredential(t *testing.T) {
 			}
 			c.setupMocks(config, kubeconfigValidator, imdsClient, serviceClient)
 
-			credentialFactory := c.getTokenCredentialFunc
-			if credentialFactory == nil {
-				credentialFactory = func(_ context.Context, _ *Config) (azcore.TokenCredential, error) {
+			getTokenCredential := c.getTokenCredentialFunc
+			if getTokenCredential == nil {
+				getTokenCredential = func(_ context.Context, _ *Config) (azcore.TokenCredential, error) {
 					return &fake.TokenCredential{}, nil
 				}
 			}
 			client := &client{
 				kubeconfigValidator:    kubeconfigValidator,
 				imdsClient:             imdsClient,
-				getTokenCredentialFunc: credentialFactory,
+				getTokenCredentialFunc: getTokenCredential,
 				getServiceClientFunc: func(_ string, _ *Config) (v1.SecureTLSBootstrapServiceClient, closeFunc, error) {
 					return serviceClient, func() error { return nil }, nil
 				},
