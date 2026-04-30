@@ -33,8 +33,8 @@ type Config struct {
 	ClusterCAFilePath         string        `json:"clusterCaFilePath"`
 	KubeconfigPath            string        `json:"kubeconfigPath"`
 	CertDir                   string        `json:"certDir"`
-	TLSMinVersion          string        `json:"tlsMinVersion"`
-	EnsureAuthorizedClient bool          `json:"ensureAuthorizedClient"`
+	TLSMinVersion             string        `json:"tlsMinVersion"`
+	EnsureAuthorizedClient    bool          `json:"ensureAuthorizedClient"`
 	ValidateKubeconfigTimeout time.Duration `json:"validateKubeconfigTimeout"`
 	GetAccessTokenTimeout     time.Duration `json:"getAccessTokenTimeout"`
 	GetInstanceDataTimeout    time.Duration `json:"getInstanceDataTimeout"`

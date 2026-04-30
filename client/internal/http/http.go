@@ -103,7 +103,7 @@ func defaultAzureClientOpts() azcore.ClientOptions {
 			RetryDelay: 800 * time.Millisecond,
 			// this is primarily to prevent deep exponential backoff loops
 			// from causing too much delay (we take a more "aggressive" retry strategy to minimze bootstrap latency)
-			MaxRetryDelay: 5 * time.Second,
+			MaxRetryDelay: 4 * time.Second,
 		},
 	}
 }
