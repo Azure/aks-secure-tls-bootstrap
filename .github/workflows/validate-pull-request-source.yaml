@@ -1,4 +1,4 @@
-name: validate-pull-request-source
+name: Validate Pull Request Source
 on: pull_request
 
 jobs:
