@@ -35,6 +35,27 @@ build_and_upload_linux_amd64() {
     display_download_url "client/linux/amd64/${VERSION}.tar.gz"
 }
 
+build_and_upload_linux_arm64() {
+    make build OS=linux ARCH=arm64 VERSION="${VERSION}"
+
+    if [ ! -f "bin/aks-secure-tls-bootstrap-client-arm64" ]; then
+        echo "could not find client binary aks-secure-tls-bootstrap-client-arm64 for upload within bin/"
+        exit 1
+    fi
+
+    pushd "bin/"
+        client_path="aks-secure-tls-bootstrap-client"
+        mv "${client_path}-arm64" "$client_path"
+        tar_path="linux-arm64.tar.gz"
+        tar -czvf "$tar_path" "$client_path"
+        az storage blob upload -f "$tar_path" --auth-mode login --blob-url "https://${STORAGE_ACCOUNT_NAME}.blob.core.windows.net/\$web/client/linux/arm64/${VERSION}.tar.gz"
+    popd
+
+    rm -rf "bin/"
+
+    display_download_url "client/linux/arm64/${VERSION}.tar.gz"
+}
+
 build_and_upload_windows_amd64() {
     make build OS=windows ARCH=amd64 EXTENSION=.exe VERSION="${VERSION}"
 
@@ -57,9 +78,11 @@ build_and_upload_windows_amd64() {
 
 if [ "${OS}" == "all" ]; then
     build_and_upload_linux_amd64
+    build_and_upload_linux_arm64
     build_and_upload_windows_amd64
 elif [ "${OS}" == "linux" ]; then
     build_and_upload_linux_amd64
+    build_and_upload_linux_arm64
 elif [ "${OS}" == "windows" ]; then
     build_and_upload_windows_amd64
 else
