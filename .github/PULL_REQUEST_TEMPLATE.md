@@ -1,8 +1,7 @@
 <!--
 Pull Request Requirements - PLEASE READ BEFORE CREATING A PR AGAINST Azure/aks-secure-tls-bootstrap:
 1. Pull requests MUST NOT come from personal forks. PRs will only be accepted from branches created directly off Azure/aks-secure-tls-bootstrap.
-   You'll need to gain write access to Azure/aks-secure-tls-bootstrap by requesting membership to the GitHub team: https://github.com/orgs/Azure/teams/agentbakerwrite/.
-   Note that to gain access to this team, you must be a member of the Azure GitHub organization: https://github.com/Azure.
+   Note that to gain write access, you must be a member of the Azure GitHub organization: https://github.com/Azure.
 2. All commits must be signed by a GPG key and marked as "Verified" by GitHub. Refer to https://github.com/Azure/aks-secure-tls-bootstrap/blob/main/README.md for more details regarding
    setting up a GPG key for your own account.
 3. Pull request titles must adhere to our tailored version of the conventional commit messages policy: https://www.conventionalcommits.org/. For specifics on
