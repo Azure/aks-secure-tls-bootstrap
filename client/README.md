@@ -52,77 +52,6 @@ hack/
   windows/install.ps1             Node-side installer (Windows) (FOR DEV PURPOSES ONLY)
 ```
 
-## Installing on a node
-
-Pre-built binaries are uploaded to an Azure Storage static-website endpoint by [hack/upload.sh](hack/upload.sh). The included installer scripts download and place the binary in the standard AKS locations:
-
-**Linux** (`/opt/bin/aks-secure-tls-bootstrap-client`, mirrored to `/usr/local/bin`):
-
-```sh
-curl -o install.sh https://raw.githubusercontent.com/Azure/aks-secure-tls-bootstrap/refs/heads/main/client/hack/linux/install.sh
-chmod +x install.sh
-VERSION=<version> STORAGE_ACCOUNT_NAME=<storage-account> ./install.sh
-```
-
-**Windows** (`C:\k\aks-secure-tls-bootstrap-client.exe`):
-
-```powershell
-Invoke-WebRequest -Uri "https://raw.githubusercontent.com/Azure/aks-secure-tls-bootstrap/refs/heads/main/client/hack/windows/install.ps1" -OutFile install.ps1
-Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process
-.\install.ps1 -Version <version> -StorageAccountName <storage-account>
-```
-
-## Usage
-
-The client accepts both CLI flags and a JSON config file via `--config-file` (file values override flag values). The full flag set is documented by `aks-secure-tls-bootstrap-client -h`.
-
-### Required configuration
-
-| Flag | JSON key | Description |
-| --- | --- | --- |
-| `--cloud-provider-config` | `cloudProviderConfigPath` | Path to the AKS cloud provider config (used to resolve the kubelet MSI). |
-| `--apiserver-fqdn` | `apiServerFqdn` | FQDN of the bootstrap-enabled API server. |
-| `--aad-resource` | `aadResource` | Audience for the AAD token request to IMDS. |
-| `--next-proto` | `nextProto` | ALPN `next-proto` header value expected by the bootstrap server. |
-| `--cluster-ca-file` | `clusterCaFilePath` | Path to the cluster CA bundle used to verify the bootstrap server. |
-| `--kubeconfig` | `kubeconfigPath` | Output kubeconfig path; must match kubelet's `--kubeconfig`. |
-| `--cert-dir` | `certDir` | Directory for new client cert/key pair; must match kubelet's `--cert-dir`. |
-
-### Useful optional flags
-
-| Flag | Default | Description |
-| --- | --- | --- |
-| `--user-assigned-identity-id` | _from cloud provider config_ | Override the MSI client ID used for IMDS token requests. |
-| `--tls-min-version` | `1.3` | Minimum TLS version (`1.2` or `1.3`). |
-| `--ensure-authorized` | `false` | If set, validate that the existing kubeconfig is not just structurally valid but authorized against the API server. |
-| `--validate-kubeconfig-timeout` | `15s` | Timeout for the existing-kubeconfig validation step. |
-| `--get-access-token-timeout` | `1m` | Timeout for the IMDS token request. |
-| `--get-instance-data-timeout` | `15s` | Timeout for IMDS instance metadata fetch. |
-| `--get-nonce-timeout` | `15s` | Timeout for the `GetNonce` RPC. |
-| `--get-attested-data-timeout` | `15s` | Timeout for IMDS attested data fetch. |
-| `--get-credential-timeout` | `6m` | Timeout for the `GetCredential` RPC. |
-| `--log-file` | _stdout only_ | Mirror logs to a file. |
-| `--verbose` | `false` | Emit debug-level logs. |
-
-`--deadline` is deprecated in favor of the per-RPC timeouts above and is retained only for backwards compatibility.
-
-### Example
-
-```sh
-aks-secure-tls-bootstrap-client \
-  --cloud-provider-config=/etc/kubernetes/azure.json \
-  --apiserver-fqdn=my-cluster-1234.hcp.eastus.azmk8s.io \
-  --aad-resource=6dae42f8-4368-4678-94ff-3960e28e3630 \
-  --next-proto=aks-tls-bootstrap \
-  --cluster-ca-file=/etc/kubernetes/certs/ca.crt \
-  --kubeconfig=/var/lib/kubelet/kubeconfig \
-  --cert-dir=/var/lib/kubelet/pki \
-  --tls-min-version=1.3 \
-  --ensure-authorized
-```
-
-The process exits `0` on success (kubeconfig either already valid or freshly written) and `1` on any failure. Failure classifications (e.g. `GetAccessTokenFailure`, `GetCredentialFailure`) are recorded in the emitted guest-agent event for downstream telemetry.
-
 ## Development
 
 ### Prerequisites
@@ -157,18 +86,3 @@ The client depends on the gRPC stubs generated from [../service/proto](../servic
 1. Update the proto files and run `make generate` in [../service](../service).
 2. Tag and release a new version of the `service` module.
 3. Bump the dependency in this module's [go.mod](go.mod) and adjust call sites under [internal/bootstrap/](internal/bootstrap/).
-
-### Releasing binaries
-
-Cross-builds are uploaded by [hack/upload.sh](hack/upload.sh), which expects:
-
-```sh
-STORAGE_ACCOUNT_SUBSCRIPTION=<sub-id> \
-STORAGE_ACCOUNT_RESOURCE_GROUP=<rg> \
-STORAGE_ACCOUNT_NAME=<storage-account> \
-VERSION=<semver> \
-OS=all \   # or linux | windows
-./hack/upload.sh
-```
-
-The script invokes `make build` per target, archives the binary (`tar.gz` for Linux, `zip` for Windows), and uploads to the `$web` container of the configured storage account, where it is consumed by the install scripts above.
