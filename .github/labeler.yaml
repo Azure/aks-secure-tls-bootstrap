@@ -1,0 +1,9 @@
+# Add the "client" label to PRs that modify any file within the client module
+client:
+- changed-files:
+  - any-glob-to-any-file: 'client/*'
+
+# Add the "service" label to PRs that modify any file within the service module
+service:
+- changed-files:
+  - any-glob-to-any-file: 'service/*'
