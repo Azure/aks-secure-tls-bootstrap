@@ -47,6 +47,14 @@ func getServiceClient(token string, cfg *Config) (v1.SecureTLSBootstrapServiceCl
 		return nil, nil, fmt.Errorf("failed to get TLS config: %w", err)
 	}
 
+	// override max delay to 3s (default is 120s) - this ensures the gRPC subchannel
+	// re-attempts a real TCP+TLS connection at least every 3s, which aligns with
+	// the ~2s RPC-level retry cadence. Without this cap, the subchannel exponential
+	// backoff grows to 120s, causing the retry interceptor to receive cached errors
+	// from the last real attempt rather than triggering new connection attempts.
+	grpcConnectionBackoffConfig := backoff.DefaultConfig
+	grpcConnectionBackoffConfig.MaxDelay = 3 * time.Second
+
 	conn, err := grpc.NewClient(
 		fmt.Sprintf("%s:443", cfg.APIServerFQDN),
 		grpc.WithUserAgent(internalhttp.GetUserAgent()),
@@ -56,15 +64,12 @@ func getServiceClient(token string, cfg *Config) (v1.SecureTLSBootstrapServiceCl
 				AccessToken: token,
 			}),
 		}),
+		// transport/connection-level retry config
 		grpc.WithConnectParams(grpc.ConnectParams{
-			Backoff: backoff.Config{
-				BaseDelay:  1 * time.Second,
-				Multiplier: 1.6,
-				Jitter:     0.2,
-				MaxDelay:   5 * time.Second,
-			},
+			Backoff:           grpcConnectionBackoffConfig,
 			MinConnectTimeout: 10 * time.Second,
 		}),
+		// RPC-level retry config
 		grpc.WithUnaryInterceptor(retry.UnaryClientInterceptor(
 			retry.WithOnRetryCallback(getGRPCOnRetryCallbackFunc()),
 			retry.WithBackoff(retry.BackoffLinearWithJitter(2*time.Second, 0.25)),
