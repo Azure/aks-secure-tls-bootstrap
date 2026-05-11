@@ -19,6 +19,7 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/backoff"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/oauth"
@@ -54,6 +55,15 @@ func getServiceClient(token string, cfg *Config) (v1.SecureTLSBootstrapServiceCl
 			TokenSource: oauth2.StaticTokenSource(&oauth2.Token{
 				AccessToken: token,
 			}),
+		}),
+		grpc.WithConnectParams(grpc.ConnectParams{
+			Backoff: backoff.Config{
+				BaseDelay:  1 * time.Second,
+				Multiplier: 1.6,
+				Jitter:     0.2,
+				MaxDelay:   5 * time.Second,
+			},
+			MinConnectTimeout: 10 * time.Second,
 		}),
 		grpc.WithUnaryInterceptor(retry.UnaryClientInterceptor(
 			retry.WithOnRetryCallback(getGRPCOnRetryCallbackFunc()),
