@@ -64,7 +64,7 @@ func getServiceClient(token string, cfg *Config) (v1.SecureTLSBootstrapServiceCl
 				AccessToken: token,
 			}),
 		}),
-		// transport/connection-level retry config
+		// transport/connection-level config
 		grpc.WithConnectParams(grpc.ConnectParams{
 			Backoff:           grpcConnectionBackoffConfig,
 			MinConnectTimeout: 10 * time.Second,
