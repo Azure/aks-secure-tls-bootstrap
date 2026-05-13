@@ -19,6 +19,7 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/backoff"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/oauth"
@@ -46,6 +47,14 @@ func getServiceClient(token string, cfg *Config) (v1.SecureTLSBootstrapServiceCl
 		return nil, nil, fmt.Errorf("failed to get TLS config: %w", err)
 	}
 
+	// override max delay to 3s (default is 120s) - this ensures the gRPC subchannel
+	// re-attempts a real TCP+TLS connection at least every 3s, which aligns with
+	// the ~2s RPC-level retry cadence. Without this cap, the subchannel exponential
+	// backoff grows to 120s, causing the retry interceptor to receive cached errors
+	// from the last real attempt rather than triggering new connection attempts.
+	grpcConnectionBackoffConfig := backoff.DefaultConfig
+	grpcConnectionBackoffConfig.MaxDelay = 3 * time.Second
+
 	conn, err := grpc.NewClient(
 		fmt.Sprintf("%s:443", cfg.APIServerFQDN),
 		grpc.WithUserAgent(internalhttp.GetUserAgent()),
@@ -55,6 +64,15 @@ func getServiceClient(token string, cfg *Config) (v1.SecureTLSBootstrapServiceCl
 				AccessToken: token,
 			}),
 		}),
+		// transport/connection-level config
+		grpc.WithConnectParams(grpc.ConnectParams{
+			Backoff: grpcConnectionBackoffConfig,
+			// MinConnectTimeout caps the per-attempt connection timeout (default: 20s).
+			// 5s balances fast retry cycles (~8s/cycle) against headroom for first-connection
+			// latency through new LB paths — healthy intra-Azure TCP+TLS 1.3 handshakes complete in <1s.
+			MinConnectTimeout: 5 * time.Second,
+		}),
+		// RPC-level retry config
 		grpc.WithUnaryInterceptor(retry.UnaryClientInterceptor(
 			retry.WithOnRetryCallback(getGRPCOnRetryCallbackFunc()),
 			retry.WithBackoff(retry.BackoffLinearWithJitter(2*time.Second, 0.25)),
