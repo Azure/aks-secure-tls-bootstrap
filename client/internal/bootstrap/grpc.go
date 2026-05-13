@@ -66,8 +66,11 @@ func getServiceClient(token string, cfg *Config) (v1.SecureTLSBootstrapServiceCl
 		}),
 		// transport/connection-level config
 		grpc.WithConnectParams(grpc.ConnectParams{
-			Backoff:           grpcConnectionBackoffConfig,
-			MinConnectTimeout: 7 * time.Second,
+			Backoff: grpcConnectionBackoffConfig,
+			// MinConnectTimeout caps the per-attempt connection timeout (default: 20s).
+			// 5s balances fast retry cycles (~8s/cycle) against headroom for first-connection
+			// latency through new LB paths — healthy intra-Azure TCP+TLS 1.3 handshakes complete in <1s.
+			MinConnectTimeout: 5 * time.Second,
 		}),
 		// RPC-level retry config
 		grpc.WithUnaryInterceptor(retry.UnaryClientInterceptor(
