@@ -9,7 +9,6 @@ require (
 	github.com/Azure/go-autorest/autorest v0.11.30
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.2
 	github.com/hashicorp/go-retryablehttp v0.7.7
-	github.com/samber/lo v1.53.0
 	github.com/stretchr/testify v1.11.1
 	go.uber.org/mock v0.5.0
 	go.uber.org/zap v1.26.0

@@ -31,7 +31,7 @@ var _ Client = (*client)(nil)
 
 func NewClient(ctx context.Context) Client {
 	retryableClient := internalhttp.NewRetryableClient(ctx)
-	retryableClient.CheckRetry = internalhttp.GetDefaultIMDSRetryPolicy()
+	retryableClient.CheckRetry = getCheckRetry()
 	return &client{
 		baseURL:    imdsURL,
 		httpClient: retryableClient.StandardClient(),
@@ -42,10 +42,10 @@ func (c *client) GetInstanceData(ctx context.Context) (*VMInstanceData, error) {
 	url := fmt.Sprintf("%s/%s", c.baseURL, instanceDataEndpoint)
 	log.MustGetLogger(ctx).Info("calling IMDS instance data endpoint", zap.String("url", url))
 
-	queryParameters := getCommonQueryParameters()
+	params := getCommonParameters()
 
 	instanceData := new(VMInstanceData)
-	if err := c.callIMDS(ctx, url, queryParameters, instanceData); err != nil {
+	if err := c.callIMDS(ctx, url, params, instanceData); err != nil {
 		return nil, fmt.Errorf("failed to retrieve IMDS instance data: %w", err)
 	}
 
@@ -56,11 +56,11 @@ func (c *client) GetAttestedData(ctx context.Context, nonce string) (*VMAttested
 	url := fmt.Sprintf("%s/%s", c.baseURL, attestedDataEndpoint)
 	log.MustGetLogger(ctx).Info("calling IMDS attested data endpoint", zap.String("url", url))
 
-	queryParameters := getCommonQueryParameters()
-	queryParameters[nonceParameterKey] = nonce
+	params := getCommonParameters()
+	params[nonceParameterKey] = nonce
 
 	attestedData := new(VMAttestedData)
-	if err := c.callIMDS(ctx, url, queryParameters, attestedData); err != nil {
+	if err := c.callIMDS(ctx, url, params, attestedData); err != nil {
 		return nil, fmt.Errorf("failed to retrieve IMDS attested data: %w", err)
 	}
 
@@ -104,7 +104,7 @@ func (c *client) callIMDS(ctx context.Context, url string, queryParameters map[s
 	return nil
 }
 
-func getCommonQueryParameters() map[string]string {
+func getCommonParameters() map[string]string {
 	return map[string]string{
 		apiVersionParameterKey: apiVersion,
 		formatParameterKey:     "json",

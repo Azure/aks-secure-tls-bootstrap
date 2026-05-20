@@ -5,6 +5,7 @@ package imds
 
 const (
 	imdsURL              = "http://169.254.169.254"
+	tokenEndpoint        = "metadata/identity/oauth2/token"
 	instanceDataEndpoint = "metadata/instance"
 	attestedDataEndpoint = "metadata/attested/document"
 )
