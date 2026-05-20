@@ -134,7 +134,7 @@ func validateClientCertificate(cert *x509.Certificate, now time.Time) error {
 	if !strings.HasPrefix(cert.Subject.CommonName, consts.SystemNodeSubjectNamePrefix) {
 		return fmt.Errorf("existing kubeconfig certificate subject name should be prefixed with %q, but was not: %s", consts.SystemNodeSubjectNamePrefix, cert.Subject.CommonName)
 	}
-	if len(cert.Subject.Organization) > 1 {
+	if len(cert.Subject.Organization) != 1 {
 		return fmt.Errorf("existing kubeconfig certificate subject has more than one organization, expected singular %q organization", consts.SystemNodesSubjectOrganizationName)
 	}
 	if subtle.ConstantTimeCompare([]byte(cert.Subject.Organization[0]), []byte(consts.SystemNodesSubjectOrganizationName)) == 0 {
