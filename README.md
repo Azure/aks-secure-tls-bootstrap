@@ -53,7 +53,7 @@ See the per-module READMEs for more details:
 
 ## Releases
 
-- **Client binaries** are tagged with `client/vX.Y.Z` and published as compressed archives to a configured Azure Storage static-website endpoint via [client/hack/upload.sh](client/hack/upload.sh). Install scripts for nodes are provided in [client/hack/linux/install.sh](client/hack/linux/install.sh) and [client/hack/windows/install.ps1](client/hack/windows/install.ps1).
+- **Client binaries** are tagged with `client/vX.Y.Z`.
 - **Service module** releases are tagged with `service/vX.Y.Z` and consumed by the client `go.mod` as a regular Go module dependency.
 
 ## Security

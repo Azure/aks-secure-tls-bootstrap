@@ -20,17 +20,18 @@ import (
 )
 
 type CertTemplate struct {
-	CommonName   string
-	Organization string
-	IsCA         bool
-	Expiration   time.Time
+	CommonName         string
+	Organization       string
+	ExtraOrganizations []string
+	IsCA               bool
+	Expiration         time.Time
 }
 
 func (t CertTemplate) getX509Template() x509.Certificate {
 	return x509.Certificate{
 		Subject: pkix.Name{
 			CommonName:   t.CommonName,
-			Organization: []string{t.Organization},
+			Organization: append([]string{t.Organization}, t.ExtraOrganizations...),
 		},
 		IsCA:     t.IsCA,
 		NotAfter: t.Expiration,
