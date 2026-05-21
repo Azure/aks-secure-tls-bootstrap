@@ -121,7 +121,7 @@ func validateClientConfig(clientConfig *restclient.Config) error {
 	now := time.Now()
 	for _, cert := range certs {
 		if err := validateClientCertificate(cert, now); err != nil {
-			return fmt.Errorf("validting existing kubelet client certificate referenced by kubeconfig: %w", err)
+			return fmt.Errorf("validating existing kubelet client certificate referenced by kubeconfig: %w", err)
 		}
 	}
 	return nil

@@ -72,13 +72,13 @@ func TestValidateKubeconfig(t *testing.T) {
 	assert.NoError(t, err)
 
 	cases := []struct {
-		name         string
-		setupFunc    func(v *validator)
-		expectedErrs []string
+		name             string
+		prepareValidator func(v *validator)
+		expectedErrs     []string
 	}{
 		{
 			name: "kubeconfig is valid",
-			setupFunc: func(v *validator) {
+			prepareValidator: func(v *validator) {
 				v.clientConfigLoader = func(kubeconfigPath string) (*restclient.Config, error) {
 					return &restclient.Config{
 						Host: "https://controlplane.azmk8s.io",
@@ -93,7 +93,7 @@ func TestValidateKubeconfig(t *testing.T) {
 		},
 		{
 			name: "the REST config cannot be loaded from the specified kubeconfig",
-			setupFunc: func(v *validator) {
+			prepareValidator: func(v *validator) {
 				v.clientConfigLoader = func(kubeconfigPath string) (*restclient.Config, error) {
 					return nil, fmt.Errorf("unable to load kubeconfig")
 				}
@@ -105,7 +105,7 @@ func TestValidateKubeconfig(t *testing.T) {
 		},
 		{
 			name: "cert data is empty",
-			setupFunc: func(v *validator) {
+			prepareValidator: func(v *validator) {
 				v.clientConfigLoader = func(kubeconfigPath string) (*restclient.Config, error) {
 					return &restclient.Config{}, nil
 				}
@@ -117,7 +117,7 @@ func TestValidateKubeconfig(t *testing.T) {
 		},
 		{
 			name: "specified private key is not compatible with specified certificate",
-			setupFunc: func(v *validator) {
+			prepareValidator: func(v *validator) {
 				v.clientConfigLoader = func(kubeconfigPath string) (*restclient.Config, error) {
 					return &restclient.Config{
 						Host: "https://controlplane.azmk8s.io",
@@ -134,7 +134,7 @@ func TestValidateKubeconfig(t *testing.T) {
 		},
 		{
 			name: "certificate has expired",
-			setupFunc: func(v *validator) {
+			prepareValidator: func(v *validator) {
 				v.clientConfigLoader = func(kubeconfigPath string) (*restclient.Config, error) {
 					return &restclient.Config{
 						Host: "https://controlplane.azmk8s.io",
@@ -151,7 +151,7 @@ func TestValidateKubeconfig(t *testing.T) {
 		},
 		{
 			name: "certificate subject common name is not prefixed with system:node:",
-			setupFunc: func(v *validator) {
+			prepareValidator: func(v *validator) {
 				v.clientConfigLoader = func(kubeconfigPath string) (*restclient.Config, error) {
 					return &restclient.Config{
 						Host: "https://controlplane.azmk8s.io",
@@ -168,7 +168,7 @@ func TestValidateKubeconfig(t *testing.T) {
 		},
 		{
 			name: "certificate subject organization is not system:nodes",
-			setupFunc: func(v *validator) {
+			prepareValidator: func(v *validator) {
 				v.clientConfigLoader = func(kubeconfigPath string) (*restclient.Config, error) {
 					return &restclient.Config{
 						Host: "https://controlplane.azmk8s.io",
@@ -185,7 +185,7 @@ func TestValidateKubeconfig(t *testing.T) {
 		},
 		{
 			name: "certificate subject has more than one organization",
-			setupFunc: func(v *validator) {
+			prepareValidator: func(v *validator) {
 				v.clientConfigLoader = func(kubeconfigPath string) (*restclient.Config, error) {
 					return &restclient.Config{
 						Host: "https://controlplane.azmk8s.io",
@@ -205,8 +205,11 @@ func TestValidateKubeconfig(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			ctx := log.NewTestContext()
+
 			v := new(validator)
-			c.setupFunc(v)
+			if c.prepareValidator != nil {
+				c.prepareValidator(v)
+			}
 
 			err := v.Validate(ctx, "path", false)
 			if len(c.expectedErrs) > 0 {
