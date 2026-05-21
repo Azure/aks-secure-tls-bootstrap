@@ -46,7 +46,7 @@ func configureRetryableHTTPBackoff(client *retryablehttp.Client) {
 	client.RetryMax = 15
 }
 
-// provides a wrapper around retryablehttp.LinearJitterBackoff whicih bounds the returned wait time with maxWait,
+// provides a wrapper around retryablehttp.LinearJitterBackoff which bounds the returned wait time with maxWait,
 // ensuring that wait times between individual retries will never exceed maxWait.
 func boundedLinearJitterBackoff(maxWait time.Duration) retryablehttp.Backoff {
 	return func(minForJitter, maxForJitter time.Duration, attemptNum int, resp *http.Response) time.Duration {
