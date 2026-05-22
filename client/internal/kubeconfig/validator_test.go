@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/consts"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/log"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/testutil"
 	"github.com/stretchr/testify/assert"
@@ -32,16 +33,38 @@ func TestNewValidator(t *testing.T) {
 
 func TestValidateKubeconfig(t *testing.T) {
 	validCertPEM, validKeyPEM, err := testutil.GenerateCertPEM(testutil.CertTemplate{
-		CommonName:   "cn",
-		Organization: "org",
+		CommonName:   consts.SystemNodeSubjectNamePrefix + "node",
+		Organization: consts.SystemNodesSubjectOrganizationName,
 		Expiration:   time.Now().Add(time.Hour),
 	})
 	assert.NoError(t, err)
 
 	expiredCertPEM, expiredKeyPEM, err := testutil.GenerateCertPEM(testutil.CertTemplate{
-		CommonName:   "cn",
-		Organization: "org",
+		CommonName:   consts.SystemNodeSubjectNamePrefix + "node",
+		Organization: consts.SystemNodesSubjectOrganizationName,
 		Expiration:   time.Now().Add(-1 * time.Hour),
+	})
+	assert.NoError(t, err)
+
+	wrongCommonNameCertPEM, wrongCommonNameKeyPEM, err := testutil.GenerateCertPEM(testutil.CertTemplate{
+		CommonName:   "not-a-node",
+		Organization: consts.SystemNodesSubjectOrganizationName,
+		Expiration:   time.Now().Add(time.Hour),
+	})
+	assert.NoError(t, err)
+
+	wrongOrganizationCertPEM, wrongOrganizationKeyPEM, err := testutil.GenerateCertPEM(testutil.CertTemplate{
+		CommonName:   consts.SystemNodeSubjectNamePrefix + "node",
+		Organization: "not-system-nodes",
+		Expiration:   time.Now().Add(time.Hour),
+	})
+	assert.NoError(t, err)
+
+	multipleOrganizationsCertPEM, multipleOrganizationsKeyPEM, err := testutil.GenerateCertPEM(testutil.CertTemplate{
+		CommonName:         consts.SystemNodeSubjectNamePrefix + "node",
+		Organization:       consts.SystemNodesSubjectOrganizationName,
+		ExtraOrganizations: []string{"other-org"},
+		Expiration:         time.Now().Add(time.Hour),
 	})
 	assert.NoError(t, err)
 
@@ -49,13 +72,13 @@ func TestValidateKubeconfig(t *testing.T) {
 	assert.NoError(t, err)
 
 	cases := []struct {
-		name         string
-		setupFunc    func(v *validator)
-		expectedErrs []string
+		name             string
+		prepareValidator func(v *validator)
+		expectedErrs     []string
 	}{
 		{
 			name: "kubeconfig is valid",
-			setupFunc: func(v *validator) {
+			prepareValidator: func(v *validator) {
 				v.clientConfigLoader = func(kubeconfigPath string) (*restclient.Config, error) {
 					return &restclient.Config{
 						Host: "https://controlplane.azmk8s.io",
@@ -70,7 +93,7 @@ func TestValidateKubeconfig(t *testing.T) {
 		},
 		{
 			name: "the REST config cannot be loaded from the specified kubeconfig",
-			setupFunc: func(v *validator) {
+			prepareValidator: func(v *validator) {
 				v.clientConfigLoader = func(kubeconfigPath string) (*restclient.Config, error) {
 					return nil, fmt.Errorf("unable to load kubeconfig")
 				}
@@ -82,7 +105,7 @@ func TestValidateKubeconfig(t *testing.T) {
 		},
 		{
 			name: "cert data is empty",
-			setupFunc: func(v *validator) {
+			prepareValidator: func(v *validator) {
 				v.clientConfigLoader = func(kubeconfigPath string) (*restclient.Config, error) {
 					return &restclient.Config{}, nil
 				}
@@ -94,7 +117,7 @@ func TestValidateKubeconfig(t *testing.T) {
 		},
 		{
 			name: "specified private key is not compatible with specified certificate",
-			setupFunc: func(v *validator) {
+			prepareValidator: func(v *validator) {
 				v.clientConfigLoader = func(kubeconfigPath string) (*restclient.Config, error) {
 					return &restclient.Config{
 						Host: "https://controlplane.azmk8s.io",
@@ -111,7 +134,7 @@ func TestValidateKubeconfig(t *testing.T) {
 		},
 		{
 			name: "certificate has expired",
-			setupFunc: func(v *validator) {
+			prepareValidator: func(v *validator) {
 				v.clientConfigLoader = func(kubeconfigPath string) (*restclient.Config, error) {
 					return &restclient.Config{
 						Host: "https://controlplane.azmk8s.io",
@@ -126,13 +149,67 @@ func TestValidateKubeconfig(t *testing.T) {
 				"some part of the existing kubeconfig certificate has expired",
 			},
 		},
+		{
+			name: "certificate subject common name is not prefixed with system:node:",
+			prepareValidator: func(v *validator) {
+				v.clientConfigLoader = func(kubeconfigPath string) (*restclient.Config, error) {
+					return &restclient.Config{
+						Host: "https://controlplane.azmk8s.io",
+						TLSClientConfig: restclient.TLSClientConfig{
+							CertData: wrongCommonNameCertPEM,
+							KeyData:  wrongCommonNameKeyPEM,
+						},
+					}, nil
+				}
+			},
+			expectedErrs: []string{
+				`existing kubeconfig certificate subject name should be prefixed with "system:node:"`,
+			},
+		},
+		{
+			name: "certificate subject organization is not system:nodes",
+			prepareValidator: func(v *validator) {
+				v.clientConfigLoader = func(kubeconfigPath string) (*restclient.Config, error) {
+					return &restclient.Config{
+						Host: "https://controlplane.azmk8s.io",
+						TLSClientConfig: restclient.TLSClientConfig{
+							CertData: wrongOrganizationCertPEM,
+							KeyData:  wrongOrganizationKeyPEM,
+						},
+					}, nil
+				}
+			},
+			expectedErrs: []string{
+				`existing kubeconfig certficate subject organization is not "system:nodes"`,
+			},
+		},
+		{
+			name: "certificate subject has more than one organization",
+			prepareValidator: func(v *validator) {
+				v.clientConfigLoader = func(kubeconfigPath string) (*restclient.Config, error) {
+					return &restclient.Config{
+						Host: "https://controlplane.azmk8s.io",
+						TLSClientConfig: restclient.TLSClientConfig{
+							CertData: multipleOrganizationsCertPEM,
+							KeyData:  multipleOrganizationsKeyPEM,
+						},
+					}, nil
+				}
+			},
+			expectedErrs: []string{
+				`existing kubeconfig certificate subject has more than one organization, expected singular "system:nodes" organization`,
+			},
+		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			ctx := log.NewTestContext()
+
 			v := new(validator)
-			c.setupFunc(v)
+			if c.prepareValidator != nil {
+				c.prepareValidator(v)
+			}
 
 			err := v.Validate(ctx, "path", false)
 			if len(c.expectedErrs) > 0 {
@@ -199,8 +276,8 @@ func TestEnsureAuthorizedClient(t *testing.T) {
 	}
 
 	validCertPEM, validKeyPEM, err := testutil.GenerateCertPEM(testutil.CertTemplate{
-		CommonName:   "cn",
-		Organization: "org",
+		CommonName:   consts.SystemNodeSubjectNamePrefix + "node",
+		Organization: consts.SystemNodesSubjectOrganizationName,
 		Expiration:   time.Now().Add(time.Hour),
 	})
 	assert.NoError(t, err)

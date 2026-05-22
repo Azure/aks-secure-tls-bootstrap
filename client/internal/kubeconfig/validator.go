@@ -5,11 +5,15 @@ package kubeconfig
 
 import (
 	"context"
+	"crypto/subtle"
+	"crypto/x509"
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/consts"
 	internalhttp "github.com/Azure/aks-secure-tls-bootstrap/client/internal/http"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/log"
 	"github.com/hashicorp/go-retryablehttp"
@@ -116,9 +120,25 @@ func validateClientConfig(clientConfig *restclient.Config) error {
 	}
 	now := time.Now()
 	for _, cert := range certs {
-		if now.After(cert.NotAfter) {
-			return fmt.Errorf("some part of the existing kubeconfig certificate has expired")
+		if err := validateClientCertificate(cert, now); err != nil {
+			return fmt.Errorf("validating existing kubelet client certificate referenced by kubeconfig: %w", err)
 		}
+	}
+	return nil
+}
+
+func validateClientCertificate(cert *x509.Certificate, now time.Time) error {
+	if now.After(cert.NotAfter) {
+		return fmt.Errorf("some part of the existing kubeconfig certificate has expired")
+	}
+	if !strings.HasPrefix(cert.Subject.CommonName, consts.SystemNodeSubjectNamePrefix) {
+		return fmt.Errorf("existing kubeconfig certificate subject name should be prefixed with %q, but was not: %s", consts.SystemNodeSubjectNamePrefix, cert.Subject.CommonName)
+	}
+	if len(cert.Subject.Organization) != 1 {
+		return fmt.Errorf("existing kubeconfig certificate subject has more than one organization, expected singular %q organization", consts.SystemNodesSubjectOrganizationName)
+	}
+	if subtle.ConstantTimeCompare([]byte(cert.Subject.Organization[0]), []byte(consts.SystemNodesSubjectOrganizationName)) == 0 {
+		return fmt.Errorf("existing kubeconfig certficate subject organization is not %q", consts.SystemNodesSubjectOrganizationName)
 	}
 	return nil
 }

@@ -15,6 +15,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/consts"
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/log"
 	"go.uber.org/zap"
 )
@@ -36,8 +37,8 @@ func makeKubeletClientCSR(ctx context.Context) (csrPEM, keyPEM []byte, err error
 
 	template := x509.CertificateRequest{
 		Subject: pkix.Name{
-			Organization: []string{"system:nodes"},
-			CommonName:   fmt.Sprintf("system:node:%s", hostname),
+			Organization: []string{consts.SystemNodesSubjectOrganizationName},
+			CommonName:   consts.SystemNodeSubjectNamePrefix + hostname,
 		},
 		SignatureAlgorithm: x509.ECDSAWithSHA256,
 	}
