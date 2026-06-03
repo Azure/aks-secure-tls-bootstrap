@@ -143,12 +143,10 @@ func (c *client) bootstrap(ctx context.Context, config *Config) (*api.Config, er
 }
 
 func (c *client) validateKubeconfig(ctx context.Context, config *Config) error {
-	validateKubeconfigDeadline, cancel := context.WithTimeout(ctx, config.ValidateKubeconfigTimeout)
-	defer cancel()
 	endSpan := telemetry.StartSpan(ctx, "ValidateKubeconfig")
 	defer endSpan()
 
-	return c.kubeconfigValidator.Validate(validateKubeconfigDeadline, config.KubeconfigPath, config.EnsureAuthorizedClient)
+	return c.kubeconfigValidator.Validate(ctx, config.KubeconfigPath, config.EnsureAuthorizedClient, config.ValidateKubeconfigTimeout)
 }
 
 func (c *client) getAccessToken(ctx context.Context, config *Config) (string, error) {
@@ -172,7 +170,6 @@ func (c *client) getServiceClient(ctx context.Context, token string, cfg *Config
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create bootstrap service client: %w", err)
 	}
-
 	return serviceClient, closer, nil
 }
 

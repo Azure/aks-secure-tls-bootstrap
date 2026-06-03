@@ -37,7 +37,7 @@ type clientsetLoaderFunc func(clientConfig *restclient.Config) (kubernetes.Inter
 //go:generate ../../bin/mockgen -copyright_file=../../../hack/copyright_header.txt -destination=./mocks/mock_validator.go -package=mocks github.com/Azure/aks-secure-tls-bootstrap/client/internal/kubeconfig Validator
 
 type Validator interface {
-	Validate(ctx context.Context, kubeconfigPath string, ensureAuthorizedClient bool) error
+	Validate(ctx context.Context, kubeconfigPath string, ensureAuthorizedClient bool, timeout time.Duration) error
 }
 
 type validator struct {
@@ -73,7 +73,7 @@ func NewValidator() Validator {
 	}
 }
 
-func (v *validator) Validate(ctx context.Context, kubeconfigPath string, ensureAuthorizedClient bool) error {
+func (v *validator) Validate(ctx context.Context, kubeconfigPath string, ensureAuthorizedClient bool, timeout time.Duration) error {
 	clientConfig, err := v.clientConfigLoader(kubeconfigPath)
 	if err != nil {
 		return fmt.Errorf("failed to create REST client config from kubeconfig: %w", err)
@@ -84,12 +84,7 @@ func (v *validator) Validate(ctx context.Context, kubeconfigPath string, ensureA
 	if !ensureAuthorizedClient {
 		return nil
 	}
-	restclient.AddUserAgent(clientConfig, internalhttp.GetUserAgent())
-	clientConfig.Wrap(func(rt http.RoundTripper) http.RoundTripper {
-		c := internalhttp.NewRetryableClient(ctx)
-		c.HTTPClient = &http.Client{Transport: rt}
-		return &retryablehttp.RoundTripper{Client: c}
-	})
+	prepareClientConfigForAuthorizationCheck(ctx, clientConfig, timeout)
 	clientset, err := v.clientsetLoader(clientConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create clientset from REST client config: %w", err)
@@ -141,6 +136,16 @@ func validateClientCertificate(cert *x509.Certificate, now time.Time) error {
 		return fmt.Errorf("existing kubeconfig certficate subject organization is not %q", consts.SystemNodesSubjectOrganizationName)
 	}
 	return nil
+}
+
+func prepareClientConfigForAuthorizationCheck(ctx context.Context, config *restclient.Config, timeout time.Duration) {
+	config.Timeout = timeout
+	restclient.AddUserAgent(config, internalhttp.GetUserAgent())
+	config.Wrap(func(rt http.RoundTripper) http.RoundTripper {
+		c := internalhttp.NewRetryableClient(ctx)
+		c.HTTPClient = &http.Client{Transport: rt}
+		return &retryablehttp.RoundTripper{Client: c}
+	})
 }
 
 // ensureAuthorized ensures that the provided clientset is authorized by making a call to get the apiserver's version.

@@ -211,7 +211,7 @@ func TestValidateKubeconfig(t *testing.T) {
 				c.prepareValidator(v)
 			}
 
-			err := v.Validate(ctx, "path", false)
+			err := v.Validate(ctx, "path", false, 100*time.Millisecond)
 			if len(c.expectedErrs) > 0 {
 				assert.Error(t, err)
 				for _, expectedErr := range c.expectedErrs {
@@ -299,11 +299,12 @@ func TestEnsureAuthorizedClient(t *testing.T) {
 			}
 
 			v.clientsetLoader = func(clientConfig *restclient.Config) (kubernetes.Interface, error) {
+				assert.Equal(t, 100*time.Millisecond, clientConfig.Timeout, "timeout should be explicitly set on client config")
 				return clientset, nil
 			}
 
 			c.setupFunc(v, clientset)
-			err := v.Validate(ctx, "path", true)
+			err := v.Validate(ctx, "path", true, 100*time.Millisecond)
 
 			if len(c.expectedErrs) > 0 {
 				assert.Error(t, err)

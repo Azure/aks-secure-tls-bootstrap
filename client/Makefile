@@ -37,7 +37,7 @@ generate: mockgen
 	go generate ./...
 
 mockgen:
-	$(call go-install-tool,$(PROJECT_DIR)/bin/mockgen,go.uber.org/mock/mockgen@v0.5.0)
+	$(call go-install-tool,$(PROJECT_DIR)/bin/mockgen,go.uber.org/mock/mockgen@v0.6.0)
 
 ##@ Build
 
