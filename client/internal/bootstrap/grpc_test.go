@@ -234,3 +234,47 @@ func TestWithLastGRPCRetryErrorIfDeadlineExceeded(t *testing.T) {
 		})
 	}
 }
+
+// TestGetDialParams covers the IP-vs-FQDN dial target selection added for
+// AB#38327357 — when APIServerIP is set we must use the gRPC passthrough
+// resolver so the built-in dns:/// resolver is never invoked.
+func TestGetDialParams(t *testing.T) {
+	cases := []struct {
+		name            string
+		cfg             *Config
+		expectTarget    string
+		expectExtraOpts int
+	}{
+		{
+			name:            "fqdn only — historical dial preserved",
+			cfg:             &Config{APIServerFQDN: "my-aks.hcp.eastus.azmk8s.io"},
+			expectTarget:    "my-aks.hcp.eastus.azmk8s.io:443",
+			expectExtraOpts: 0,
+		},
+		{
+			name: "ipv4 set — passthrough target plus WithAuthority",
+			cfg: &Config{
+				APIServerFQDN: "my-aks.hcp.eastus.azmk8s.io",
+				APIServerIP:   "10.0.0.1",
+			},
+			expectTarget:    "passthrough:///10.0.0.1:443",
+			expectExtraOpts: 1,
+		},
+		{
+			name: "ipv6 set — bracketed host:port",
+			cfg: &Config{
+				APIServerFQDN: "my-aks.hcp.eastus.azmk8s.io",
+				APIServerIP:   "2001:db8::1",
+			},
+			expectTarget:    "passthrough:///[2001:db8::1]:443",
+			expectExtraOpts: 1,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			target, extraOpts := getDialParams(c.cfg)
+			assert.Equal(t, c.expectTarget, target)
+			assert.Len(t, extraOpts, c.expectExtraOpts)
+		})
+	}
+}

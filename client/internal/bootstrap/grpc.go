@@ -9,6 +9,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"math"
+	"net"
 	"os"
 	"time"
 
@@ -36,6 +37,24 @@ type closeFunc func() error
 // getServiceClientFunc returns a new SecureTLSBootstrapServiceClient over a gRPC connection, fake implementations given in unit tests.
 type getServiceClientFunc func(token string, cfg *Config) (v1.SecureTLSBootstrapServiceClient, closeFunc, error)
 
+// getDialParams returns the gRPC NewClient target string and any extra dial
+// options needed for that target. When APIServerIP is set, it is treated as an
+// IPv4/IPv6 literal (already validated in Config.applyDefaults) and used with
+// the passthrough resolver so gRPC never invokes the built-in dns:/// resolver.
+// In that case we also pass WithAuthority so the gRPC :authority header still
+// carries the apiserver FQDN — TLS SAN validation continues to match the FQDN
+// via tlsConfig.ServerName (set by the caller). See AB#38327357.
+//
+// When APIServerIP is empty, this preserves the historical FQDN-only dial.
+func getDialParams(cfg *Config) (target string, extraOpts []grpc.DialOption) {
+	if cfg.APIServerIP != "" {
+		hostPort := net.JoinHostPort(cfg.APIServerIP, "443")
+		authority := net.JoinHostPort(cfg.APIServerFQDN, "443")
+		return "passthrough:///" + hostPort, []grpc.DialOption{grpc.WithAuthority(authority)}
+	}
+	return fmt.Sprintf("%s:443", cfg.APIServerFQDN), nil
+}
+
 func getServiceClient(token string, cfg *Config) (v1.SecureTLSBootstrapServiceClient, closeFunc, error) {
 	clusterCAData, err := os.ReadFile(cfg.ClusterCAFilePath)
 	if err != nil {
@@ -46,6 +65,12 @@ func getServiceClient(token string, cfg *Config) (v1.SecureTLSBootstrapServiceCl
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get TLS config: %w", err)
 	}
+	// When dialing by IP (APISERVER_IP set), force TLS SAN validation against
+	// the apiserver FQDN, not the IP literal. The apiserver cert does not list
+	// the IP as a SAN.
+	if cfg.APIServerIP != "" {
+		tlsConfig.ServerName = cfg.APIServerFQDN
+	}
 
 	// override max delay to 3s (default is 120s) - this ensures the gRPC subchannel
 	// re-attempts a real TCP+TLS connection at least every 3s, which aligns with
@@ -55,8 +80,8 @@ func getServiceClient(token string, cfg *Config) (v1.SecureTLSBootstrapServiceCl
 	grpcConnectionBackoffConfig := backoff.DefaultConfig
 	grpcConnectionBackoffConfig.MaxDelay = 3 * time.Second
 
-	conn, err := grpc.NewClient(
-		fmt.Sprintf("%s:443", cfg.APIServerFQDN),
+	dialTarget, extraDialOpts := getDialParams(cfg)
+	dialOpts := []grpc.DialOption{
 		grpc.WithUserAgent(internalhttp.GetUserAgent()),
 		grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)),
 		grpc.WithPerRPCCredentials(oauth.TokenSource{
@@ -85,7 +110,10 @@ func getServiceClient(token string, cfg *Config) (v1.SecureTLSBootstrapServiceCl
 		// enough to have the client bypass any proxies when communicating with the cluster's apiserver.
 		// see: https://github.com/grpc/grpc-go/issues/3401 for more details.
 		grpc.WithNoProxy(),
-	)
+	}
+	dialOpts = append(dialOpts, extraDialOpts...)
+
+	conn, err := grpc.NewClient(dialTarget, dialOpts...)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to dial client connection with context: %w", err)
 	}

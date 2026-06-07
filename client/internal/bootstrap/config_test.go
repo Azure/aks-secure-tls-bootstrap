@@ -304,6 +304,7 @@ func TestToZapFields(t *testing.T) {
 	config := &Config{
 		CloudProviderConfigPath:   "path/to/azure.json",
 		APIServerFQDN:             "fqdn",
+		APIServerIP:               "10.0.0.1",
 		UserAssignedIdentityID:    "clientId",
 		NextProto:                 "alpn",
 		AADResource:               "appID",
@@ -323,6 +324,7 @@ func TestToZapFields(t *testing.T) {
 	expectedFields := []zap.Field{
 		zap.String("cloudProviderConfigPath", "path/to/azure.json"),
 		zap.String("apiServerFqdn", "fqdn"),
+		zap.String("apiServerIp", "10.0.0.1"),
 		zap.String("userAssignedIdentityId", "clientId"),
 		zap.String("nextProto", "alpn"),
 		zap.String("aadResource", "appID"),
@@ -341,3 +343,78 @@ func TestToZapFields(t *testing.T) {
 	}
 	assert.Equal(t, expectedFields, config.ToZapFields())
 }
+
+// TestApplyDefaultsAPIServerIP verifies the APISERVER_IP fallback path added
+// for AB#38327357.
+func TestApplyDefaultsAPIServerIP(t *testing.T) {
+	cases := []struct {
+		name      string
+		envValue  string
+		preset    string
+		expectIP  string
+		setEnvVar bool
+	}{
+		{
+			name:      "env var ipv4 picked up when field empty",
+			envValue:  "10.0.0.1",
+			preset:    "",
+			expectIP:  "10.0.0.1",
+			setEnvVar: true,
+		},
+		{
+			name:      "env var ipv6 picked up when field empty",
+			envValue:  "2001:db8::1",
+			preset:    "",
+			expectIP:  "2001:db8::1",
+			setEnvVar: true,
+		},
+		{
+			name:      "json field takes precedence over env var",
+			envValue:  "10.0.0.99",
+			preset:    "10.0.0.1",
+			expectIP:  "10.0.0.1",
+			setEnvVar: true,
+		},
+		{
+			name:      "invalid env var literal cleared silently",
+			envValue:  "not-an-ip",
+			preset:    "",
+			expectIP:  "",
+			setEnvVar: true,
+		},
+		{
+			name:      "invalid json field cleared silently",
+			envValue:  "",
+			preset:    "256.300.0.1",
+			expectIP:  "",
+			setEnvVar: false,
+		},
+		{
+			name:      "no env var, no preset leaves empty",
+			envValue:  "",
+			preset:    "",
+			expectIP:  "",
+			setEnvVar: false,
+		},
+		{
+			name:      "ipv4 in brackets is rejected (not a literal)",
+			envValue:  "[10.0.0.1]",
+			preset:    "",
+			expectIP:  "",
+			setEnvVar: true,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if c.setEnvVar {
+				t.Setenv(apiServerIPEnvVar, c.envValue)
+			} else {
+				t.Setenv(apiServerIPEnvVar, "")
+			}
+			cfg := &Config{APIServerIP: c.preset}
+			cfg.applyDefaults()
+			assert.Equal(t, c.expectIP, cfg.APIServerIP)
+		})
+	}
+}
+

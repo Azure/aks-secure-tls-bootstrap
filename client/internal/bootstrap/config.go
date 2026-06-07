@@ -6,12 +6,21 @@ package bootstrap
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"os"
 	"time"
 
 	"github.com/Azure/aks-secure-tls-bootstrap/client/internal/cloud"
 	"go.uber.org/zap"
 )
+
+// apiServerIPEnvVar is the name of the environment variable the AgentBaker CSE
+// scripts (parts/linux/cloud-init/artifacts/cse_config.sh) drop into
+// /etc/default/secure-tls-bootstrap with the pre-resolved apiserver IP. When
+// set, the gRPC client dials this IP literal directly and never invokes the
+// built-in dns:/// resolver, which avoids infinite "produced zero addresses"
+// retries when node DNS is unhealthy at bootstrap time.
+const apiServerIPEnvVar = "APISERVER_IP"
 
 const (
 	defaultTLSMinVersion             = "1.3"
@@ -27,6 +36,12 @@ type Config struct {
 	CloudProviderConfig       *cloud.ProviderConfig
 	CloudProviderConfigPath   string        `json:"cloudProviderConfigPath"`
 	APIServerFQDN             string        `json:"apiServerFqdn"`
+	// APIServerIP, when non-empty, must be a valid IPv4 or IPv6 literal. It is
+	// populated either via the json config file or, by default, by reading the
+	// APISERVER_IP environment variable in applyDefaults. When set, the gRPC
+	// client dials this IP directly via the passthrough resolver and skips
+	// DNS resolution entirely. See AB#38327357.
+	APIServerIP               string        `json:"apiServerIp"`
 	UserAssignedIdentityID    string        `json:"userAssignedIdentityId"`
 	NextProto                 string        `json:"nextProto"`
 	AADResource               string        `json:"aadResource"`
@@ -67,6 +82,7 @@ func (c *Config) ToZapFields() []zap.Field {
 	return []zap.Field{
 		zap.String("cloudProviderConfigPath", c.CloudProviderConfigPath),
 		zap.String("apiServerFqdn", c.APIServerFQDN),
+		zap.String("apiServerIp", c.APIServerIP),
 		zap.String("userAssignedIdentityId", c.UserAssignedIdentityID),
 		zap.String("nextProto", c.NextProto),
 		zap.String("aadResource", c.AADResource),
@@ -86,6 +102,18 @@ func (c *Config) ToZapFields() []zap.Field {
 }
 
 func (c *Config) applyDefaults() {
+	// If no APIServerIP was supplied through the json config, fall back to the
+	// APISERVER_IP environment variable. Reject anything that does not parse
+	// as a valid IPv4 or IPv6 literal — the gRPC client treats this field as
+	// optional, so silently clearing on bad input is preferable to failing
+	// the whole bootstrap. The downstream consumer then falls back to dialing
+	// by FQDN, which preserves the pre-AB#38327357 behavior.
+	if c.APIServerIP == "" {
+		c.APIServerIP = os.Getenv(apiServerIPEnvVar)
+	}
+	if c.APIServerIP != "" && net.ParseIP(c.APIServerIP) == nil {
+		c.APIServerIP = ""
+	}
 	if c.TLSMinVersion == "" {
 		c.TLSMinVersion = defaultTLSMinVersion
 	}
