@@ -17,7 +17,7 @@ require (
 	google.golang.org/grpc v1.83.0
 	k8s.io/apimachinery v0.36.1
 	k8s.io/client-go v0.36.1
-	software.sslmate.com/src/go-pkcs12 v0.7.1
+	software.sslmate.com/src/go-pkcs12 v0.7.2
 )
 
 require (
