@@ -76,7 +76,7 @@ stages:
     - bash: /bin/bash .pipelines/client/scripts/generate-github-token.sh
       env:
         PRIVATE_KEY: $(aks-node-assistant-private-key)
-        APP_ID: $(aks-node-assistant-app-id)
+        CLIENT_ID: $(aks-node-assistant-client-id)
       displayName: Generate GitHub token
 
     - bash: /bin/bash .pipelines/client/scripts/github-publish.sh

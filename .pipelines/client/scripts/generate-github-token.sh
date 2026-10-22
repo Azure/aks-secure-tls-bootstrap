@@ -2,7 +2,7 @@
 set -euo pipefail
 
 [ -z "${PRIVATE_KEY:-}" ] && echo "PRIVATE_KEY must be set" && exit 1
-[ -z "${APP_ID:-}" ] && echo "APP_ID must be set" && exit 1
+[ -z "${CLIENT_ID:-}" ] && echo "CLIENT_ID must be set" && exit 1
 
 REPO_OWNER="Azure"
 REPO_NAME="aks-secure-tls-bootstrap"
@@ -23,7 +23,7 @@ header=$(echo -n "${header_json}" | b64enc)
 payload_json="{
     \"iat\":${iat},
     \"exp\":${exp},
-    \"iss\":\"${APP_ID}\"
+    \"iss\":\"${CLIENT_ID}\"
 }"
 # encode the JWT payload
 payload=$(echo -n "${payload_json}" | b64enc)
