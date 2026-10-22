@@ -25,7 +25,7 @@ setup_pmc
 sudo apt-get -y install make
 
 # install msft-golang
-sudo apt-get -y install msft-golang
+sudo apt-get -y install 'msft-golang=1.26.10-*'
 
 # make sure go is accessible from the command line
 go version
