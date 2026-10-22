@@ -1,6 +1,6 @@
 module github.com/Azure/aks-secure-tls-bootstrap/client
 
-go 1.26.3
+go 1.26.10
 
 require (
 	github.com/Azure/aks-secure-tls-bootstrap/service v1.0.2
@@ -17,7 +17,7 @@ require (
 	google.golang.org/grpc v1.81.1
 	k8s.io/apimachinery v0.36.1
 	k8s.io/client-go v0.36.1
-	software.sslmate.com/src/go-pkcs12 v0.7.1
+	software.sslmate.com/src/go-pkcs12 v0.7.2
 )
 
 require (
