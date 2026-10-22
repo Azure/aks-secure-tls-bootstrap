@@ -2,9 +2,9 @@
 set -euo pipefail
 
 [ -z "${PRIVATE_KEY:-}" ] && echo "PRIVATE_KEY must be set" && exit 1
-[ -z "${CLIENT_ID:-}" ] && echo "CLIENT_ID must be set" && exit 1
-[ -z "${INSTALLATION_ID:-}" ] && echo "INSTALLATION_ID must be set" && exit 1
+[ -z "${APP_ID:-}" ] && echo "APP_ID must be set" && exit 1
 
+REPO_OWNER="Azure"
 REPO_NAME="aks-secure-tls-bootstrap"
 
 now=$(date +%s)
@@ -23,7 +23,7 @@ header=$(echo -n "${header_json}" | b64enc)
 payload_json="{
     \"iat\":${iat},
     \"exp\":${exp},
-    \"iss\":\"${CLIENT_ID}\"
+    \"iss\":\"${APP_ID}\"
 }"
 # encode the JWT payload
 payload=$(echo -n "${payload_json}" | b64enc)
@@ -38,18 +38,30 @@ signature=$(
 # create the JWT
 jwt="${header_payload}"."${signature}"
 
+# get the app installation for the repository
+installation_response=$(curl --fail-with-body -sSL \
+    -H "Accept: application/vnd.github+json" \
+    -H "Authorization: Bearer ${jwt}" \
+    -H "X-GitHub-Api-Version: 2022-11-28" \
+    "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/installation")
+
+if ! INSTALLATION_ID=$(echo "${installation_response}" | jq -er '.id | select(type == "number")'); then
+    echo "unable to find app installation for repository: ${REPO_OWNER}/${REPO_NAME}" >&2
+    exit 1
+fi
+
 # get the installation token
-response=$(curl -X POST -L \
+response=$(curl --fail-with-body -sSL -X POST \
     -H "Accept: application/vnd.github+json" \
     -H "Authorization: Bearer $jwt" \
     -H "X-GitHub-Api-Version: 2022-11-28" \
     -d "{\"repositories\":[\"$REPO_NAME\"]}" \
     "https://api.github.com/app/installations/${INSTALLATION_ID}/access_tokens")
 
-token="$(echo $response | jq -r '.token')"
+token="$(echo "${response}" | jq -r '.token')"
 if [ -z "$token" ] || [ "$token" == "null" ]; then
     echo "unable to generate installation access token for repository: $REPO_NAME"
-    echo "unable to extract token from GitHub resposne"
+    echo "unable to extract token from GitHub response"
     exit 1
 fi
 
