@@ -1,6 +1,6 @@
 module github.com/Azure/aks-secure-tls-bootstrap/service
 
-go 1.25.0
+go 1.26.10
 
 require (
 	buf.build/gen/go/service-hub/loggable/protocolbuffers/go v1.36.11-20231012175355-a349f6324a7e.1
