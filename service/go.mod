@@ -3,15 +3,15 @@ module github.com/Azure/aks-secure-tls-bootstrap/service
 go 1.26.10
 
 require (
-	buf.build/gen/go/service-hub/loggable/protocolbuffers/go v1.36.5-20231012175355-a349f6324a7e.1
-	go.uber.org/mock v0.5.0
-	google.golang.org/grpc v1.79.3
-	google.golang.org/protobuf v1.36.10
+	buf.build/gen/go/service-hub/loggable/protocolbuffers/go v1.36.11-20231012175355-a349f6324a7e.1
+	go.uber.org/mock v0.6.0
+	google.golang.org/grpc v1.83.2
+	google.golang.org/protobuf v1.36.12
 )
 
 require (
-	golang.org/x/net v0.48.0 // indirect
-	golang.org/x/sys v0.39.0 // indirect
-	golang.org/x/text v0.32.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20251202230838-ff82c1b0f217 // indirect
+	golang.org/x/net v0.58.0 // indirect
+	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/text v0.41.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260810153831-ec0a7760b754 // indirect
 )
